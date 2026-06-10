@@ -77,7 +77,12 @@ Remove: `rm -f ~/.config/omarchy/hooks/post-boot.d/quickshell-rise`
 ## Quickshell setup for Omarchy (Waybar-based, ~3.8.x)
 
 
-https://github.com/user-attachments/assets/e99e49f0-4760-4433-bdb6-e014cac55fe4
+
+
+https://github.com/user-attachments/assets/160ca54f-defb-40de-a0e4-6d2e4139294d
+https://github.com/user-attachments/assets/5e91501e-e12c-4125-be10-caa26678098d
+
+
 
 
 
