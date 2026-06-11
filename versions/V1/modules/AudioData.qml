@@ -20,11 +20,11 @@ Item {
     Process {
         id: proc
         running: false
+        // one pactl call, exact sink match, real active port (the old grep -A80 could
+        // miss the port or bleed into the next sink's block — returned empty on some setups)
         command: ["bash", "-c",
-            "export LC_ALL=C; " +
-            "pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | grep -oP '[0-9]+(?=%)' | head -1; " +
-            "pactl get-sink-mute   @DEFAULT_SINK@ 2>/dev/null | awk '{print $2}'; " +
-            "pactl list sinks 2>/dev/null | grep -A80 \"Name: $(pactl get-default-sink)\" | grep 'Active Port' | awk '{print $NF}'"
+            "export LC_ALL=C; def=$(pactl get-default-sink); " +
+            "pactl -f json list sinks 2>/dev/null | jq -r --arg n \"$def\" '.[]|select(.name==$n)|(.volume|to_entries[0].value.value_percent|rtrimstr(\"%\")),(if .mute then \"yes\" else \"no\" end),(.active_port // \"-\")'"
         ]
         stdout: SplitParser {
             onRead: function(line) { proc.lines.push(line.trim()) }
