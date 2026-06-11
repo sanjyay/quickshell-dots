@@ -439,11 +439,13 @@ PanelWindow {
             }
         }
 
-        // click EMPTY bar area → toggle unlock (sits below widgets/markers)
+        // DOUBLE-click EMPTY bar area → unlock (sits below widgets/markers).
+        // double-click so a stray single click while aiming for Control/Volume can't
+        // accidentally trigger unlock. (lock again via dim backdrop click / ESC.)
         MouseArea {
             anchors.fill: parent
             z: -1
-            onClicked: barSlot.root.barUnlocked = !barSlot.root.barUnlocked
+            onDoubleClicked: barSlot.root.barUnlocked = true
         }
 
         // ── split state (positional, per within-region gap) ──
