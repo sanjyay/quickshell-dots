@@ -94,7 +94,7 @@ PanelWindow {
         border.color: root.sep
         border.width: 1
 
-        x: parent.width - width - 6
+        x: Math.round(Math.max(6, Math.min(root.networkBarX - width / 2, parent.width - width - 6)))
         y: barBottom + gap
         opacity: netPanel.reveal
         focus: root.networkVisible
@@ -299,7 +299,14 @@ PanelWindow {
                                     color: (nma.containsMouse || modelData.conn) ? root.seal : root.ink
                                     font.family: root.mono; font.pixelSize: 11
                                     font.weight: modelData.conn ? Font.Medium : Font.Normal
-                                    width: 170; elide: Text.ElideRight
+                                    width: modelData.conn ? 116 : 170; elide: Text.ElideRight
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                                Text {
+                                    visible: modelData.conn
+                                    text: "· Connected"
+                                    color: root.seal
+                                    font.family: root.mono; font.pixelSize: 9
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
                             }
@@ -390,7 +397,7 @@ PanelWindow {
         }
     }
 
-    Process { id: wifiRunner; command: ["bash", "-c", "omarchy-launch-wifi"] }
+    Process { id: wifiRunner; command: ["bash", "-c", root.launchWifiCmd] }
 
     // detect wifi device presence
     Process {

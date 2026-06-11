@@ -55,12 +55,15 @@ Item {
         return "Offline"
     }
 
-    implicitWidth: row.implicitWidth + 18
+    // hideable via modNetwork — but only on ethernet/none; on WiFi always shown
+    implicitWidth: (root.modNetwork || mode === "wifi") ? (row.implicitWidth + 18) : 0
+    // mirror the connection type so the ControlPanel can gate the Network toggle
+    Binding { target: rootMod.root; property: "networkMode"; value: rootMod.mode }
     implicitHeight: 28
 
     Rectangle {
-        anchors.centerIn: row
-        width: row.implicitWidth + 18
+        x: 0; anchors.verticalCenter: parent.verticalCenter
+        width: Math.round(row.implicitWidth) + 18
         height: 24
         radius: 12
         color: root.pill
@@ -250,7 +253,7 @@ Item {
 
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
 
-    Process { id: clickRunner; command: ["bash", "-c", "omarchy-launch-wifi"] }
+    Process { id: clickRunner; command: ["bash", "-c", root.launchWifiCmd] }
 
     MouseArea {
         anchors.fill: parent

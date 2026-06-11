@@ -30,8 +30,8 @@ Item {
     Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
     Rectangle {
-        anchors.centerIn: row
-        width: row.width + 18
+        x: 0; anchors.verticalCenter: parent.verticalCenter
+        width: Math.round(row.width) + 18
         height: 24
         radius: 12
         color: root.pill
@@ -108,7 +108,7 @@ Item {
 
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
 
-    Process { id: clickRunner; command: ["bash", "-c", "omarchy-launch-bluetooth"] }
+    Process { id: clickRunner; command: ["bash", "-c", root.launchBtCmd] }
 
     MouseArea {
         anchors.fill: parent

@@ -51,7 +51,7 @@ PanelWindow {
         border.color: root.sep
         border.width: 1
 
-        x: parent.width - width - 6
+        x: Math.round(Math.max(6, Math.min(root.bluetoothBarX - width / 2, parent.width - width - 6)))
         y: barBottom + gap
         opacity: btPanel.reveal
         focus: root.bluetoothVisible
@@ -335,7 +335,7 @@ PanelWindow {
         onExited: btPanel.refresh()
     }
 
-    Process { id: btRunner; command: ["bash", "-c", "omarchy-launch-bluetooth"] }
+    Process { id: btRunner; command: ["bash", "-c", root.launchBtCmd] }
 
     onVisibleChanged: { if (visible) btPanel.refresh() }
 }
