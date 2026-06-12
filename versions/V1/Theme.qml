@@ -14,6 +14,7 @@ Item {
     property color inkDeep: "#c8c093"
     property color sumi:    "#a6a69c"
     property color indigo:  "#658594"
+    property color green:   "#8a9a73"   // gate "OK" verdict
     property color sealRaw:    "#c4746e"
     property color accentHint: sealRaw    // filled by palette; default = same as red
     property bool  useThemeAccent: false
@@ -402,6 +403,87 @@ Item {
     property bool archVisible: false
     property var archUpdates: []
     property int archRefreshTick: 0
+
+    // ── Arch security gate (pre-install verdict per package) ──
+    // idle | scanning | clean | warn | blocked | degraded
+    property string archGateState: "idle"
+    property var    archGateResults: []   // [{pkg,repo,old,new,verdict,reason}]
+    property int    archGateOk: 0
+    property int    archGateWarn: 0
+    property int    archGateFail: 0
+    property int    archGateBlacklist: 0
+    property bool   archGateDegraded: false
+
+    Process {
+        id: archGate
+        // Hang on the DATA, not the refresh trigger: archRefreshTick fires the
+        // refresh, but archUpdates is only filled when the refresh finishes — so
+        // watching the tick would scan the PREVIOUS list. Watch archUpdates.
+        property var watched: theme.archUpdates
+        onWatchedChanged: rerun()
+        function rerun() {
+            running = false   // restart even if a previous scan is still running
+            theme.archGateResults = []
+            theme.archGateOk = 0; theme.archGateWarn = 0; theme.archGateFail = 0
+            theme.archGateBlacklist = 0; theme.archGateDegraded = false
+            if (!theme.archUpdates || theme.archUpdates.length === 0) {
+                theme.archGateState = "clean"; return
+            }
+            theme.archGateState = "scanning"
+            running = true
+        }
+        command: ["bash", Quickshell.env("HOME") + "/.local/bin/qs-arch-security-gate.sh"]
+        stdinEnabled: true
+        onStarted: {
+            // Feed "pkg|repo|old|new" — exactly the gate's stdin format.
+            for (var i = 0; i < theme.archUpdates.length; i++) {
+                var u = theme.archUpdates[i]
+                var repo = (u.source === "aur") ? "aur" : "system"
+                write(u.name + "|" + repo + "|" + (u.oldVer || "") + "|" + (u.newVer || "") + "\n")
+            }
+            stdinEnabled = false   // EOF → gate finishes
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var results = [], ok = 0, warn = 0, fail = 0, sawMeta = false
+                var lines = this.text.trim().split("\n")
+                for (var i = 0; i < lines.length; i++) {
+                    var s = lines[i].trim(); if (!s) continue
+                    var o; try { o = JSON.parse(s) } catch (e) { continue }
+                    if (o.meta === "gate") {
+                        sawMeta = true
+                        theme.archGateBlacklist = o.blacklist || 0
+                        if (o.degraded) theme.archGateDegraded = true
+                        continue
+                    }
+                    results.push(o)
+                    if (o.verdict === "FAIL") fail++
+                    else if (o.verdict === "WARN") warn++
+                    else ok++
+                }
+                theme.archGateResults = results
+                theme.archGateOk = ok; theme.archGateWarn = warn; theme.archGateFail = fail
+                // Fail-CLOSED: if the gate didn't fully respond (no meta line, or a
+                // package has no verdict — gate missing/crashed/partial), do NOT
+                // claim "clean". An empty/short answer means "unverified", not "safe".
+                if (!sawMeta || results.length !== theme.archUpdates.length)
+                    theme.archGateDegraded = true
+                theme.archGateState =
+                    fail > 0 ? "blocked"
+                    : theme.archGateDegraded ? "degraded"
+                    : warn > 0 ? "warn" : "clean"
+            }
+        }
+        onExited: (exitCode) => {
+            // Gate exited nonzero (missing script, crash) and produced no findings
+            // => force degraded so the panel never shows a false all-clear.
+            if (exitCode !== 0) {
+                theme.archGateDegraded = true
+                if (theme.archGateFail === 0 && theme.archGateWarn === 0)
+                    theme.archGateState = "degraded"
+            }
+        }
+    }
 
     // ── Shell Updater state (badge ⇄ panel; fed by ShellUpdateWidget's FileView) ──
     property bool shellUpdateVisible: false

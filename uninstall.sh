@@ -53,6 +53,10 @@ if compgen -G "$unitdir/qs-shell-update-check.*" >/dev/null 2>&1 || [[ -e "$qsbi
   info "Removed shell self-updater (scripts, timer, cache, updater clone)"
 fi
 
+# 1d. remove the ArchUpdater security gate script
+[[ -f "$bindir/qs-arch-security-gate.sh" ]] && \
+  { rm -f "$bindir/qs-arch-security-gate.sh"; info "Removed ArchUpdater security gate"; }
+
 # 2. remove the post-boot hook (if the user installed it)
 boot="$HOME/.config/omarchy/hooks/post-boot.d/quickshell-rise"
 [[ -f "$boot" ]] && { rm -f "$boot"; info "Removed post-boot hook"; }

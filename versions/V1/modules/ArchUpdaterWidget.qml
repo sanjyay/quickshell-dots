@@ -40,7 +40,13 @@ Item {
 
     // safety: if the check ever hangs (AUR RPC stalls past the timeout), unstick
     // `refreshing` so future refreshes aren't blocked forever
-    Timer { id: refreshWatchdog; interval: 45000; onTriggered: rootMod.refreshing = false }
+    // checkupdates can sync a DB over the network + the 30s AUR timeout, so the
+    // legitimate worst case is well past 45s. Kill the process (not just the flag)
+    // so the state is unambiguous if it ever hangs.
+    Timer {
+        id: refreshWatchdog; interval: 70000
+        onTriggered: { rootMod.refreshing = false; checkProc.running = false }
+    }
 
     Timer {
         interval: 1800000; running: true; repeat: true; triggeredOnStart: true
@@ -55,7 +61,9 @@ Item {
     function doRefresh() {
         var cmd = [
             "bash", "-c",
-            "LC_ALL=C pacman -Qu 2>/dev/null | while read n o _ v; do echo \"S|\"$n\"|\"$o\"|\"$v; done; " +
+            // checkupdates (temp-synced DB, no root, no partial-upgrade risk) sees
+            // pending updates without a `pacman -Sy`; fall back to -Qu if missing.
+            "{ if command -v checkupdates &>/dev/null; then checkupdates 2>/dev/null; else LC_ALL=C pacman -Qu 2>/dev/null; fi; } | while read n o _ v; do echo \"S|\"$n\"|\"$o\"|\"$v; done; " +
             "if command -v paru &>/dev/null; then timeout 30 paru -Qum 2>/dev/null | while read n o _ v; do echo \"A|\"$n\"|\"$o\"|\"$v; done; " +
             "elif command -v yay &>/dev/null; then timeout 30 yay -Qum 2>/dev/null | while read n o _ v; do echo \"A|\"$n\"|\"$o\"|\"$v; done; fi"
         ]

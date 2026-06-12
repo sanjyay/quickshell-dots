@@ -18,7 +18,9 @@ PanelWindow {
 
     Process {
         id: panelUpdateRunner
-        command: ["bash", "-c", "omarchy-launch-floating-terminal-with-presentation 'gum confirm \"Update packages?\" && { AUR=$(command -v paru || command -v yay); $AUR -Syu --noconfirm; }'"]
+        // No default command — it is built (gated, with --ignore) on click only,
+        // so an accidental start can never run an ungated -Syu.
+        command: []
     }
 
     property real reveal: root.archVisible ? 1 : 0
@@ -34,6 +36,14 @@ PanelWindow {
     MouseArea {
         anchors.fill: parent
         onClicked: root.archVisible = false
+    }
+
+    // pkg -> gate verdict, rebuilt once per gate run (avoids O(n²) per-row scans)
+    readonly property var gateMap: {
+        var m = ({})
+        var r = root.archGateResults || []
+        for (var i = 0; i < r.length; i++) m[r[i].pkg] = r[i]
+        return m
     }
 
     Rectangle {
@@ -98,6 +108,48 @@ PanelWindow {
 
             Rectangle { width: parent.width; height: 1; color: root.sep }
 
+            // ── security-gate status ──
+            Row {
+                width: parent.width
+                spacing: 12
+                visible: root.archUpdates.length > 0
+                Text {
+                    text: "✓ " + root.archGateOk + " OK"
+                    color: root.green
+                    font.family: root.mono; font.pixelSize: 10; font.letterSpacing: 1
+                }
+                Text {
+                    visible: root.archGateWarn > 0
+                    text: "⚠ " + root.archGateWarn + " review"
+                    color: root.inkDeep
+                    font.family: root.mono; font.pixelSize: 10; font.letterSpacing: 1
+                }
+                Text {
+                    visible: root.archGateFail > 0
+                    text: "✗ " + root.archGateFail + " blocked"
+                    color: root.seal
+                    font.family: root.mono; font.pixelSize: 10; font.letterSpacing: 1
+                }
+                Item { width: 1; height: 1 }
+                Text {
+                    visible: root.archGateDegraded
+                    text: "⚠ protection limited"
+                    color: root.seal
+                    font.family: root.mono; font.pixelSize: 10; font.letterSpacing: 1
+                }
+            }
+
+            // ── escalation: a FAIL means the INSTALLED copy is on the list, i.e.
+            // possibly already compromised — --ignore only freezes that version ──
+            Text {
+                visible: root.archGateFail > 0
+                width: parent.width
+                text: "⚠ installed copy may be compromised — run the infection checker"
+                color: root.seal
+                font.family: root.mono; font.pixelSize: 10
+                wrapMode: Text.WordWrap
+            }
+
             // ── column headers ──
             Row {
                 width: parent.width
@@ -148,16 +200,35 @@ PanelWindow {
                                 return root.sumi;
                             }
 
+                            readonly property var gv: archPanel.gateMap[modelData.name]
+                            readonly property bool vBlocked: gv !== undefined && gv.verdict === "FAIL"
+                            readonly property bool vReview:  gv !== undefined && gv.verdict === "WARN"
+                            readonly property bool vOk:      gv !== undefined && gv.verdict === "OK"
+                            readonly property string vReason: (gv !== undefined && gv.reason) ? gv.reason : ""
+                            readonly property bool showReason: vReason !== "" && (vBlocked || vReview)
+
                             width: parent.width
-                            height: 22
+                            height: showReason ? 34 : 22
+                            opacity: vBlocked ? 0.55 : 1.0
 
                             Row {
+                                id: rowTop
                                 width: parent.width
+                                height: 22
                                 spacing: 4
                                 Text {
-                                    width: parent.width * 0.4
+                                    width: 14
+                                    // neutral · until the gate has actually vouched —
+                                    // unknown/scanning must NOT look like a green pass
+                                    text: vBlocked ? "✗" : vReview ? "⚠" : vOk ? "✓" : "·"
+                                    color: vBlocked ? root.seal : vReview ? root.inkDeep : vOk ? root.green : root.sumi
+                                    font.family: root.mono; font.pixelSize: 11
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
+                                Text {
+                                    width: parent.width * 0.4 - 18
                                     text: modelData.name
-                                    color: srcColor
+                                    color: vBlocked ? root.seal : srcColor
                                     font.family: root.mono; font.pixelSize: 11
                                     elide: Text.ElideRight
                                 }
@@ -176,6 +247,17 @@ PanelWindow {
                                     font.weight: Font.Medium
                                     elide: Text.ElideRight
                                 }
+                            }
+
+                            Text {
+                                visible: showReason
+                                anchors.top: rowTop.bottom
+                                x: 18
+                                width: parent.width - 18
+                                text: vReason
+                                color: vBlocked ? root.seal : root.sumi
+                                font.family: root.mono; font.pixelSize: 9
+                                elide: Text.ElideRight
                             }
 
                             Rectangle {
@@ -237,7 +319,9 @@ PanelWindow {
                     Behavior on color { ColorAnimation { duration: 120 } }
                     Text {
                         anchors.centerIn: parent
-                        text: "Update"
+                        text: root.archGateFail > 0
+                            ? "Update (" + root.archGateFail + " ignored)"
+                            : "Update"
                         color: root.paper
                         font.family: root.mono; font.pixelSize: 11
                     }
@@ -247,6 +331,20 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
+                            // Block FAIL packages by --ignore — keeps the upgrade
+                            // whole (no partial-upgrade risk), unlike a name allowlist.
+                            var ignore = [];
+                            var r = root.archGateResults || [];
+                            for (var i = 0; i < r.length; i++) {
+                                if (r[i].verdict === "FAIL" && /^[a-zA-Z0-9@._+-]+$/.test(r[i].pkg))
+                                    ignore.push(r[i].pkg);
+                            }
+                            var ign = ignore.length ? " --ignore " + ignore.join(",") : "";
+                            var prompt = root.archGateDegraded
+                                ? "protection limited — blacklist unavailable. Continue?"
+                                : "Update packages?";
+                            panelUpdateRunner.command = ["bash", "-c",
+                                "omarchy-launch-floating-terminal-with-presentation 'gum confirm \"" + prompt + "\" && { AUR=$(command -v paru || command -v yay); $AUR -Syu" + ign + "; }'"];
                             root.archVisible = false;
                             panelUpdateRunner.running = false;
                             panelUpdateRunner.running = true;

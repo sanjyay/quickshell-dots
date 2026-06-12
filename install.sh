@@ -157,6 +157,15 @@ cp -r "$tmp/repo/versions/$choice/." "$DEST/"
 echo "$choice" > "$DEST/.qsrise"
 info "Installed '${c_b}$choice${c_0}' → $DEST"
 
+# ── 4b. ArchUpdater security gate (pre-install package verdicts) ─
+# Pure bash, no extra deps. Without it the updater panel fail-closes to
+# "protection limited" instead of claiming packages are clean.
+if [[ -f "$tmp/repo/scripts/qs-arch-security-gate.sh" ]]; then
+  mkdir -p "$HOME/.local/bin"
+  install -m 755 "$tmp/repo/scripts/qs-arch-security-gate.sh" "$HOME/.local/bin/qs-arch-security-gate.sh"
+  info "ArchUpdater security gate installed"
+fi
+
 # ── 5. theme hook (live color updates on Omarchy theme switch) ──
 hookdst="$HOME/.config/omarchy/hooks/theme-set.d"
 if [[ -f "$tmp/repo/hooks/50-quickshell-bar.sh" ]]; then
