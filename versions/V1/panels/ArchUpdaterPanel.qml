@@ -150,8 +150,18 @@ PanelWindow {
                 Text {
                     visible: root.archGateListDate !== "" && root.archGateBlacklist > 0
                     text: "list " + root.archGateListDate
-                    color: root.sumi
+                    color: listMa.containsMouse ? root.seal : root.ink
                     font.family: root.mono; font.pixelSize: 10; font.letterSpacing: 1
+                    font.underline: listMa.containsMouse
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                    MouseArea {
+                        id: listMa
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Quickshell.execDetached(
+                            ["xdg-open", "https://gist.github.com/quantenProjects/3f768dce7331618310f016d975bf8547"])
+                    }
                 }
             }
 
@@ -271,7 +281,7 @@ PanelWindow {
                                 x: 18
                                 width: parent.width - 18
                                 text: vReason
-                                color: vBlocked ? root.seal : root.sumi
+                                color: vBlocked ? root.seal : root.ink
                                 font.family: root.mono; font.pixelSize: 9
                                 elide: Text.ElideRight
                             }
