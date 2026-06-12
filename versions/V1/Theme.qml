@@ -403,6 +403,13 @@ Item {
     property var archUpdates: []
     property int archRefreshTick: 0
 
+    // ── Shell Updater state (badge ⇄ panel; fed by ShellUpdateWidget's FileView) ──
+    property bool shellUpdateVisible: false
+    property int  shellUpdateBehind: 0
+    property var  shellUpdateSummary: []
+    property string shellUpdateVersion: ""
+    property real shellUpdateBarX: 0
+
     // ── Tray state ──
     property bool trayVisible: false
     property var trayPinned: []

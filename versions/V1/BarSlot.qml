@@ -283,6 +283,7 @@ PanelWindow {
                 ScreenRecordWidget       { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
                 VoxtypeWidget            { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
                 UpdateWidget             { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                ShellUpdateWidget        { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
             }
         }
     }

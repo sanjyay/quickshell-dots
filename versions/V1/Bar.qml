@@ -296,6 +296,7 @@ PanelWindow {
             ScreenRecordWidget { root: bar.root; anchors.verticalCenter: parent.verticalCenter }
             VoxtypeWidget { root: bar.root; anchors.verticalCenter: parent.verticalCenter }
             UpdateWidget { root: bar.root; anchors.verticalCenter: parent.verticalCenter }
+            ShellUpdateWidget { root: bar.root; anchors.verticalCenter: parent.verticalCenter }
         }
 
         // ── sep1/sep2 (Left/Right) are now handled by Monitor/Media at the
