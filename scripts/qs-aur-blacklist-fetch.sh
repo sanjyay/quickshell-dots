@@ -11,20 +11,33 @@ set -uo pipefail
 DEST="${QS_AUR_BLACKLIST_LIST:-$HOME/.local/share/qs-aur-blacklist.txt}"
 LOCAL="${QS_AUR_BLACKLIST_LOCAL:-$HOME/.local/share/qs-aur-blacklist.local.txt}"
 MIN_COUNT="${QS_GATE_MIN:-100}"   # a "list" below this is treated as bogus
+# Live feeds only: every URL must update in place (unpinned raw URLs).
+# Dated snapshots (pastes, pinned gist revisions, mailing-list posts) belong
+# in the local supplement instead — they never change after publication.
 URLS=(
   "https://gist.githubusercontent.com/quantenProjects/3f768dce7331618310f016d975bf8547/raw/packages"
 )
 
-raw="$(mktemp)"; trap 'rm -f "$raw"' EXIT
-ok=false
+# Union merge: fetch every source, keep going if one fails; fail-closed only
+# when none of them could be fetched.
+raw="$(mktemp)"; part="$(mktemp)"; trap 'rm -f "$raw" "$part"' EXIT
+fetched=0
 for url in "${URLS[@]}"; do
+  : > "$part"
   if command -v curl >/dev/null 2>&1; then
-    curl -sfL --max-time 30 "$url" -o "$raw" 2>/dev/null && { ok=true; break; }
+    curl -sfL --max-time 30 "$url" -o "$part" 2>/dev/null || continue
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO "$raw" --timeout=30 "$url" 2>/dev/null && { ok=true; break; }
+    wget -qO "$part" --timeout=30 "$url" 2>/dev/null || continue
+  else
+    break
   fi
+  cat "$part" >> "$raw"; printf '\n' >> "$raw"
+  fetched=$((fetched+1))
 done
-$ok || { echo "qs-aur-blacklist-fetch: download failed — keeping previous list" >&2; exit 1; }
+if [ "$fetched" -eq 0 ]; then
+  echo "qs-aur-blacklist-fetch: all downloads failed — keeping previous list" >&2
+  exit 1
+fi
 
 # Sanitize hard: only valid pacman package-name tokens survive, one per line,
 # deduped. Anything else in the payload (markup, commands, garbage) is dropped.
