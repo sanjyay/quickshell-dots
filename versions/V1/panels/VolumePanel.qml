@@ -346,6 +346,8 @@ PanelWindow {
                         ? Qt.rgba(root.seal.r, root.seal.g, root.seal.b, 0.5)
                         : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.7)
                     font.family: root.mono; font.pixelSize: 11
+                    width: parent.width * 0.5
+                    horizontalAlignment: Text.AlignRight
                 }
             }
 
