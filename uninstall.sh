@@ -46,7 +46,8 @@ if compgen -G "$unitdir/qs-shell-update-check.*" >/dev/null 2>&1 || [[ -e "$qsbi
   systemctl --user stop qs-shell-update-check.service >/dev/null 2>&1 || true
   rm -f "$unitdir"/qs-shell-update-check.service "$unitdir"/qs-shell-update-check.timer
   rm -f "$qsbindir"/qs-shell-check-update.sh "$qsbindir"/qs-shell-apply-update.sh
-  rm -rf "$HOME/.cache/qs-shell" "$HOME/.local/share/quickshell-dots"
+  rm -rf "$HOME/.cache/qs-shell" "$HOME/.local/share/quickshell-dots" \
+         "${XDG_STATE_HOME:-$HOME/.local/state}/qs-shell"
   systemctl --user daemon-reload >/dev/null 2>&1 || true
   systemctl --user reset-failed 'qs-shell-update-check*' >/dev/null 2>&1 || true
   info "Removed shell self-updater (scripts, timer, cache, updater clone)"

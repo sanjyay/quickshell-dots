@@ -21,7 +21,9 @@ REPO="${QS_SHELL_REPO:-$HOME/.local/share/quickshell-dots}"
 DEST="${QS_SHELL_DEST:-$HOME/.config/quickshell/bar}"
 STATE_DIR="$HOME/.cache/qs-shell"
 STATE="$STATE_DIR/update-available.json"
-BACKUP_ROOT="$STATE_DIR/backups"
+# Backups live in STATE_HOME (durable), NOT in ~/.cache — caches get tmpfs-mounted
+# or wiped by hygiene tools, and the backup is the rollback's last-resort restore.
+BACKUP_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/qs-shell/backups"
 mkdir -p "$STATE_DIR"
 
 note() { notify-send -a "QS-Shell" "$@" 2>/dev/null || true; }
@@ -72,10 +74,12 @@ cp -a "$DEST" "$backup"
 # keep only the 3 most recent backups
 ls -1dt "$BACKUP_ROOT"/bar.* 2>/dev/null | tail -n +4 | xargs -r rm -rf
 
-# 4. Stage on the SAME filesystem as $DEST (BACKUP_ROOT is under $HOME like
-#    $DEST), so the swap is an atomic rename — never a cross-FS copy that could
-#    be interrupted mid-write. Clean the stage on any exit.
-stage="$(mktemp -d -p "$BACKUP_ROOT")"
+# 4. Stage in $DEST's OWN parent directory — same filesystem by construction, so
+#    the swap is guaranteed an atomic rename (never a cross-FS copy that could be
+#    interrupted mid-write, regardless of how ~/.cache or ~/.local are mounted).
+#    The bar watches the `bar` config dir specifically, so a sibling .qs-stage.*
+#    dir is ignored. Clean the stage on any exit.
+stage="$(mktemp -d -p "$(dirname "$DEST")" .qs-stage.XXXXXX)"
 trap 'rm -rf "$stage" 2>/dev/null || true' EXIT
 cp -r "$REPO/versions/$ver/." "$stage/"
 printf '%s\n' "$ver" > "$stage/.qsrise"
@@ -92,18 +96,24 @@ fi
 # new tree in full; any failure restores a working bar and notifies.
 old="$DEST.old.$ts"
 rollback() {
-  if [ ! -e "$DEST" ]; then            # swap-in failed after moving the old tree aside
+  local msg
+  if [ ! -e "$DEST" ]; then            # old tree was moved aside, swap-in failed → restore
     if [ -d "$old" ]; then
       mv "$old" "$DEST" 2>/dev/null || cp -a "$backup" "$DEST" 2>/dev/null || true
     else
       cp -a "$backup" "$DEST" 2>/dev/null || true
     fi
+    msg="Deploy failed — previous version restored."
+  else                                 # $DEST never changed (the aside-move itself failed)
+    msg="Update aborted before any change — bar restarted unchanged."
   fi
   rm -rf "$old" 2>/dev/null || true
+  # 9>&- : do NOT leak the flock fd into the relaunched bar, or it holds the lock
+  # for its whole lifetime and blocks every future update (see normal path below).
   if [ -z "${QS_SHELL_NO_RESTART:-}" ]; then
-    setsid qs -n -d -c bar >/dev/null 2>&1 < /dev/null &
+    setsid qs -n -d -c bar >/dev/null 2>&1 9>&- < /dev/null &
   fi
-  note -u critical "Shell update rolled back" "Deploy failed — previous version restored."
+  note -u critical "Shell update failed" "$msg"
 }
 trap 'rollback' ERR
 
@@ -116,9 +126,13 @@ trap - EXIT              # $stage was renamed into place; nothing left to clean
 # 5. Mark up-to-date via an atomic state write (never delete).
 clear_state
 
-# 6. Relaunch exactly how the user runs it.
+# 6. Relaunch exactly how the user runs it. The Wayland session env is inherited
+#    via the chain bar → setsid → this script (so only ever call apply from the
+#    session, never from the timer). 9>&- closes the flock fd so the new bar does
+#    NOT inherit the lock — otherwise it would hold it for its whole lifetime and
+#    every future update would fail with "already running" (flock is on the OFD).
 if [ -z "${QS_SHELL_NO_RESTART:-}" ]; then
-  setsid qs -n -d -c bar >/dev/null 2>&1 < /dev/null &
+  setsid qs -n -d -c bar >/dev/null 2>&1 9>&- < /dev/null &
 fi
 
 note "Shell updated" "Now on the latest '$ver'. Backup kept at $backup"
