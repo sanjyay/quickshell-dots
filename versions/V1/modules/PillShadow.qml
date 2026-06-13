@@ -10,7 +10,7 @@ RectangularShadow {
     required property var theme
     anchors.fill: parent
     radius: parent.radius
-    visible: theme.styleBorderless
+    visible: theme.styleShadow
     blur: 8
     spread: 0
     // cast away from the screen edge the bar sits on (down for a top bar, up for

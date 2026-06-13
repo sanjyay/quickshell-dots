@@ -26,7 +26,7 @@ Item {
     RectangularShadow {
         anchors.fill: pill
         radius: pill.radius
-        visible: root.styleBorderless
+        visible: root.styleShadow
         blur: 8
         spread: 0
         offset: Qt.vector2d(0, root.barPosition === "bottom" ? -1 : 1)

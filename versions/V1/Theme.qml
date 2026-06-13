@@ -56,12 +56,14 @@ Item {
     // ── bar style tokens (persisted; consumed by every widget pill surface) ──
     // Single source for the pill recipe that is duplicated ~16× across modules.
     // P1: tokens exist but NO surface consumes them yet → bar renders identical.
-    property bool styleBorderless:  false   // border 1px ⇄ box-shadow
+    // border on/off and shadow on/off are INDEPENDENT (4 combos possible).
+    property bool styleBorder:      true    // pill/card 1px border on/off
+    property bool styleShadow:      false   // box-shadow on/off
     property bool styleRadiusSmall: false   // radius 12 ⇄ 6
     property bool styleHeightMin:   false   // inner pill 24 ⇄ 20 (slot stays 28)
     readonly property int   pillRadius:   styleRadiusSmall ? 6 : 12
     readonly property int   pillH:        styleHeightMin ? 20 : 24
-    readonly property int   pillBorderW:  styleBorderless ? 0 : 1
+    readonly property int   pillBorderW:  styleBorder ? 1 : 0
     readonly property int   islandRadius: styleRadiusSmall ? 8 : 16
     readonly property int   tileRadius:   pillRadius - 2   // inner panel buttons: 2 less than global (10 ⇄ 4)
     readonly property color pillShadow:   Qt.rgba(0, 0, 0, 0.55)   // dark, theme-independent
@@ -310,7 +312,8 @@ Item {
     onPickerStyleChanged:   if (_widgetsLoaded) saveWidgets()
     onWeatherImperialChanged: if (_widgetsLoaded) saveWidgets()
     onClock12hChanged:        if (_widgetsLoaded) saveWidgets()
-    onStyleBorderlessChanged:  if (_widgetsLoaded) saveWidgets()
+    onStyleBorderChanged:      if (_widgetsLoaded) saveWidgets()
+    onStyleShadowChanged:      if (_widgetsLoaded) saveWidgets()
     onStyleRadiusSmallChanged: if (_widgetsLoaded) saveWidgets()
     onStyleHeightMinChanged:   if (_widgetsLoaded) saveWidgets()
     onWorkspaceStyleChanged:   if (_widgetsLoaded) saveWidgets()
@@ -327,11 +330,12 @@ Item {
                  + (weatherImperial ? "1" : "0") + " "
                  + (clock12h        ? "1" : "0") + " "
                  + (modNetwork      ? "1" : "0") + " "
-                 + (styleBorderless  ? "1" : "0") + " "   // ↓ appended → old caches keep defaults
+                 + (styleShadow      ? "1" : "0") + " "   // field +5 (was styleBorderless; value-compatible)
                  + (styleRadiusSmall ? "1" : "0") + " "
                  + (styleHeightMin   ? "1" : "0") + " "
                  + workspaceStyle + " "
-                 + barPosition
+                 + barPosition + " "
+                 + (styleBorder      ? "1" : "0")         // +10 (new; old caches → derived from styleShadow)
         widgetSaveProc.command = ["bash", "-c",
             "echo '" + line + "' > '" + widgetsCachePath + "'"]
         widgetSaveProc.running = false
@@ -376,7 +380,7 @@ Item {
                     if (parts.length > wsField + 3) theme.clock12h        = parts[wsField + 3] === "1"
                     if (parts.length > wsField + 4) theme.modNetwork      = parts[wsField + 4] === "1"
                     // style tokens — appended after modNetwork, each guarded
-                    if (parts.length > wsField + 5) theme.styleBorderless  = parts[wsField + 5] === "1"
+                    if (parts.length > wsField + 5) theme.styleShadow      = parts[wsField + 5] === "1"
                     if (parts.length > wsField + 6) theme.styleRadiusSmall = parts[wsField + 6] === "1"
                     // field wsField+7 (styleHeightMin) is reserved for offset
                     // stability only — the Height toggle was removed (plan §1.4), so
@@ -391,6 +395,10 @@ Item {
                         var bp = parts[wsField + 9]
                         if (bp === "top" || bp === "bottom") theme.barPosition = bp
                     }
+                    // +10 styleBorder (independent border on/off). Old caches lack it →
+                    // migrate from the old coupled meaning: border = NOT shadow.
+                    if (parts.length > wsField + 10) theme.styleBorder = parts[wsField + 10] === "1"
+                    else if (parts.length > wsField + 5) theme.styleBorder = !theme.styleShadow
                 }
                 theme._widgetsLoaded = true
             }

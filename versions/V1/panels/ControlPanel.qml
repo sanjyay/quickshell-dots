@@ -512,8 +512,9 @@ PanelWindow {
             }
             Row {
                 width: parent.width; spacing: 4
-                Tile { width: (wwCol.width - 4) / 2; label: "Borders"; active: !root.styleBorderless; onActivated: root.styleBorderless = false }
-                Tile { width: (wwCol.width - 4) / 2; label: "Shadow";  active: root.styleBorderless;  onActivated: root.styleBorderless = true }
+                // independent toggles: each highlights when ON, click flips it
+                Tile { width: (wwCol.width - 4) / 2; label: "Border"; active: root.styleBorder; onActivated: root.styleBorder = !root.styleBorder }
+                Tile { width: (wwCol.width - 4) / 2; label: "Shadow"; active: root.styleShadow; onActivated: root.styleShadow = !root.styleShadow }
             }
             Row {
                 width: parent.width; spacing: 4
