@@ -25,7 +25,7 @@ Item {
 
     // ── transparency knobs (0.0 = fully transparent, 1.0 = opaque) ──
     property real barOpacity:  0.94   // große Insel / Split-Sektionen
-    property real pillOpacity: 0.45   // einzelne Widget-Pillen (workspace, mem, cpu, …)
+    property real pillOpacity: 0.18   // einzelne Widget-Pillen (workspace, mem, cpu, …)
 
     readonly property color bg:     Qt.rgba(paper.r, paper.g, paper.b, barOpacity)
     readonly property color pill:   Qt.rgba(paper.r, paper.g, paper.b, pillOpacity)
