@@ -418,6 +418,7 @@ PanelWindow {
                 Tile { width: (wwCol.width - 8) / 2; label: "CPU";         active: root.modCpu;     onActivated: root.modCpu = !root.modCpu }
                 Tile { width: (wwCol.width - 8) / 2; label: "Volume";      active: root.modVolume;  onActivated: root.modVolume = !root.modVolume }
                 Tile { width: (wwCol.width - 8) / 2; label: "Now playing"; active: root.modMpris;   onActivated: root.modMpris = !root.modMpris }
+                Tile { width: (wwCol.width - 8) / 2; label: "Battery";     visible: root.hasBattery; active: true; enabled: false }
             }
 
             Rectangle { width: parent.width; height: 1; color: root.sep }

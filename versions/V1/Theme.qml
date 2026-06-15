@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import Quickshell.Services.UPower
 import "Palette.js" as Palette
 
 Item {
@@ -266,6 +267,9 @@ Item {
     property bool modWeather:    true
     property bool modNetwork:    true
     property string networkMode: "none"   // mirrored from NetworkWidget: wifi/ethernet/none
+    // battery presence (laptop) — drives the Battery indicator tile's visibility (shown only
+    // where a battery exists, like Brightness uses hasBacklight). Direct UPower check, event-driven.
+    readonly property bool hasBattery: UPower.displayDevice !== null && UPower.displayDevice.isLaptopBattery
     // NetworkManager active (Omarchy 4.0) → the panel's iwctl scan/connect won't work,
     // so it shows an "open nmtui" button instead of an empty list
     property bool useNM: false
@@ -282,7 +286,6 @@ Item {
     readonly property string launchBtCmd:   "omarchy-launch-bluetooth"
     property bool modPower:      false   // default off (toggle in ControlPanel)
     property bool modBluetooth:  false   // default off (toggle in ControlPanel)
-    property bool modBattery:    true
     property bool modBrightness: true
     property bool modMedia:      true
     property bool modQuick:      true    // G10 group pill (idle-inhibitor · media · theme)
