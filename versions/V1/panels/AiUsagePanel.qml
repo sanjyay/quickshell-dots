@@ -83,7 +83,7 @@ PanelWindow {
             id: rowVal
             anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
             text: pct + "%"
-            color: aiPanel.dim ? aiPanel.root.sumi : aiPanel.root.seal
+            color: dim ? aiPanel.root.sumi : aiPanel.root.seal
             font.family: aiPanel.root.mono; font.pixelSize: 11; font.weight: Font.Medium
         }
         Rectangle {
@@ -297,7 +297,11 @@ PanelWindow {
                     aiPanel.clTokens = used ? (used / 1e6).toFixed(2) + "M / " + (lim / 1e6).toFixed(1) + "M" : ""
                     var rateH = Math.round((d["_rate_per_hour"] || 0) / 1000)
                     aiPanel.clRate = rateH > 0 ? rateH + "k tok/h" : ""
-                } catch (e) { aiPanel.clHas = false; aiPanel.clFresh = false }
+                } catch (e) {
+                    aiPanel.clHas = false; aiPanel.clFresh = false
+                    aiPanel.clPct5h = 0; aiPanel.clPct7d = 0
+                    aiPanel.clTokens = ""; aiPanel.clRate = ""
+                }
             }
         }
     }
@@ -324,7 +328,11 @@ PanelWindow {
                     var cxRateH = Math.round((d["_rate_per_hour"] || 0) / 1000)
                     aiPanel.cxRate = cxRateH > 0 ? cxRateH + "k tok/h" : ""
                     aiPanel.cxToday = parseInt(d._today_tokens) || 0
-                } catch (e) { aiPanel.cxHas = false; aiPanel.cxFresh = false }
+                } catch (e) {
+                    aiPanel.cxHas = false; aiPanel.cxFresh = false
+                    aiPanel.cxPct5h = 0; aiPanel.cxPct7d = 0
+                    aiPanel.cxPlan = ""; aiPanel.cxTokens = ""; aiPanel.cxRate = ""; aiPanel.cxToday = 0
+                }
             }
         }
     }
