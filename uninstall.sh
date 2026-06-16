@@ -39,6 +39,20 @@ if compgen -G "$unitdir/claude-usage*" >/dev/null 2>&1 || compgen -G "$bindir/cl
   info "Removed Claude usage backend (script, timer, cache; nothing left running)"
 fi
 
+# 1b2. remove the Codex usage backend, if it was installed (idempotent).
+# Pairs with the AI usage widget's Codex side (install_codex_backend in install.sh).
+if compgen -G "$unitdir/codex-usage*" >/dev/null 2>&1 || compgen -G "$bindir/codex-usage*" >/dev/null 2>&1; then
+  systemctl --user disable --now codex-usage.timer >/dev/null 2>&1 || true
+  systemctl --user stop codex-usage.service >/dev/null 2>&1 || true
+  rm -f "$unitdir"/codex-usage.service "$unitdir"/codex-usage.timer
+  rm -f "$bindir"/codex-usage
+  rm -f "$HOME/.cache/codex-usage.json"
+  systemctl --user daemon-reload >/dev/null 2>&1 || true
+  systemctl --user reset-failed 'codex-usage*' >/dev/null 2>&1 || true   # clear any ghost state
+  pkill -f "$bindir/codex-usage" 2>/dev/null || true
+  info "Removed Codex usage backend (script, timer, cache; nothing left running)"
+fi
+
 # 1c. remove the shell self-updater, if installed (idempotent).
 qsbindir="$HOME/.config/quickshell/bin"
 if compgen -G "$unitdir/qs-shell-update-check.*" >/dev/null 2>&1 || [[ -e "$qsbindir/qs-shell-check-update.sh" ]]; then
