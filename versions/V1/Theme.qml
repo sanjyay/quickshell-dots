@@ -168,6 +168,10 @@ Item {
     // ── CPU panel state ──
     property bool cpuVisible: false
 
+    // ── AI usage panel state + which tool the bar pill shows ──
+    property bool   aiUsageVisible: false
+    property string aiTool: "claude"   // "claude" or "codex" — icon shown in the bar
+
     // ── Memory panel state ──
     property bool memVisible: false
 
@@ -324,6 +328,7 @@ Item {
     onModCpuChanged:        if (_widgetsLoaded) saveWidgets()
     onModVolumeChanged:     if (_widgetsLoaded) saveWidgets()
     onModMprisChanged:      if (_widgetsLoaded) saveWidgets()
+    onAiToolChanged:        if (_widgetsLoaded) saveWidgets()
     onWorkspaceModeChanged: if (_widgetsLoaded) saveWidgets()
     onPickerStyleChanged:   if (_widgetsLoaded) saveWidgets()
     onWeatherImperialChanged: if (_widgetsLoaded) saveWidgets()
@@ -355,7 +360,8 @@ Item {
                  + (modQuick  ? "1" : "0") + " "          // +12 group pill: quick (idle/media/theme)
                  + (modCpu    ? "1" : "0") + " "          // +13
                  + (modVolume ? "1" : "0") + " "          // +14
-                 + (modMpris  ? "1" : "0")                // +15 now-playing / mpris
+                 + (modMpris  ? "1" : "0") + " "          // +15 now-playing / mpris
+                 + aiTool                                 // +16 AI tool shown in bar (claude/codex)
         widgetSaveProc.command = ["bash", "-c",
             "echo '" + line + "' > '" + widgetsCachePath + "'"]
         widgetSaveProc.running = false
@@ -427,6 +433,10 @@ Item {
                     if (parts.length > wsField + 13) theme.modCpu    = parts[wsField + 13] !== "0"
                     if (parts.length > wsField + 14) theme.modVolume = parts[wsField + 14] !== "0"
                     if (parts.length > wsField + 15) theme.modMpris  = parts[wsField + 15] !== "0"
+                    if (parts.length > wsField + 16) {
+                        var at = parts[wsField + 16]
+                        if (at === "claude" || at === "codex") theme.aiTool = at
+                    }
                 }
                 theme._widgetsLoaded = true
             }
@@ -608,6 +618,7 @@ Item {
     property real batteryBarX:    0
     property real memoryBarX:     0
     property real cpuBarX:        0
+    property real aiBarX:         0
     property real workspaceBarX:  0
     property real archBarX:       0
     property real bluetoothBarX:  0

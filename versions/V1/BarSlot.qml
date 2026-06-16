@@ -681,6 +681,7 @@ PanelWindow {
         Binding { target: barSlot.root; property: "batteryBarX";    value: (island.width, rightRowItem.width,  island.groupX("G12", 0.5)) }
         Binding { target: barSlot.root; property: "memoryBarX";     value: (island.width, leftRowItem.width,   island.groupX("G4",  0.5)) }
         Binding { target: barSlot.root; property: "cpuBarX";        value: (island.width, leftRowItem.width,   island.groupX("G5",  0.5)) }
+        Binding { target: barSlot.root; property: "aiBarX";         value: (island.width, leftRowItem.width,   island.groupX("G7",  0.5)) }
         Binding { target: barSlot.root; property: "workspaceBarX";  value: (island.width, leftRowItem.width,   island.groupX("G2",  0.5)) }
         Binding { target: barSlot.root; property: "archBarX";       value: (island.width, leftRowItem.width,   island.groupX("G3",  0.5)) }
         Binding { target: barSlot.root; property: "bluetoothBarX";  value: (island.width, rightRowItem.width,  island.groupX("G15", 0.5)) }

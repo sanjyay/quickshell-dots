@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+"""
+OpenAI Codex quota for the Quickshell bar widget.
+
+Mirrors ~/.local/bin/claude-usage: queries the authoritative rate limits the
+Codex CLI itself exposes via its local app-server JSON-RPC (account/rateLimits/
+read) — no browser, no scraping, 0 tokens. The primary window is the 5h limit,
+the secondary the weekly (7d) limit, exactly like Claude's 5h/7d model.
+
+Writes ~/.cache/codex-usage.json in the format the widget reads. If the RPC is
+unavailable it falls back to the last rate_limits snapshot recorded in the most
+recent session rollout, and finally to the last good cache (marked stale).
+"""
+import json, os, select, shutil, subprocess, sys, time
+from datetime import datetime, timezone
+from pathlib import Path
+
+CODEX_HOME = Path(os.environ.get("CODEX_HOME") or (Path.home() / ".codex"))
+CACHE_FILE = Path.home() / ".cache" / "codex-usage.json"
+
+
+def runtime_env() -> dict:
+    home = str(Path.home())
+    parts = [os.environ.get("PATH", ""), f"{home}/.local/bin",
+             f"{home}/.npm-global/bin", f"{home}/.local/share/mise/shims"]
+    env = os.environ.copy()
+    env["PATH"] = os.pathsep.join(p for p in parts if p)
+    return env
+
+
+ENV = runtime_env()
+
+
+def find_codex() -> str | None:
+    return shutil.which("codex", path=ENV.get("PATH"))
+
+
+# ── authoritative live limits via the Codex app-server JSON-RPC ──
+def rpc_request(proc, request_id, method, params=None, timeout=8):
+    proc.stdin.write(json.dumps({"id": request_id, "method": method,
+                                 "params": params or {}}) + "\n")
+    proc.stdin.flush()
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        ready, _, _ = select.select([proc.stdout], [], [], 0.25)
+        if not ready:
+            continue
+        line = proc.stdout.readline()
+        if not line:
+            break
+        try:
+            msg = json.loads(line)
+        except Exception:
+            continue
+        if msg.get("id") == request_id:
+            return msg
+    raise TimeoutError(method)
+
+
+def fetch_rpc() -> dict | None:
+    codex = find_codex()
+    if not codex:
+        return None
+    try:
+        proc = subprocess.Popen(
+            [codex, "-s", "read-only", "-a", "untrusted", "app-server"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, text=True, env=ENV)
+    except Exception as e:
+        sys.stderr.write(f"app-server spawn failed: {e}\n")
+        return None
+    try:
+        rpc_request(proc, 1, "initialize",
+                    {"clientInfo": {"name": "codex-usage", "version": "1"}}, timeout=8)
+        proc.stdin.write(json.dumps({"method": "initialized", "params": {}}) + "\n")
+        proc.stdin.flush()
+        account = (rpc_request(proc, 2, "account/read", timeout=5)
+                   .get("result") or {}).get("account") or {}
+        limits = (rpc_request(proc, 3, "account/rateLimits/read", timeout=5)
+                  .get("result") or {}).get("rateLimits") or {}
+    except Exception as e:
+        sys.stderr.write(f"rpc error: {e}\n")
+        return None
+    finally:
+        try:
+            proc.terminate(); proc.wait(timeout=1)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+    primary = limits.get("primary") or {}
+    secondary = limits.get("secondary") or {}
+    if primary.get("usedPercent") is None and secondary.get("usedPercent") is None:
+        return None
+    return {
+        "primary": primary,
+        "secondary": secondary,
+        "plan": limits.get("planType") or account.get("planType") or account.get("type") or "",
+        "source": "rpc",
+    }
+
+
+# ── fallback: last rate_limits snapshot from the newest session rollout ──
+def newest_rollout() -> Path | None:
+    roots = [CODEX_HOME / "sessions", CODEX_HOME / "archived_sessions"]
+    newest, newest_mtime = None, 0.0
+    for root in roots:
+        if not root.exists():
+            continue
+        for p in root.rglob("*.jsonl"):
+            try:
+                m = p.stat().st_mtime
+            except OSError:
+                continue
+            if m > newest_mtime:
+                newest, newest_mtime = p, m
+    return newest
+
+
+def fetch_rollout() -> dict | None:
+    path = newest_rollout()
+    if not path:
+        return None
+    last = None
+    try:
+        with path.open(errors="replace") as fh:
+            for raw in fh:
+                if '"rate_limits"' not in raw:
+                    continue
+                try:
+                    ev = json.loads(raw)
+                except Exception:
+                    continue
+                rl = (ev.get("payload") or {}).get("rate_limits")
+                if rl:
+                    last = rl
+    except OSError:
+        return None
+    if not last:
+        return None
+
+    def conv(window):
+        if not isinstance(window, dict):
+            return {}
+        return {"usedPercent": window.get("used_percent"),
+                "windowDurationMins": window.get("window_minutes"),
+                "resetsAt": window.get("resets_at")}
+
+    return {
+        "primary": conv(last.get("primary")),
+        "secondary": conv(last.get("secondary")),
+        "plan": last.get("plan_type") or "",
+        "source": "rollout",
+    }
+
+
+# ── light "today" token estimate from today's rollouts (per-call deltas) ──
+def iso_epoch(s: str) -> float:
+    try:
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        return datetime.fromisoformat(s).timestamp()
+    except Exception:
+        return 0.0
+
+
+def scan_tokens(window_start: float):
+    """One pass over recent rollouts → (tokens in the 5h window, tokens in the
+    last hour, tokens today) by summing each token_count event's per-call delta
+    (last_token_usage.total_tokens). Mirrors claude-usage's local count."""
+    root = CODEX_HOME / "sessions"
+    if not root.exists():
+        return 0, 0, 0
+    now = time.time()
+    today = datetime.now().strftime("%Y-%m-%d")
+    # a file untouched before the window can't hold in-window events
+    cutoff = min(window_start, now - 24 * 3600)
+    window = recent = today_tok = 0
+    for p in root.rglob("*.jsonl"):
+        try:
+            if p.stat().st_mtime < cutoff:
+                continue
+        except OSError:
+            continue
+        try:
+            with p.open(errors="replace") as fh:
+                for raw in fh:
+                    if '"token_count"' not in raw:
+                        continue
+                    try:
+                        ev = json.loads(raw)
+                    except Exception:
+                        continue
+                    if (ev.get("payload") or {}).get("type") != "token_count":
+                        continue
+                    ts_str = str(ev.get("timestamp") or "")
+                    ts = iso_epoch(ts_str)
+                    last = ((ev["payload"].get("info") or {})
+                            .get("last_token_usage") or {})
+                    tok = int(last.get("total_tokens") or 0)
+                    if ts >= window_start:
+                        window += tok
+                    if ts >= now - 3600:
+                        recent += tok
+                    if ts_str[:10] == today:
+                        today_tok += tok
+        except OSError:
+            continue
+    return window, recent, today_tok
+
+
+def reset_epoch(window) -> int:
+    try:
+        return int(window.get("resetsAt") or 0)
+    except Exception:
+        return 0
+
+
+def main():
+    data = fetch_rpc() or fetch_rollout()
+
+    if not data:
+        # keep the last numbers on screen, marked stale
+        if CACHE_FILE.exists():
+            try:
+                cur = json.loads(CACHE_FILE.read_text())
+                cur["_source"] = "stale"
+                CACHE_FILE.write_text(json.dumps(cur))
+            except Exception:
+                pass
+        return
+
+    primary = data["primary"] or {}
+    secondary = data["secondary"] or {}
+    util5h = (float(primary.get("usedPercent") or 0)) / 100.0
+    util7d = (float(secondary.get("usedPercent") or 0)) / 100.0
+
+    # local token breakdown for the 5h window (same approach as claude-usage):
+    # count the window's tokens and derive the limit from the server's %.
+    reset5h = reset_epoch(primary)
+    window_start = (reset5h - 5 * 3600) if reset5h else (time.time() - 5 * 3600)
+    win_tok, recent_tok, today_tok = scan_tokens(window_start)
+    limit = int(win_tok / util5h) if (util5h > 0 and win_tok) else 0
+
+    out = {
+        "5h-utilization": f"{util5h:.4f}",
+        "5h-reset":       str(reset5h),
+        "7d-utilization": f"{util7d:.4f}",
+        "7d-reset":       str(reset_epoch(secondary)),
+        "updated_at":     datetime.now().strftime("%H:%M:%S"),
+        "_source":        data["source"],
+        "_plan":          str(data.get("plan") or ""),
+        "_tokens_used":   win_tok,
+        "_window_limit":  limit,
+        "_rate_per_hour": recent_tok,
+        "_today_tokens":  today_tok,
+        "status": "rejected" if util5h >= 1.0
+                  else "allowed_warning" if util5h >= 0.9
+                  else "allowed",
+    }
+    CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    CACHE_FILE.write_text(json.dumps(out))
+
+
+if __name__ == "__main__":
+    main()

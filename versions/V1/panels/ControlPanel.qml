@@ -409,7 +409,7 @@ PanelWindow {
                 rowSpacing: 8
                 Tile { width: (wwCol.width - 8) / 2; label: "Memory";      active: root.modMemory;    onActivated: root.modMemory = !root.modMemory }
                 Tile { width: (wwCol.width - 8) / 2; label: "Brightness";  visible: root.hasBacklight; active: root.modBrightness; onActivated: root.modBrightness = !root.modBrightness }
-                Tile { width: (wwCol.width - 8) / 2; label: "Claude";      active: root.modClaude;    onActivated: root.modClaude = !root.modClaude }
+                Tile { width: (wwCol.width - 8) / 2; label: "AI usage";    active: root.modClaude;    onActivated: root.modClaude = !root.modClaude }
                 Tile { width: (wwCol.width - 8) / 2; label: "Power Prof."; active: root.modPower;     onActivated: root.modPower = !root.modPower }
                 Tile { width: (wwCol.width - 8) / 2; label: "Bluetooth";   active: root.modBluetooth; onActivated: root.modBluetooth = !root.modBluetooth }
                 Tile { width: (wwCol.width - 8) / 2; label: "Network";     active: root.modNetwork; enabled: root.networkMode !== "wifi"; onActivated: root.modNetwork = !root.modNetwork }

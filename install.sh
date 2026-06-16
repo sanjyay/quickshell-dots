@@ -58,6 +58,32 @@ install_claude_backend() {
   info "Claude usage backend installed (exact 5h + 7d via Claude Code's own token, 0 tokens)"
 }
 
+# ── codex-usage backend (opt-in; pairs with the AI usage widget) ─
+# Installs the script + systemd timer that feed the Codex side of the quota
+# widget. It reads the authoritative rate limits the Codex CLI exposes over its
+# local app-server JSON-RPC (account/rateLimits/read) — no browser, no scraping,
+# 0 tokens. Any failure here only warns; it never aborts the bar install.
+install_codex_backend() {
+  local src="$1"                              # repo root (temp clone)
+  local bindst="$HOME/.local/bin"
+  local unitdst="$HOME/.config/systemd/user"
+
+  command -v python3 >/dev/null 2>&1 || { err "python3 missing — skipping Codex backend"; return 1; }
+  command -v codex   >/dev/null 2>&1 || \
+    warn "codex CLI not found in PATH — install it and run 'codex login'; the widget fills once Codex has run."
+
+  mkdir -p "$bindst" "$unitdst"
+  install -m 755 "$src/scripts/codex-usage"          "$bindst/codex-usage"
+  install -m 644 "$src/systemd/codex-usage.service"   "$unitdst/codex-usage.service"
+  install -m 644 "$src/systemd/codex-usage.timer"     "$unitdst/codex-usage.timer"
+
+  systemctl --user daemon-reload
+  systemctl --user enable --now codex-usage.timer >/dev/null 2>&1 || true
+  "$bindst/codex-usage" >/dev/null 2>&1 || true   # prime the cache now
+
+  info "Codex usage backend installed (5h + weekly via Codex app-server RPC, 0 tokens)"
+}
+
 # ── shell self-updater (the in-bar update badge + apply) ────────
 # Installs the check/apply scripts + systemd timer, and keeps a persistent FULL
 # clone the updater pulls from (the install clone below is --depth 1, too shallow
@@ -210,7 +236,7 @@ printf "  ${c_b}rm -f %s/quickshell-rise${c_0}  # to remove\n" \
 do_claude="$WANT_CLAUDE"
 if [[ -z "$do_claude" ]]; then
   if [[ -t 0 || -e /dev/tty ]]; then
-    read -p "Install the Claude usage backend for the quota widget (exact 5h + 7d, 0 tokens)? [y/N] " ans </dev/tty || ans=""
+    read -p "Install the AI usage backend for the quota widget (Claude + Codex, exact 5h + 7d, 0 tokens)? [y/N] " ans </dev/tty || ans=""
     case "${ans,,}" in y|yes) do_claude="yes" ;; *) do_claude="no" ;; esac
   else
     do_claude="no"
@@ -218,8 +244,14 @@ if [[ -z "$do_claude" ]]; then
 fi
 if [[ "$do_claude" == "yes" ]]; then
   install_claude_backend "$tmp/repo" || warn "Claude backend setup incomplete — the bar is installed and fine; re-run with --claude-backend to retry."
+  # Codex side of the same AI usage widget — installed alongside when present.
+  if command -v codex >/dev/null 2>&1; then
+    install_codex_backend "$tmp/repo" || warn "Codex backend setup incomplete — re-run install to retry."
+  else
+    info "Skipped Codex usage backend (codex CLI not found; the bar still shows Claude)."
+  fi
 else
-  info "Skipped Claude usage backend (the quota widget stays hidden until it's installed)."
+  info "Skipped AI usage backend (the quota widget stays hidden until it's installed)."
 fi
 
 info "${c_b}Done — enjoy!${c_0}"
