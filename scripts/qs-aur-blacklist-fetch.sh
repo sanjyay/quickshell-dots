@@ -46,16 +46,16 @@ fetch() {  # url outfile → 0 ok / 1 fail
 }
 count() { local n; n="$(grep -c . "$1" 2>/dev/null)"; echo "${n:-0}"; }
 
-write_meta() {  # total primary mirrors_agree degraded pending
+write_meta() {  # total primary mirrors_agree degraded pending mirror_mismatch
   local mtmp; mtmp="$(mktemp "${META}.XXXXXX")" || return 1
-  printf '{"updated_at":"%s","total_count":%s,"primary_count":%s,"mirrors_agree":%s,"degraded":%s,"pending_review":%s}\n' \
-    "$(date -Iseconds)" "${1:-0}" "${2:-0}" "${3:-false}" "${4:-false}" "${5:-false}" > "$mtmp" \
+  printf '{"updated_at":"%s","total_count":%s,"primary_count":%s,"mirrors_agree":%s,"degraded":%s,"pending_review":%s,"mirror_mismatch":%s}\n' \
+    "$(date -Iseconds)" "${1:-0}" "${2:-0}" "${3:-false}" "${4:-false}" "${5:-false}" "${6:-false}" > "$mtmp" \
     || { rm -f "$mtmp"; return 1; }
   chmod 644 "$mtmp"; mv -f "$mtmp" "$META"      # same dir as DEST ⇒ atomic
 }
 keep_old() {  # reason — refresh degraded meta, keep existing list, exit 1
   echo "qs-aur-blacklist-fetch: $1 — keeping previous list" >&2
-  write_meta "$(count "$DEST")" 0 false true false || true
+  write_meta "$(count "$DEST")" 0 false true false "${mirror_mismatch:-false}" || true
   exit 1
 }
 
@@ -65,14 +65,27 @@ for u in "${PRIMARY_URLS[@]}"; do
   fetch "$u" "$tmpd/p.raw" && { sanitize < "$tmpd/p.raw" > "$tmpd/primary"; primary_ok=true; break; }
 done
 # --- 2. mirror (cross-check + fallback) -----------------------------------
-mirror_ok=false; mirrors_agree=false
+mirror_ok=false; mirrors_agree=false; mirror_mismatch=false
 for u in "${MIRROR_URLS[@]}"; do
   fetch "$u" "$tmpd/m.raw" && { sanitize < "$tmpd/m.raw" > "$tmpd/mirror"; mirror_ok=true; break; }
 done
 # --- choose the trusted remote base ---------------------------------------
-if $primary_ok; then
+if $primary_ok && $mirror_ok; then
+  if cmp -s "$tmpd/primary" "$tmpd/mirror"; then
+    mirrors_agree=true
+    cp "$tmpd/primary" "$tmpd/base"
+  else
+    # The two mirrors of the same upstream disagree — transient lag or a tampered
+    # feed, indistinguishable here. Don't trust either alone: UNION them so a
+    # stripped feed can never drop a known-malicious name (false negatives are the
+    # danger; extra names only ever cause a harmless WARN). Flag it loudly instead
+    # of going degraded, so a benign lag doesn't cry wolf.
+    mirror_mismatch=true
+    sort -u "$tmpd/primary" "$tmpd/mirror" > "$tmpd/base"
+    echo "qs-aur-blacklist-fetch: primary/mirror MISMATCH — using their union ($(count "$tmpd/base") names)" >&2
+  fi
+elif $primary_ok; then
   cp "$tmpd/primary" "$tmpd/base"
-  if $mirror_ok && cmp -s "$tmpd/primary" "$tmpd/mirror"; then mirrors_agree=true; fi
 elif $mirror_ok; then
   echo "qs-aur-blacklist-fetch: primary unreachable — falling back to mirror" >&2
   cp "$tmpd/mirror" "$tmpd/base"
@@ -107,7 +120,7 @@ if [ "$old_count" -gt 0 ]; then
   if [ "$new_count" -gt $(( old_count + MAX_GROWTH )) ]; then
     ptmp="$(mktemp "$DEST.pending.XXXXXX")" && { cp "$tmpd/cand" "$ptmp"; chmod 644 "$ptmp"; mv -f "$ptmp" "$DEST.pending"; }
     echo "qs-aur-blacklist-fetch: +$(( new_count - old_count )) names exceeds growth cap ($MAX_GROWTH) → wrote $DEST.pending for review, keeping previous list" >&2
-    write_meta "$old_count" "$primary_count" "$mirrors_agree" true true || true
+    write_meta "$old_count" "$primary_count" "$mirrors_agree" true true "$mirror_mismatch" || true
     exit 1
   fi
 fi
@@ -119,5 +132,5 @@ cp "$tmpd/cand" "$tmp" || { rm -f "$tmp"; exit 1; }
 chmod 644 "$tmp"
 mv -f "$tmp" "$DEST"     # same dir ⇒ atomic rename
 rm -f "$DEST.pending"    # a clean adoption clears any stale quarantine
-write_meta "$new_count" "$primary_count" "$mirrors_agree" false false || true
-echo "qs-aur-blacklist-fetch: $new_count packages → $DEST (primary $primary_count, mirrors_agree=$mirrors_agree, supplement $sup_count)"
+write_meta "$new_count" "$primary_count" "$mirrors_agree" false false "$mirror_mismatch" || true
+echo "qs-aur-blacklist-fetch: $new_count packages → $DEST (primary $primary_count, mirrors_agree=$mirrors_agree, mismatch=$mirror_mismatch, supplement $sup_count)"

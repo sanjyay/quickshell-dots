@@ -52,14 +52,15 @@ while read -r p; do [ -n "$p" ] && INFECTED["$p"]=1; done < <(load_plain; load_l
 # Prefer the fetcher's content timestamp over file mtime: install/mv/post-update
 # can reset mtime and thereby mask or fake staleness. Fall back to mtime only
 # when no meta is present.
-meta_updated=""; meta_degraded=false; meta_pending=false; mirrors_agree=false
+meta_updated=""; meta_degraded=false; meta_pending=false; mirrors_agree=false; mirror_mismatch=false
 if [ -r "$META" ]; then
   meta_raw="$(cat "$META" 2>/dev/null || true)"
   if [ -n "$meta_raw" ]; then
     meta_updated="$(printf '%s' "$meta_raw" | grep -oE '"updated_at":"[^"]*"' | head -1 | sed 's/.*:"//; s/"$//')"
-    printf '%s' "$meta_raw" | grep -qE '"degraded":[[:space:]]*true'       && meta_degraded=true
-    printf '%s' "$meta_raw" | grep -qE '"pending_review":[[:space:]]*true' && meta_pending=true
-    printf '%s' "$meta_raw" | grep -qE '"mirrors_agree":[[:space:]]*true'  && mirrors_agree=true
+    printf '%s' "$meta_raw" | grep -qE '"degraded":[[:space:]]*true'        && meta_degraded=true
+    printf '%s' "$meta_raw" | grep -qE '"pending_review":[[:space:]]*true'  && meta_pending=true
+    printf '%s' "$meta_raw" | grep -qE '"mirrors_agree":[[:space:]]*true'   && mirrors_agree=true
+    printf '%s' "$meta_raw" | grep -qE '"mirror_mismatch":[[:space:]]*true' && mirror_mismatch=true
   fi
 fi
 
@@ -99,8 +100,8 @@ emit() { # pkg repo old new verdict reason
 }
 
 # --- meta line first so the UI can show a degraded/limited-protection state
-printf '{"meta":"gate","blacklist":%d,"degraded":%s,"list_date":"%s","stale":%s,"mirrors_agree":%s}\n' \
-  "$blacklist_count" "$degraded" "$list_date" "$stale" "$mirrors_agree"
+printf '{"meta":"gate","blacklist":%d,"degraded":%s,"list_date":"%s","stale":%s,"mirrors_agree":%s,"mirror_mismatch":%s}\n' \
+  "$blacklist_count" "$degraded" "$list_date" "$stale" "$mirrors_agree" "$mirror_mismatch"
 
 # --- 4. Classify each update candidate -----------------------------------
 while IFS='|' read -r pkg repo old new || [ -n "$pkg" ]; do

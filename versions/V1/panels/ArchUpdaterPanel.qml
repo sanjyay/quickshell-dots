@@ -171,6 +171,7 @@ PanelWindow {
                     if (root.archGateDegraded) s.push({ t: "⚠ protection limited", c: root.seal, link: false })
                     if (root.archGateStale) s.push({ t: "⚠ source stale", c: root.seal, link: false })
                     if (root.archGateMirrorsAgree && !root.archGateDegraded) s.push({ t: "mirrors ✓", c: root.green, link: false })
+                    if (root.archGateMirrorMismatch) s.push({ t: "⚠ mirror mismatch", c: root.seal, link: false })
                     if (root.archGateBlacklist > 0) {
                         var b = "blacklist " + root.archGateBlacklist
                         if (root.archGateListDate !== "") b += " · " + root.archGateListDate
@@ -202,8 +203,8 @@ PanelWindow {
                                 enabled: !!modelData.link
                                 hoverEnabled: true
                                 cursorShape: modelData.link ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                onClicked: if (modelData.link) Quickshell.execDetached(
-                                    ["xdg-open", "https://gist.github.com/quantenProjects/3f768dce7331618310f016d975bf8547"])
+                                onClicked: if (modelData.link) Quickshell.execDetached(["bash", "-c",
+                                    "omarchy-launch-floating-terminal-with-presentation 'less ~/.local/share/qs-aur-blacklist.txt'"])
                             }
                         }
                     }
@@ -448,7 +449,7 @@ PanelWindow {
                         onClicked: {
                             // Display-only: list AUR updates, install nothing.
                             panelUpdateRunner.command = ["bash", "-c",
-                                "omarchy-launch-floating-terminal-with-presentation 'echo \"AUR review — no packages are installed by this view.\"; echo; yay -Qum; echo; echo \"Inspect:  yay -G <pkg> && less <pkg>/PKGBUILD\"'"];
+                                "omarchy-launch-floating-terminal-with-presentation 'echo \"AUR review — no packages are installed by this view.\"; echo; AUR=$(command -v paru || command -v yay || echo yay); \"$AUR\" -Qum; echo; echo \"Review each PKGBUILD before building these manually.\"'"];
                             root.archVisible = false;
                             panelUpdateRunner.running = false;
                             panelUpdateRunner.running = true;
