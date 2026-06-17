@@ -60,14 +60,36 @@ cd "$REPO"
 [ -z "$(git status --porcelain)" ] || \
   fail "Repo has uncommitted changes — commit or stash in $REPO first."
 
-# 2. Fast-forward only. Diverged local commits must never be lost.
+# 2. Fast-forward when possible. The working tree is already verified clean
+#    above, so the only thing a divergence can cost here is local *commits*.
 git fetch --quiet origin || fail "Could not reach origin (offline?)."
 upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)" \
   || fail "No upstream tracking branch in $REPO."
-if ! git merge-base --is-ancestor HEAD "$upstream"; then
-  fail "Local branch diverged from $upstream — resolve manually (git status in $REPO)."
+if git merge-base --is-ancestor HEAD "$upstream"; then
+  git pull --ff-only --quiet || fail "git pull failed in $REPO."
+elif [ -z "$(git merge-base HEAD "$upstream" 2>/dev/null)" ]; then
+  # No common ancestor ⇒ upstream history was rewritten (e.g. a maintenance
+  # force-push). A FULL rewrite (new root) also leaves any genuine local commit
+  # without a common ancestor, so "no merge-base" alone does NOT prove a pure
+  # consumer. Auto-heal ONLY when HEAD carries no commits beyond the PRE-fetch
+  # upstream tip (origin reflog @{1}); otherwise refuse — and if we cannot prove
+  # it (no reflog), refuse too (fail closed). So real local work is never reset.
+  # Recovery, should the proof ever be wrong, is git's own reflog (HEAD@{1});
+  # we deliberately do NOT pin a named backup ref — that would keep the
+  # rewritten-away history (e.g. a privacy scrub) reachable forever instead of
+  # letting it gc.
+  prev="$(git rev-parse --verify --quiet "$upstream@{1}" 2>/dev/null || true)"
+  if [ -n "$prev" ] && [ "$(git rev-list --count "$prev..HEAD" 2>/dev/null || echo 1)" -eq 0 ]; then
+    note "Shell update" "Re-aligned with upstream history."
+    git reset --quiet --hard "$upstream" || fail "Could not re-align to $upstream."
+  else
+    fail "Local branch has its own commits and cannot fast-forward — resolve manually (git status in $REPO)."
+  fi
+else
+  # A shared ancestor exists but local has its own commits on top ⇒ this could
+  # be real local work. Refuse rather than silently discard it.
+  fail "Local branch has unmerged commits — resolve manually (git status in $REPO)."
 fi
-git pull --ff-only --quiet || fail "git pull failed in $REPO."
 
 [ -d "$REPO/versions/$ver" ] || fail "Version '$ver' missing in repo after pull."
 
@@ -94,10 +116,13 @@ printf '%s\n' "$ver" > "$stage/.qsrise"
 # `quickshell -p $DEST` (install.sh's first start) — a bar left running through
 # the swap would keep serving the old tree.
 if [ -z "${QS_SHELL_NO_RESTART:-}" ]; then
-  pkill -x qs 2>/dev/null || true
+  # Scope to THIS config only. A bare `pkill -x qs` also kills any other
+  # quickshell instance the user runs (e.g. a second `qs -c <other>` config) —
+  # match the bar config's command line instead.
+  pkill -f 'qs.* -c bar([[:space:]]|$)' 2>/dev/null || true
   pkill -f "quickshell -p $DEST" 2>/dev/null || true
   for _ in $(seq 1 30); do
-    pgrep -x qs >/dev/null 2>&1 || pgrep -f "quickshell -p $DEST" >/dev/null 2>&1 || break
+    pgrep -f 'qs.* -c bar([[:space:]]|$)' >/dev/null 2>&1 || pgrep -f "quickshell -p $DEST" >/dev/null 2>&1 || break
     sleep 0.1
   done
 fi
