@@ -129,7 +129,7 @@ PanelWindow {
                 width: Math.max(0, rx - lx)
                 visible: hasContent && width > 16
                 radius: rad
-                color: root.bg
+                color: root.barBg
                 border.color: root.sep
                 border.width: 1
                 Behavior on x     { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }

@@ -518,9 +518,10 @@ PanelWindow {
             }
             Row {
                 width: parent.width; spacing: 4
-                // independent toggles: each highlights when ON, click flips it
-                Tile { width: (wwCol.width - 4) / 2; label: "Border"; active: root.styleBorder; onActivated: root.styleBorder = !root.styleBorder }
-                Tile { width: (wwCol.width - 4) / 2; label: "Shadow"; active: root.styleShadow; onActivated: root.styleShadow = !root.styleShadow }
+                // independent toggles: each highlights when ON, click flips it (Border+Frost+Shadow combinable)
+                Tile { width: (wwCol.width - 8) / 3; label: "Border"; active: root.styleBorder; onActivated: root.styleBorder = !root.styleBorder }
+                Tile { width: (wwCol.width - 8) / 3; label: "Frost";  active: root.styleFrost;  onActivated: root.styleFrost = !root.styleFrost }
+                Tile { width: (wwCol.width - 8) / 3; label: "Shadow"; active: root.styleShadow; onActivated: root.styleShadow = !root.styleShadow }
             }
             Row {
                 width: parent.width; spacing: 4

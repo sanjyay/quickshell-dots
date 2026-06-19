@@ -601,7 +601,7 @@ PanelWindow {
                 width: Math.max(0, modelData.w)
                 height: island.height
                 radius: barSlot.root.islandRadius
-                color: barSlot.root.bg
+                color: barSlot.root.barBg
                 border.color: barSlot.root.islandBorder
                 border.width: barSlot.root.pillBorderW
                 PillShadow { theme: barSlot.root }

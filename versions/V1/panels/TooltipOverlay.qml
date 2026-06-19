@@ -11,7 +11,9 @@ PanelWindow {
     anchors { top: true; bottom: true; left: true; right: true }
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "omarchy-tooltip"
+    // "quickshell" (not "omarchy-tooltip") so the theme's match:namespace quickshell
+    // blur rule frosts the tooltip too — same ride-the-theme mechanism as the bar.
+    WlrLayershell.namespace: "quickshell"
     mask: Region {}
 
     readonly property int barBottom: 35
@@ -40,7 +42,7 @@ PanelWindow {
         }
         y: root.barPosition === "bottom" ? (parent.height - barBottom - gap - height) : (barBottom + gap)
 
-        color: root.bg
+        color: root.barBg   // frosts with the bar's Frost toggle (0.68 ⇄ 0.94)
         border.color: root.pillBorder
         border.width: root.pillBorderW
         radius: 6

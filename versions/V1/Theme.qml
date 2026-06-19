@@ -29,6 +29,11 @@ Item {
     property real pillOpacity: 0.18   // einzelne Widget-Pillen (workspace, mem, cpu, …)
 
     readonly property color bg:     Qt.rgba(paper.r, paper.g, paper.b, barOpacity)
+    // bar island/section bg ONLY (NOT the shared bg -> panels keep their opacity): Frost
+    // lowers the island alpha; compositor blur appears automatically when the theme
+    // already blurs Quickshell layer surfaces.
+    readonly property color barBg:  Qt.rgba(paper.r, paper.g, paper.b,
+                                            styleFrost ? Math.min(barOpacity, 0.68) : barOpacity)
     readonly property color pill:   Qt.rgba(paper.r, paper.g, paper.b, pillOpacity)
     readonly property color fg:     ink
     readonly property color muted:  sumi
@@ -60,6 +65,7 @@ Item {
     // border on/off and shadow on/off are INDEPENDENT (4 combos possible).
     property bool styleBorder:      true    // pill/card 1px border on/off
     property bool styleShadow:      false   // box-shadow on/off
+    property bool styleFrost:       false   // lower bar-island opacity; theme blur may show through
     property bool styleRadiusSmall: false   // radius 12 ⇄ 6
     property bool styleHeightMin:   false   // inner pill 24 ⇄ 20 (slot stays 28)
     readonly property int   pillRadius:   styleRadiusSmall ? 6 : 12
@@ -443,6 +449,7 @@ Item {
     onClock12hChanged:        if (_widgetsLoaded) saveWidgets()
     onStyleBorderChanged:      if (_widgetsLoaded) saveWidgets()
     onStyleShadowChanged:      if (_widgetsLoaded) saveWidgets()
+    onStyleFrostChanged:       if (_widgetsLoaded) saveWidgets()
     onStyleRadiusSmallChanged: if (_widgetsLoaded) saveWidgets()
     onWorkspaceStyleChanged:   if (_widgetsLoaded) saveWidgets()
     onBarPositionChanged:      if (_widgetsLoaded) saveWidgets()
@@ -469,7 +476,8 @@ Item {
                  + (modCpu    ? "1" : "0") + " "          // +13
                  + (modVolume ? "1" : "0") + " "          // +14
                  + (modMpris  ? "1" : "0") + " "          // +15 now-playing / mpris
-                 + aiTool                                 // +16 AI tool shown in bar (claude/codex)
+                 + aiTool + " "                           // +16 AI tool shown in bar (claude/codex)
+                 + (styleFrost ? "1" : "0")               // +17 frost / lowered island opacity
         widgetSaveProc.command = ["bash", "-c",
             "echo '" + line + "' > '" + widgetsCachePath + "'"]
         widgetSaveProc.running = false
@@ -545,6 +553,7 @@ Item {
                         var at = parts[wsField + 16]
                         if (at === "claude" || at === "codex") theme.aiTool = at
                     }
+                    if (parts.length > wsField + 17) theme.styleFrost = parts[wsField + 17] === "1"
                 }
                 theme._widgetsLoaded = true
             }
