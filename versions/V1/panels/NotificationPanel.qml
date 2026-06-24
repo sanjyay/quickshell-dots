@@ -17,75 +17,210 @@ PanelWindow {
     readonly property int barBottom: 35
     readonly property int gap: 8
 
-    // all parsed notifications (active popups + mako history), deduped by id
-    property var recent: []
-    // set of ids the user has dismissed in the panel (persisted)
-    property var dismissedIds: ({})
+    // ── quickshell-owned notification history ────────────────────────────────
+    // Mako's history is capped (default max-history 5), so polling it and
+    // REPLACING our list each time loses everything older. Instead we MERGE each
+    // poll into our own retained history (capped 50) and persist it, so entries
+    // survive both mako dropping them and a quickshell restart.
+    //
+    // Identity: mako ids are a per-session counter that RESETS on a mako restart,
+    // so a bare id is ambiguous across restarts. We derive a session token
+    // (boot-id + mako pid + proc start-time) once per poll; when it changes we
+    // bump `generation`, and every entry is keyed "generation:id". Old entries
+    // (gen 0) and reused new ids (gen 1) therefore never collide. The bare id is
+    // used ONLY for makoctl dismiss/invoke operations.
 
-    // pending = not yet dismissed → drives both the list and the badge
+    property var recent: []             // [{key,id,gen,appName,summary,body,firstSeen,active}]
+    property var dismissed: ({})         // composite-key -> true (persisted)
+    property string sessionToken: ""
+    property int generation: 0
+    property int seq: 0                  // monotonic first-seen counter (ordering)
+    property bool cacheLoaded: false
+    property string lastSaved: ""
+
+    // pending = not dismissed → drives both the list and the badge
     readonly property var pending: {
         var out = []
-        for (var i = 0; i < recent.length; i++) {
-            var id = parseInt(recent[i].id) || 0
-            if (!dismissedIds[id]) out.push(recent[i])
-        }
+        for (var i = 0; i < recent.length; i++)
+            if (!dismissed[recent[i].key]) out.push(recent[i])
         return out
     }
     readonly property int unreadCount: pending.length
-    readonly property int maxShown: 6
-    readonly property var shownNotifs: pending.slice(0, maxShown)
-
-    readonly property string dismPath: "${XDG_CACHE_HOME:-$HOME/.cache}/qs-rise-notif-dismissed"
+    // scrollable list height cap, clamped to the monitor
+    readonly property int listCap: Math.max(120, Math.min(420, notifPanel.height - 220))
 
     Binding { target: root; property: "notifCount"; value: notifPanel.unreadCount }
 
-    Component.onCompleted: loadDism.running = true
-
-    // load the persisted dismissed-id set, then do a first parse
-    Process {
-        id: loadDism
-        command: ["bash", "-c", "cat \"" + notifPanel.dismPath + "\" 2>/dev/null || echo ''"]
-        stdout: StdioCollector { onStreamFinished: {
-            var d = {}
-            var parts = this.text.trim().split(',')
-            for (var i = 0; i < parts.length; i++) {
-                var n = parseInt(parts[i]); if (!isNaN(n)) d[n] = true
+    // ── persistent cache (quickshell is the sole writer; write only on change) ──
+    readonly property string cachePath: Quickshell.env("HOME") + "/.cache/qs-rise-notifications.json"
+    FileView {
+        id: cacheFile
+        path: notifPanel.cachePath
+        onLoaded: {
+            try {
+                var j = JSON.parse(cacheFile.text())
+                notifPanel.sessionToken = j.token || ""
+                notifPanel.generation   = j.generation || 0
+                notifPanel.seq          = j.seq || 0
+                notifPanel.recent       = Array.isArray(j.recent) ? j.recent : []
+                notifPanel.dismissed    = (j.dismissed && typeof j.dismissed === "object") ? j.dismissed : ({})
+                notifPanel.lastSaved    = cacheFile.text()
+            } catch (e) {
+                notifPanel.recent = []; notifPanel.dismissed = ({})
             }
-            notifPanel.dismissedIds = d
-            historyProc.running = false; historyProc.running = true
-        }}
+            notifPanel.cacheLoaded = true
+            notifPanel.poll()
+        }
+        onLoadFailed: {                  // first run: no cache yet
+            notifPanel.cacheLoaded = true
+            notifPanel.poll()
+        }
+    }
+    // force the initial load (don't rely on implicit auto-load) — the whole panel
+    // is gated on cacheLoaded, so a missed load would mean no notifications ever
+    Component.onCompleted: cacheFile.reload()
+
+    function saveCache() {
+        if (!notifPanel.cacheLoaded) return
+        var state = JSON.stringify({
+            token: notifPanel.sessionToken,
+            generation: notifPanel.generation,
+            seq: notifPanel.seq,
+            recent: notifPanel.recent,
+            dismissed: notifPanel.dismissed
+        })
+        if (state === notifPanel.lastSaved) return   // no real change → no write
+        notifPanel.lastSaved = state
+        cacheFile.setText(state)
     }
 
-    Process { id: saveDism; command: ["bash", "-c", "true"] }
-    function persistDismissed() {
-        var keys = Object.keys(notifPanel.dismissedIds)
-        saveDism.command = ["bash", "-c",
-            "mkdir -p \"$(dirname \"" + notifPanel.dismPath + "\")\"; echo '" + keys.join(",") + "' > \"" + notifPanel.dismPath + "\""]
-        saveDism.running = false; saveDism.running = true
+    // pid-guarded: with an empty pid, /proc//stat collapses to /proc/stat (a
+    // multi-line file) and awk would inject raw newlines into the token → broken
+    // JSON. So build the token ONLY when mako's pid is known; else token="" (the
+    // merge then keeps the current generation untouched — a safe no-op).
+    readonly property string pollScript: "pid=$(pidof mako 2>/dev/null | awk '{print $1}'); if [ -n \"$pid\" ]; then bid=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null); st=$(awk '{print $22}' /proc/$pid/stat 2>/dev/null); tok=\"$bid-$pid-$st\"; else tok=\"\"; fi; lst=$(makoctl list -j 2>/dev/null); [ -z \"$lst\" ] && lst='[]'; his=$(makoctl history -j 2>/dev/null); [ -z \"$his\" ] && his='[]'; printf '{\"token\":\"%s\",\"list\":%s,\"history\":%s}' \"$tok\" \"$lst\" \"$his\""
+
+    Process {
+        id: pollProc
+        command: ["bash", "-c", notifPanel.pollScript]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var d
+                try { d = JSON.parse(this.text) } catch (e) { return }
+                notifPanel.merge(d.token || "", d.list || [], d.history || [])
+            }
+        }
+    }
+    function poll() {
+        if (!notifPanel.cacheLoaded) return
+        pollProc.running = false; pollProc.running = true
     }
 
-    function dismissOne(id) {
-        var nd = {}
-        for (var k in notifPanel.dismissedIds) nd[k] = true
-        nd[parseInt(id)] = true
-        notifPanel.dismissedIds = nd          // reassign → bindings update
-        persistDismissed()
-        // also clear it from mako if it's still an active popup
-        actionProc.command = ["bash", "-c", "makoctl dismiss -n " + id + " 2>/dev/null || true"]
+    // merge this poll's active(list) + history into our retained history
+    function merge(token, listArr, histArr) {
+        // session / generation
+        if (token !== "" && token !== notifPanel.sessionToken) {
+            if (notifPanel.sessionToken !== "") notifPanel.generation += 1
+            notifPanel.sessionToken = token
+        }
+        var gen = notifPanel.generation
+
+        // incoming this poll (current generation), by bare id; active = in `list`
+        var incoming = {}
+        for (var i = 0; i < listArr.length; i++) {
+            var n = listArr[i]
+            incoming[n.id] = { appName: n.app_name || "", summary: n.summary || "", body: n.body || "", active: true }
+        }
+        for (var j = 0; j < histArr.length; j++) {
+            var h = histArr[j]
+            if (incoming[h.id] === undefined)
+                incoming[h.id] = { appName: h.app_name || "", summary: h.summary || "", body: h.body || "", active: false }
+        }
+
+        // existing entries by composite key
+        var byKey = {}
+        for (var k = 0; k < notifPanel.recent.length; k++) byKey[notifPanel.recent[k].key] = notifPanel.recent[k]
+
+        // update-or-create current-gen entries; oldest id first so newest gets the largest seq
+        var ids = []
+        for (var idk in incoming) ids.push(parseInt(idk))
+        ids.sort(function(a, b) { return a - b })
+        for (var m = 0; m < ids.length; m++) {
+            var id = ids[m]
+            var key = gen + ":" + id
+            var src = incoming[id]
+            if (byKey[key] !== undefined) {
+                var e = byKey[key]
+                e.appName = src.appName; e.summary = src.summary; e.body = src.body
+            } else {
+                byKey[key] = { key: key, id: id, gen: gen,
+                    appName: src.appName, summary: src.summary, body: src.body,
+                    firstSeen: (++notifPanel.seq) }
+            }
+        }
+
+        // recompute the (transient) active flag for ALL entries, build a NEW array
+        var out = []
+        for (var ek in byKey) {
+            var ee = byKey[ek]
+            ee.active = (ee.gen === gen && incoming[ee.id] !== undefined && incoming[ee.id].active === true)
+            out.push(ee)
+        }
+        out.sort(function(a, b) { return b.firstSeen - a.firstSeen })
+        if (out.length > 50) out = out.slice(0, 50)
+
+        // prune dismissed keys no longer present (bounds the set)
+        var present = {}
+        for (var o = 0; o < out.length; o++) present[out[o].key] = true
+        var nd = {}, changed = false
+        for (var dk in notifPanel.dismissed) {
+            if (present[dk]) nd[dk] = true; else changed = true
+        }
+
+        notifPanel.recent = out                  // reassign → bindings fire
+        if (changed) notifPanel.dismissed = nd
+        notifPanel.saveCache()
+    }
+
+    // ── actions ──
+    Process { id: actionProc; command: ["bash", "-c", "true"] }
+    function runMako(cmd) {
+        actionProc.command = ["bash", "-c", cmd + " 2>/dev/null || true"]
         actionProc.running = false; actionProc.running = true
+    }
+
+    function dismissOne(entry) {
+        var nd = {}
+        for (var k in notifPanel.dismissed) nd[k] = true
+        nd[entry.key] = true
+        notifPanel.dismissed = nd                // reassign → bindings update
+        if (entry.active) notifPanel.runMako("makoctl dismiss -h -n " + entry.id)
+        notifPanel.saveCache()
     }
 
     function dismissAll() {
         var nd = {}
-        for (var k in notifPanel.dismissedIds) nd[k] = true
-        for (var i = 0; i < notifPanel.recent.length; i++) nd[parseInt(notifPanel.recent[i].id)] = true
-        notifPanel.dismissedIds = nd
-        persistDismissed()
-        actionProc.command = ["bash", "-c", "makoctl dismiss --all 2>/dev/null || true"]
-        actionProc.running = false; actionProc.running = true
+        for (var k in notifPanel.dismissed) nd[k] = true
+        for (var i = 0; i < notifPanel.recent.length; i++) nd[notifPanel.recent[i].key] = true
+        notifPanel.dismissed = nd
+        notifPanel.recent = []                   // clear own history; re-merged entries stay dismissed-filtered
+        notifPanel.runMako("makoctl dismiss --all")
+        notifPanel.saveCache()
     }
 
-    Process { id: actionProc; command: ["bash", "-c", "true"] }
+    function openNotification(entry) {
+        if (entry.active) notifPanel.runMako("makoctl invoke -n " + entry.id)
+        // history/cache-only entries are no longer active → do nothing (never `restore`)
+        root.notifVisible = false
+    }
+
+    // ── poll cadence: fast while open, slow when closed (badge still updates) ──
+    Timer {
+        interval: notifPanel.visible ? 1500 : 3500
+        running: true; repeat: true; triggeredOnStart: true
+        onTriggered: notifPanel.poll()
+    }
 
     property real reveal: root.notifVisible ? 1 : 0
     Behavior on reveal {
@@ -97,68 +232,11 @@ PanelWindow {
     visible: reveal > 0.001
     WlrLayershell.keyboardFocus: root.notifVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+    onVisibleChanged: { if (visible) notifPanel.poll() }
+
     MouseArea {
         anchors.fill: parent
         onClicked: root.notifVisible = false
-    }
-
-    // ── parse active popups + history into `recent` (deduped by id) ──
-    Process {
-        id: historyProc
-        command: ["bash", "-c", "(makoctl list 2>/dev/null; makoctl history 2>/dev/null) | head -120"]
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var lines = this.text.split('\n')
-                var list = [], cur = null, seen = {}
-                function flush() {
-                    if (cur && !seen[cur.id]) { seen[cur.id] = true; list.push(cur) }
-                    cur = null
-                }
-                for (var i = 0; i < lines.length; i++) {
-                    var l = lines[i]
-                    var m = l.match(/^Notification (\d+): (.*)/)
-                    if (m) {
-                        flush()
-                        cur = { id: m[1], summary: (m[2] || "").trim(), appName: '', body: '' }
-                    } else if (cur) {
-                        var a = l.match(/^\s+App name:\s+(.+)/)
-                        if (a) { cur.appName = a[1].trim(); continue }
-                        var b = l.match(/^\s+Body:\s+(.+)/)
-                        if (b) cur.body = b[1].trim()
-                    }
-                }
-                flush()
-                notifPanel.recent = list
-
-                // prune dismissed ids that are no longer present (keeps the set small)
-                var nd = {}, changed = false
-                for (var k in notifPanel.dismissedIds) {
-                    if (seen[k]) nd[k] = true; else changed = true
-                }
-                if (changed) { notifPanel.dismissedIds = nd; notifPanel.persistDismissed() }
-            }
-        }
-    }
-
-    Timer {
-        // F7: fast poll only while the panel is open (live list); slow when closed — the badge
-        // still updates (via the binding), but at idle this cuts makoctl spawns ~57%.
-        // (Event-driven via mako's DBus signal would be the next step.)
-        interval: notifPanel.visible ? 1500 : 3500
-        running: true; repeat: true; triggeredOnStart: true
-        onTriggered: { historyProc.running = false; historyProc.running = true }
-    }
-
-    onVisibleChanged: {
-        if (visible) { historyProc.running = false; historyProc.running = true }
-    }
-
-    Process { id: invokeRunner; command: ["bash", "-c", "true"] }
-    function openNotification(id) {
-        invokeRunner.command = ["bash", "-c", "makoctl invoke -n " + id + " 2>/dev/null || makoctl restore 2>/dev/null"]
-        invokeRunner.running = false; invokeRunner.running = true
-        root.notifVisible = false
     }
 
     Rectangle {
@@ -224,114 +302,114 @@ PanelWindow {
 
             Rectangle { width: parent.width; height: 1; color: root.sep }
 
-            // ── notification list (each individually dismissable) ──
-            Column {
+            // ── notification list (scrollable; each individually dismissable) ──
+            Flickable {
                 width: parent.width
-                spacing: 6
+                height: Math.min(listCol.implicitHeight, notifPanel.listCap)
+                contentHeight: listCol.implicitHeight
+                clip: true
+                interactive: listCol.implicitHeight > notifPanel.listCap
+                boundsBehavior: Flickable.StopAtBounds   // no overshoot/rebound at the top/bottom edge
+                flickableDirection: Flickable.VerticalFlick
 
-                Repeater {
-                    model: notifPanel.shownNotifs
+                Column {
+                    id: listCol
+                    width: parent.width
+                    spacing: 6
 
-                    delegate: Rectangle {
-                        required property var modelData
-                        width: col.width
-                        height: entryCol.implicitHeight + 16
-                        radius: root.tileRadius
-                        color: entryMa.containsMouse ? root.fillHover : root.fillIdle
-                        border.color: entryMa.containsMouse ? root.seal : root.sep
-                        border.width: 1
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                    Repeater {
+                        model: notifPanel.pending
 
-                        Column {
-                            id: entryCol
-                            anchors { left: parent.left; right: parent.right; top: parent.top }
-                            anchors.margins: 8
-                            anchors.topMargin: 8
-                            anchors.rightMargin: 26   // leave room for the ✕
-                            spacing: 3
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: listCol.width
+                            height: entryCol.implicitHeight + 16
+                            radius: root.tileRadius
+                            color: entryMa.containsMouse ? root.fillHover : root.fillIdle
+                            border.color: entryMa.containsMouse ? root.seal : root.sep
+                            border.width: 1
+                            Behavior on color { ColorAnimation { duration: 120 } }
 
-                            UiText {
-                                text: modelData.appName || "App"
-                                color: root.sumiHi
-                                font.family: root.mono
-                                font.pixelSize: 10
-                                font.letterSpacing: 0.5
-                                width: parent.width
-                                elide: Text.ElideRight
+                            Column {
+                                id: entryCol
+                                anchors { left: parent.left; right: parent.right; top: parent.top }
+                                anchors.margins: 8
+                                anchors.topMargin: 8
+                                anchors.rightMargin: 26   // leave room for the ✕
+                                spacing: 3
+
+                                UiText {
+                                    text: modelData.appName || "App"
+                                    color: root.sumiHi
+                                    font.family: root.mono
+                                    font.pixelSize: 10
+                                    font.letterSpacing: 0.5
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                }
+                                UiText {
+                                    text: modelData.summary || ""
+                                    color: root.ink
+                                    font.family: root.mono
+                                    font.pixelSize: 11
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                    visible: text !== ""
+                                }
+                                UiText {
+                                    text: modelData.body || ""
+                                    color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.6)
+                                    font.family: root.mono
+                                    font.pixelSize: 10
+                                    width: parent.width
+                                    wrapMode: Text.WordWrap
+                                    maximumLineCount: 2
+                                    elide: Text.ElideRight
+                                    visible: text !== ""
+                                }
                             }
-                            UiText {
-                                text: modelData.summary || ""
-                                color: root.ink
-                                font.family: root.mono
-                                font.pixelSize: 11
-                                width: parent.width
-                                elide: Text.ElideRight
-                                visible: text !== ""
-                            }
-                            UiText {
-                                text: modelData.body || ""
-                                color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.6)
-                                font.family: root.mono
-                                font.pixelSize: 10
-                                width: parent.width
-                                wrapMode: Text.WordWrap
-                                maximumLineCount: 2
-                                elide: Text.ElideRight
-                                visible: text !== ""
-                            }
-                        }
 
-                        // click body → focus the app
-                        MouseArea {
-                            id: entryMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: notifPanel.openNotification(modelData.id)
-                        }
-
-                        // per-item dismiss ✕ (on top, top-right corner)
-                        Rectangle {
-                            anchors.top: parent.top; anchors.right: parent.right
-                            anchors.topMargin: 4; anchors.rightMargin: 4
-                            width: 18; height: 18; radius: 9
-                            color: "transparent"
-                            UiText {
-                                anchors.centerIn: parent
-                                text: "✕"
-                                color: xMa.containsMouse ? root.seal : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.45)
-                                font.pixelSize: 10
-                            }
+                            // click body → focus the app (only if still active in mako)
                             MouseArea {
-                                id: xMa
+                                id: entryMa
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: notifPanel.dismissOne(modelData.id)
+                                onClicked: notifPanel.openNotification(modelData)
+                            }
+
+                            // per-item dismiss ✕ (on top, top-right corner)
+                            Rectangle {
+                                anchors.top: parent.top; anchors.right: parent.right
+                                anchors.topMargin: 4; anchors.rightMargin: 4
+                                width: 18; height: 18; radius: 9
+                                color: "transparent"
+                                UiText {
+                                    anchors.centerIn: parent
+                                    text: "✕"
+                                    color: xMa.containsMouse ? root.seal : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.45)
+                                    font.pixelSize: 10
+                                }
+                                MouseArea {
+                                    id: xMa
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: notifPanel.dismissOne(modelData)
+                                }
                             }
                         }
                     }
-                }
 
-                // "+N more" hint when the list is capped
-                UiText {
-                    visible: notifPanel.pending.length > notifPanel.maxShown
-                    width: col.width
-                    horizontalAlignment: Text.AlignHCenter
-                    text: "+ " + (notifPanel.pending.length - notifPanel.maxShown) + " more"
-                    color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.4)
-                    font.family: root.mono
-                    font.pixelSize: 10
-                }
-
-                UiText {
-                    visible: notifPanel.pending.length === 0
-                    width: col.width
-                    horizontalAlignment: Text.AlignHCenter
-                    text: "No notifications"
-                    color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.3)
-                    font.family: root.mono
-                    font.pixelSize: 11
+                    UiText {
+                        visible: notifPanel.pending.length === 0
+                        width: listCol.width
+                        horizontalAlignment: Text.AlignHCenter
+                        text: "No notifications"
+                        color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.3)
+                        font.family: root.mono
+                        font.pixelSize: 11
+                    }
                 }
             }
 
