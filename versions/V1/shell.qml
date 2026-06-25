@@ -1,4 +1,11 @@
 //@ pragma UseQApplication
+//
+// V1 single-bar lifecycle fix: bind the bar to the first real Wayland output,
+// skip transient nameless/0x0 placeholder screens, and recreate the BarSlot when
+// that output disappears and returns. If the screen remains valid but the layer
+// window loses resources or closes, recreate only that window instead of
+// reloading the complete Quickshell configuration.
+
 import Quickshell
 import QtQuick
 import "panels"
@@ -8,8 +15,121 @@ ShellRoot {
 
     Theme { id: theme }
 
-    // Bar { root: theme }              // ← original (revert: uncomment, comment BarSlot)
-    BarSlot { root: theme }             // ← WIP slot-based port (left region)
+    // Preserve V1's current single-bar behavior. QtWayland creates a nameless
+    // 0x0 placeholder screen while no real output exists; exclude it so no
+    // unusable layer surface is created. A new real ShellScreen identity makes
+    // Variants destroy the old BarSlot and instantiate a fresh one.
+    readonly property var barScreens: {
+        var valid = []
+
+        for (var i = 0; i < Quickshell.screens.length; i++) {
+            var candidate = Quickshell.screens[i]
+            if (candidate.name !== "" && candidate.width > 0 && candidate.height > 0) {
+                valid.push(candidate)
+                break
+            }
+        }
+
+        return valid
+    }
+
+    // Secondary guard for failures that do not replace the ShellScreen object.
+    // resourcesLost is followed by closed, so one pending flag handles the pair
+    // once. A closed PanelWindow drops its backing layer-shell window; setting
+    // visible=true creates a fresh one without resetting the rest of the shell.
+    component BarWindowRecovery: Scope {
+        id: recovery
+
+        required property var targetWindow
+        required property var targetScreen
+
+        property bool pending: false
+        property int attempt: 0
+        property string reason: ""
+
+        function screenReady() {
+            return targetScreen !== null
+                && targetScreen.name !== ""
+                && targetScreen.width > 0
+                && targetScreen.height > 0
+        }
+
+        function schedule(reason_) {
+            if (pending) return
+
+            pending = true
+            attempt = 0
+            reason = reason_
+            console.warn("[BarWindowRecovery] window lost: " + reason)
+            retryTimer.restart()
+        }
+
+        Connections {
+            target: recovery.targetWindow
+
+            function onResourcesLost() { recovery.schedule("resourcesLost") }
+            function onClosed() { recovery.schedule("closed") }
+        }
+
+        Timer {
+            id: retryTimer
+            interval: 750
+            repeat: false
+            onTriggered: {
+                // Screen replacement is owned by Variants. The delegate and this
+                // timer will normally be destroyed before reaching this branch.
+                if (!recovery.screenReady()) {
+                    console.warn("[BarWindowRecovery] invalid screen; waiting for Variants")
+                    recovery.pending = false
+                    return
+                }
+
+                recovery.attempt++
+                console.warn("[BarWindowRecovery] recreating bar window (attempt "
+                             + recovery.attempt + "/3)")
+                recovery.targetWindow.visible = true
+                verifyTimer.restart()
+            }
+        }
+
+        Timer {
+            id: verifyTimer
+            interval: 1200
+            repeat: false
+            onTriggered: {
+                if (recovery.targetWindow.backingWindowVisible) {
+                    console.log("[BarWindowRecovery] bar window recovered")
+                    recovery.pending = false
+                    recovery.attempt = 0
+                } else if (recovery.attempt < 3 && recovery.screenReady()) {
+                    retryTimer.restart()
+                } else {
+                    console.warn("[BarWindowRecovery] targeted recovery failed")
+                    recovery.pending = false
+                }
+            }
+        }
+    }
+
+    Variants {
+        model: root.barScreens
+
+        delegate: Component {
+            BarSlot {
+                id: barWindow
+                required property var modelData
+
+                root: theme
+                screen: modelData
+
+                BarWindowRecovery {
+                    targetWindow: barWindow
+                    targetScreen: barWindow.modelData
+                }
+            }
+        }
+    }
+
     TooltipOverlay { root: theme }
     CalendarPopup { root: theme }
     ArchUpdaterPanel { root: theme }
@@ -30,10 +150,8 @@ ShellRoot {
     WorkspacePanel { root: theme }
     ControlPanel { root: theme }
     TrayMenu { root: theme }
-    // Picker variants: only the selected pickerStyle is instantiated — the other
-    // four full-screen PanelWindows never exist until the style is switched.
-    // (each panel already early-returns when its style isn't active; LazyLoader
-    //  removes the dormant window + bindings entirely.)
+
+    // Picker variants: only the selected pickerStyle is instantiated.
     LazyLoader { active: theme.pickerStyle === "tanzaku" || theme.pickerStyle === "";  ImageCarouselPanel       { root: theme } }
     LazyLoader { active: theme.pickerStyle === "hearthstone";                           ImageCarouselHearthstone { root: theme } }
     LazyLoader { active: theme.pickerStyle === "carousel";                              ImageCarouselCarousel    { root: theme } }
