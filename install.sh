@@ -216,7 +216,7 @@ pkill -x waybar 2>/dev/null && info "Stopped waybar (use the panel/control to ma
 pkill -f "qs.*-c bar" 2>/dev/null || true
 pkill -f "quickshell -p $DEST" 2>/dev/null || true
 sleep 0.3
-setsid quickshell -p "$DEST" >/dev/null 2>&1 &
+setsid qs -n -d -c bar >/dev/null 2>&1 < /dev/null &
 info "Bar started — try it out."
 
 # ── 6b. shell self-updater (never blocks the bar install) ───────

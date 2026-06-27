@@ -4,4 +4,4 @@
 # the bar detached so we don't block later post-boot.d hooks (omarchy-hook runs
 # them sequentially). -n bails out if an instance is already running (idempotent).
 pkill -x waybar 2>/dev/null || true
-setsid qs -n -c bar >/dev/null 2>&1 &
+setsid qs -n -d -c bar >/dev/null 2>&1 < /dev/null &
