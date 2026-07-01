@@ -4,6 +4,7 @@ import Quickshell
 Item {
     id: rootMod
     required property var root
+    property var screen: null
 
     implicitWidth: 22
     implicitHeight: 28
@@ -37,6 +38,7 @@ Item {
                 root.imagePickerVisible = false
                 return
             }
+            root.activatePopupScreen(rootMod.screen)
             root.imagePickerMode    = (mouse.button === Qt.RightButton) ? "wallpaper" : "theme"
             root.imagePickerVisible = true
         }

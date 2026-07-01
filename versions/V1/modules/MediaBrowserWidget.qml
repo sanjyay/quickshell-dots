@@ -6,6 +6,7 @@ import Quickshell
 Item {
     id: rootMod
     required property var root
+    property var screen: null
 
     implicitWidth: 22
     implicitHeight: 28
@@ -39,6 +40,7 @@ Item {
                 root.mediaBrowserVisible = false
                 return
             }
+            root.activatePopupScreen(rootMod.screen)
             root.mediaBrowserMode    = (mouse.button === Qt.RightButton) ? "videos" : "screenshots"
             root.mediaBrowserVisible = true
         }

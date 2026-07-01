@@ -229,6 +229,20 @@ Item {
         return false
     }
 
+    Connections {
+        target: Hyprland
+
+        function onFocusedMonitorChanged() {
+            if (!theme.keyboardPopupVisible || theme.activePopupScreenName === "") return
+
+            var monitor = Hyprland.focusedMonitor
+            var focusedName = monitor ? monitor.name : ""
+            if (focusedName !== "" && focusedName !== theme.activePopupScreenName) {
+                theme.closePopups()
+            }
+        }
+    }
+
     function isActivePopupScreenName(screenName) {
         return activePopupScreenName !== "" && screenName === activePopupScreenName
     }
