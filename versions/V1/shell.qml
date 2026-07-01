@@ -180,6 +180,7 @@ ShellRoot {
             }
         }
         visible: root.anyPopupVisible
+            && !root.keyboardPopupVisible
             && targetScreen
             && targetScreen.name !== ""
             && !root.isActivePopupScreenName(targetScreen.name)
