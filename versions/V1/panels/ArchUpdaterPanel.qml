@@ -21,9 +21,65 @@ PanelWindow {
 
     Process {
         id: panelUpdateRunner
-        // No default command — it is built (gated, with --ignore) on click only,
-        // so an accidental start can never run an ungated -Syu.
+        // No default command: package updates and theme-terminal launches build
+        // the command only on click, so an accidental start cannot run anything.
         command: []
+    }
+
+    // ── Theme-updates backend (this panel is the single instance in shell.qml,
+    //    so the check runs ONCE, not per-monitor like the bar widgets would). The
+    //    FileView publishes the read-only cache into root.themeUpd*; the button
+    //    (Themes tab) bumps root.themeCheckTick to run the check script. ──
+    function publishThemeState() {
+        try {
+            var j = JSON.parse(themeState.text())
+            root.themeUpdTotal        = j.total      || 0
+            root.themeUpdReachable    = j.reachable  || 0
+            root.themeUpdOutdated     = j.outdated   || 0
+            root.themeUpdLocalEdits   = j.localEdits || 0
+            root.themeUpdDegraded     = !!j.degraded
+            root.themeUpdCurrentStale = !!j.currentStale
+            root.themeUpdChecked      = j.checked   || ""
+            root.themeUpdList         = j.themes    || []
+        } catch (e) {
+            // keep the last good values on a malformed read
+        }
+    }
+
+    FileView {
+        id: themeState
+        path: Quickshell.env("HOME") + "/.cache/qs-theme-updates.json"
+        watchChanges: true
+        onFileChanged: themeState.reload()
+        onLoaded: archPanel.publishThemeState()
+        // no onLoadFailed reset: absence just means "never checked" (themeUpdChecked stays "")
+    }
+
+    Process {
+        id: themeCheckProc
+        command: ["bash", Quickshell.env("HOME") + "/.config/quickshell/bin/qs-theme-update-check.sh"]
+        running: false
+        onExited: {
+            root.themeUpdChecking = false
+            themeCheckWatchdog.stop()
+            themeState.reload()   // pick up the freshly written cache immediately
+        }
+    }
+
+    // unstick the button if the check ever hangs past its own 180s budget
+    Timer {
+        id: themeCheckWatchdog
+        interval: 190000
+        onTriggered: { root.themeUpdChecking = false; themeCheckProc.running = false }
+    }
+
+    property int themeCheckTrigger: root.themeCheckTick
+    onThemeCheckTriggerChanged: {
+        if (root.themeUpdChecking) return
+        root.themeUpdChecking = true
+        themeCheckWatchdog.restart()
+        themeCheckProc.running = false
+        themeCheckProc.running = true
     }
 
     property real reveal: root.archVisible ? 1 : 0
@@ -112,6 +168,125 @@ PanelWindow {
             + " GUM_CONFIRM_UNSELECTED_BACKGROUND=" + shellQuote(hexColor(root.bg))
     }
 
+    // ── theme update = the accepted Omarchy path, shown in a visible terminal ──
+    // No custom apply script and no safe/review policy: "Update all" runs Omarchy's
+    // own omarchy-theme-update; a per-theme update runs `git -C <dir> pull` — the
+    // single-theme equivalent. Both run in the Omarchy floating terminal so git
+    // output, conflicts, auth prompts and merge notices are visible, exactly like
+    // Omarchy. Each ends by re-running our check so the panel refreshes.
+    readonly property string themeCheckScript: Quickshell.env("HOME") + "/.config/quickshell/bin/qs-theme-update-check.sh"
+
+    function launchThemeTerminal(inner) {
+        panelUpdateRunner.command = ["bash", "-c",
+            "omarchy-launch-floating-terminal-with-presentation " + shellQuote(inner)]
+        root.archVisible = false
+        panelUpdateRunner.running = false
+        panelUpdateRunner.running = true
+    }
+
+    function updateAllThemes() {
+        // Omarchy's own updater over every git theme, then refresh our cache.
+        launchThemeTerminal("omarchy-theme-update; " + shellQuote(themeCheckScript))
+    }
+
+    function updateOneTheme(name) {
+        if (!/^[A-Za-z0-9._-]+$/.test(name)) return   // never build a command from a bad name
+        var dir = Quickshell.env("HOME") + "/.config/omarchy/themes/" + name
+        // plain `git -C <dir> pull` = Omarchy semantics for a single theme; the
+        // terminal shows any merge/conflict/auth just as omarchy-theme-update would.
+        launchThemeTerminal("git -C " + shellQuote(dir) + " pull; " + shellQuote(themeCheckScript))
+    }
+
+    function viewThemeChanges(name) {
+        if (!/^[A-Za-z0-9._-]+$/.test(name)) return
+        var dir = Quickshell.env("HOME") + "/.config/omarchy/themes/" + name
+        var git = "git -C " + shellQuote(dir)
+                + " -c core.fsmonitor="
+                + " -c core.hooksPath=/dev/null"
+        var inner = "printf '%s\\n\\n' " + shellQuote("Theme changes: " + name) + "; "
+                  + "up=$(" + git + " rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null) "
+                  + "|| { echo 'No upstream configured.'; exit 1; }; "
+                  + "echo \"Upstream: $up\"; echo; "
+                  + "echo 'Commits:'; "
+                  + git + " --no-pager log --oneline --decorate HEAD..'@{upstream}' || true; "
+                  + "echo; echo 'Changed files:'; "
+                  + git + " --no-pager diff --no-ext-diff --no-textconv --stat HEAD..'@{upstream}' || true"
+        launchThemeTerminal(inner)
+    }
+
+    // Re-apply the CURRENT theme (a separate, explicit action). omarchy-theme-update
+    // (and a per-theme pull) only advance the theme's REPO; the live copy under
+    // current/theme is a generated copy, so it stays stale until re-applied. Reads
+    // the name from disk — no user-controlled string reaches the shell.
+    function reapplyCurrentTheme() {
+        var nameFile = Quickshell.env("HOME") + "/.config/omarchy/current/theme.name"
+        var inner = "n=$(tr -d '[:space:]' < " + shellQuote(nameFile) + "); "
+                  + "[ -n \"$n\" ] || { echo 'no current theme'; exit 1; }; "
+                  + themedGumConfirmEnv() + " gum confirm " + shellQuote("Re-apply the current theme to pick up its update?")
+                  + " && omarchy-theme-set \"$n\""
+        panelUpdateRunner.command = ["bash", "-c",
+            "omarchy-launch-floating-terminal-with-presentation " + shellQuote(inner)]
+        root.archVisible = false
+        panelUpdateRunner.running = false
+        panelUpdateRunner.running = true
+    }
+
+    // Reusable scroll-position thumb for the update lists: appears ONLY when the
+    // list overflows, height is proportional to the visible fraction, tracks
+    // contentY, AND is draggable with the mouse (drag translates to contentY —
+    // we never bind-fight the y). One definition used by both tabs so they can
+    // never drift apart (the F2 "fixed one variant, missed the sibling" lesson).
+    component ScrollThumb: Item {
+        id: scrollTrack
+        required property var flick
+        anchors.right: parent.right
+        anchors.rightMargin: -6   // sit in the right gutter, clear of the full-width row separators
+        width: 14
+        height: flick.height
+        visible: flick.contentHeight > flick.height + 1
+        readonly property real thumbHeight: flick.contentHeight > 0
+            ? Math.max(24, flick.height * flick.height / flick.contentHeight)
+            : 0
+        readonly property real thumbY: (flick.contentHeight > flick.height)
+            ? (flick.height - thumbHeight) * (flick.contentY / (flick.contentHeight - flick.height))
+            : 0
+
+        Rectangle {
+            id: thumb
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: scrollTrack.thumbY
+            width: (dragMa.containsMouse || dragMa.pressed) ? 6 : 3
+            height: scrollTrack.thumbHeight
+            radius: width / 2
+            color: Qt.rgba(archPanel.root.ink.r, archPanel.root.ink.g, archPanel.root.ink.b,
+                           (dragMa.containsMouse || dragMa.pressed) ? 0.5 : 0.28)
+            Behavior on width { NumberAnimation { duration: 100 } }
+        }
+
+        // A wider stationary grab target. The visible thumb moves, but this track
+        // stays fixed, so drag math is stable while contentY changes.
+        MouseArea {
+            id: dragMa
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            property real startY: 0
+            property real startContent: 0
+            onPressed: (m) => {
+                startY = m.y
+                startContent = scrollTrack.flick.contentY
+            }
+            onPositionChanged: (m) => {
+                if (!pressed) return
+                var track = scrollTrack.flick.height - scrollTrack.thumbHeight
+                if (track <= 0) return
+                var scrollable = scrollTrack.flick.contentHeight - scrollTrack.flick.height
+                var nc = startContent + (m.y - startY) * scrollable / track
+                scrollTrack.flick.contentY = Math.max(0, Math.min(scrollable, nc))
+            }
+        }
+    }
+
     Rectangle {
         id: card
         width: 520
@@ -174,6 +349,47 @@ PanelWindow {
             }
 
             Rectangle { width: parent.width; height: 1; color: root.sep }
+
+            // ── Packages ⟷ Themes tab switch (segmented, AiUsagePanel style) ──
+            Row {
+                width: parent.width
+                height: 26
+                spacing: 6
+                Repeater {
+                    model: [ { id: "packages", label: "Packages" }, { id: "themes", label: "Themes" } ]
+                    Rectangle {
+                        required property var modelData
+                        width: (parent.width - 6) / 2
+                        height: 26; radius: root.tileRadius
+                        readonly property bool active: root.activeUpdateTab === modelData.id
+                        color: active ? root.fillActive : tabMa.containsMouse ? root.fillHover : root.fillIdle
+                        border.color: (active || tabMa.containsMouse) ? root.seal : root.sep
+                        border.width: 1
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                        UiText {
+                            anchors.centerIn: parent
+                            text: modelData.label
+                            color: (parent.active || tabMa.containsMouse) ? root.seal : root.ink
+                            font.family: root.mono; font.pixelSize: 11
+                            font.weight: parent.active ? Font.Medium : Font.Normal
+                        }
+                        MouseArea {
+                            id: tabMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.activeUpdateTab = parent.modelData.id
+                        }
+                    }
+                }
+            }
+
+            // ══════════ PACKAGES TAB (existing content, unchanged) ══════════
+            Column {
+                id: packagesTab
+                width: parent.width
+                spacing: 8
+                visible: root.activeUpdateTab === "packages"
 
             // ── one status line: counts + protection, "·"-separated, colored.
             //    A single RichText Text (NOT a Repeater) so it re-renders reliably
@@ -259,12 +475,15 @@ PanelWindow {
             }
 
             // ── update list ──
-            Flickable {
+            Item {
                 width: parent.width
                 height: Math.min(updatesCol.implicitHeight, 280)
-                contentHeight: updatesCol.implicitHeight
-                clip: true
-                interactive: updatesCol.implicitHeight > 280
+                Flickable {
+                    id: packagesFlick
+                    anchors.fill: parent
+                    contentHeight: updatesCol.implicitHeight
+                    clip: true
+                    interactive: updatesCol.implicitHeight > 280
 
                 Column {
                     id: updatesCol
@@ -363,6 +582,8 @@ PanelWindow {
                         topPadding: 20
                     }
                 }
+                }
+                ScrollThumb { flick: packagesFlick }
             }
 
             Rectangle { width: parent.width; height: 1; color: root.sep }
@@ -475,6 +696,275 @@ PanelWindow {
                     }
                 }
             }
+            }
+            // ══════════ END PACKAGES TAB ══════════
+
+            // ══════════ THEMES TAB ══════════
+            Column {
+                id: themesTab
+                width: parent.width
+                spacing: 8
+                visible: root.activeUpdateTab === "themes"
+
+                // ── status line: counts + freshness (RichText, native) ──
+                Text {
+                    width: parent.width
+                    textFormat: Text.RichText
+                    renderType: Text.NativeRendering
+                    wrapMode: Text.NoWrap
+                    elide: Text.ElideRight
+                    font.family: root.mono; font.pixelSize: 10
+                    text: {
+                        function hx(c) { function h(v){var x=Math.round(v*255).toString(16); return x.length<2?"0"+x:x} return "#"+h(c.r)+h(c.g)+h(c.b) }
+                        function seg(t,c){ return '<font color="'+hx(c)+'">'+t+'</font>' }
+                        if (root.themeUpdChecked === "") return seg("never checked — run a scan", root.sumi)
+                        var p = []
+                        p.push(seg(root.themeUpdOutdated + (root.themeUpdOutdated === 1 ? " update found" : " updates found"),
+                                   root.themeUpdOutdated>0?root.ink:root.sumi))
+                        if (root.themeUpdLocalEdits>0) p.push(seg(root.themeUpdLocalEdits + " with local edits", root.inkDeep))
+                        if (root.themeUpdDegraded) p.push(seg("⚠ check incomplete", root.seal))
+                        var d = new Date(root.themeUpdChecked)
+                        if (!isNaN(d.getTime())) p.push(seg("checked " + Qt.formatDateTime(d, "HH:mm"), root.sumi))
+                        return p.join(' <font color="'+hx(root.sumi)+'">·</font> ')
+                    }
+                }
+
+                // ── current theme became stale after its repo advanced ──
+                Item {
+                    visible: root.themeUpdCurrentStale
+                    width: parent.width
+                    height: 18
+                    UiText {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - 84
+                        text: "⟳ current theme updated — live copy is stale"
+                        color: root.inkDeep
+                        font.family: root.mono; font.pixelSize: 10
+                        elide: Text.ElideRight
+                    }
+                    Rectangle {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.verticalCenterOffset: -2   // match the update chip: onto the text's optical centre
+                        width: 78; height: 18; radius: root.tileRadius
+                        color: reapplyMa.containsMouse ? root.fillHover : root.fillIdle
+                        border.color: reapplyMa.containsMouse ? root.seal : root.sep
+                        border.width: 1
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                        UiText {
+                            anchors.centerIn: parent
+                            text: "Re-apply"
+                            color: reapplyMa.containsMouse ? root.seal : root.ink
+                            font.family: root.mono; font.pixelSize: 9
+                        }
+                        MouseArea {
+                            id: reapplyMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: archPanel.reapplyCurrentTheme()
+                        }
+                    }
+                }
+
+                // ── column headers ──
+                Row {
+                    width: parent.width
+                    spacing: 6
+                    UiText { width: parent.width - 220; text: "Theme";  color: Qt.rgba(root.ink.r,root.ink.g,root.ink.b,0.6); font.family: root.mono; font.pixelSize: 10; font.letterSpacing: 1 }
+                    UiText { width: 60;  text: "Behind"; color: Qt.rgba(root.ink.r,root.ink.g,root.ink.b,0.6); font.family: root.mono; font.pixelSize: 10; font.letterSpacing: 1 }
+                    UiText { width: 148; text: "State";  color: Qt.rgba(root.ink.r,root.ink.g,root.ink.b,0.6); font.family: root.mono; font.pixelSize: 10; font.letterSpacing: 1 }
+                }
+
+                // ── theme list (only outdated + unreachable themes are in the model) ──
+                Item {
+                    width: parent.width
+                    height: Math.min(themesCol.implicitHeight, 240)
+                    Flickable {
+                        id: themesFlick
+                        anchors.fill: parent
+                        contentHeight: themesCol.implicitHeight
+                        clip: true
+                        interactive: themesCol.implicitHeight > 240
+
+                    Column {
+                        id: themesCol
+                        width: parent.width
+                        spacing: 2
+
+                        Repeater {
+                            model: root.themeUpdList
+
+                            delegate: Item {
+                                id: themeRow
+                                required property var modelData
+                                required property int index
+                                readonly property bool isUnreach:   modelData.state === "unreachable"
+                                readonly property bool isLocalEdits: modelData.state === "local-edits"
+                                // a per-theme "update this" runs `git -C <dir> pull` (Omarchy
+                                // semantics). Offered for any reachable outdated theme — even
+                                // local-edits, where the terminal will show the merge/conflict.
+                                readonly property bool canPull: modelData.behind > 0 && !isUnreach
+
+                                width: parent.width
+                                height: 22
+
+                                Row {
+                                    width: parent.width
+                                    height: 22
+                                    spacing: 6
+                                    UiText {
+                                        width: parent.width - 220
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: modelData.name
+                                        color: modelData.current ? root.seal : root.ink
+                                        font.family: root.mono; font.pixelSize: 11
+                                        elide: Text.ElideRight
+                                    }
+                                    Item {
+                                        width: 60
+                                        height: 22
+                                        UiText {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: parent.width
+                                            text: isUnreach ? "—" : (modelData.behind + (modelData.behind === 1 ? " commit" : " commits"))
+                                            color: behindMa.containsMouse && themeRow.canPull ? root.seal : Qt.rgba(root.ink.r,root.ink.g,root.ink.b,0.7)
+                                            font.family: root.mono; font.pixelSize: 10
+                                            elide: Text.ElideRight
+                                        }
+                                        MouseArea {
+                                            id: behindMa
+                                            anchors.fill: parent
+                                            hoverEnabled: themeRow.canPull
+                                            enabled: themeRow.canPull
+                                            cursorShape: themeRow.canPull ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                            onClicked: archPanel.viewThemeChanges(modelData.name)
+                                        }
+                                    }
+                                    // right slot: neutral state word + a per-theme "update" chip
+                                    Item {
+                                        width: 148
+                                        height: 22
+                                        UiText {
+                                            anchors.left: parent.left
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: parent.width - 76
+                                            text: isUnreach ? "unreachable" : isLocalEdits ? "local edits" : "clean"
+                                            color: isLocalEdits ? root.inkDeep : root.sumi
+                                            font.family: root.mono; font.pixelSize: 10
+                                            elide: Text.ElideRight
+                                        }
+                                        Rectangle {
+                                            visible: themeRow.canPull
+                                            anchors.right: parent.right
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            anchors.verticalCenterOffset: -2   // mono line-box sits high; nudge the button onto the text's optical centre
+                                            anchors.rightMargin: 16
+                                            width: 52; height: 18; radius: root.tileRadius
+                                            color: pullMa.containsMouse ? root.fillPrimaryHover : root.seal
+                                            Behavior on color { ColorAnimation { duration: 120 } }
+                                            UiText {
+                                                anchors.centerIn: parent
+                                                text: "update"
+                                                color: root.paper
+                                                font.family: root.mono; font.pixelSize: 9
+                                            }
+                                            MouseArea {
+                                                id: pullMa
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: archPanel.updateOneTheme(modelData.name)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    anchors.bottom: parent.bottom
+                                    width: parent.width - 16; height: 1
+                                    color: root.sep
+                                    visible: index < root.themeUpdList.length - 1
+                                }
+                            }
+                        }
+
+                        UiText {
+                            width: parent.width
+                            visible: root.themeUpdList.length === 0
+                            text: root.themeUpdChecked === "" ? "Not checked yet" : "All themes up to date"
+                            color: Qt.rgba(root.ink.r,root.ink.g,root.ink.b,0.5)
+                            font.family: root.mono; font.pixelSize: 11
+                            horizontalAlignment: Text.AlignHCenter
+                            topPadding: 20
+                        }
+                    }
+                    }
+                    ScrollThumb { flick: themesFlick }
+                }
+
+                Rectangle { width: parent.width; height: 1; color: root.sep }
+
+                // ── buttons ──
+                Row {
+                    width: parent.width
+                    spacing: 8
+
+                    // Update all — runs Omarchy's own omarchy-theme-update over every
+                    // git theme, in the visible Omarchy terminal (per-theme "update"
+                    // chips cover selective updates). Enabled when anything is outdated.
+                    Rectangle {
+                        readonly property bool canApply: root.themeUpdOutdated > 0
+                        width: (parent.width - 8) / 2
+                        height: 28; radius: root.tileRadius
+                        opacity: canApply ? 1.0 : 0.45
+                        color: (allMa.containsMouse && canApply) ? root.fillPrimaryHover : root.seal
+                        border.color: "transparent"
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                        UiText {
+                            anchors.centerIn: parent
+                            text: root.themeUpdOutdated > 0 ? "Update all" : "No updates"
+                            color: root.paper
+                            font.family: root.mono; font.pixelSize: 11
+                        }
+                        MouseArea {
+                            id: allMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: parent.canApply
+                            cursorShape: parent.canApply ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: archPanel.updateAllThemes()
+                        }
+                    }
+
+                    // Check themes — runs the read-only check script; disabled while scanning
+                    Rectangle {
+                        width: (parent.width - 8) / 2
+                        height: 28; radius: root.tileRadius
+                        color: (checkMa.containsMouse && !root.themeUpdChecking) ? root.fillHover : root.fillIdle
+                        border.color: (checkMa.containsMouse && !root.themeUpdChecking) ? root.seal : root.sep
+                        border.width: 1
+                        opacity: root.themeUpdChecking ? 0.5 : 1.0
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                        UiText {
+                            anchors.centerIn: parent
+                            text: root.themeUpdChecking ? "Checking…" : "Check themes"
+                            color: (checkMa.containsMouse && !root.themeUpdChecking) ? root.seal : root.ink
+                            font.family: root.mono; font.pixelSize: 11
+                        }
+                        MouseArea {
+                            id: checkMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: !root.themeUpdChecking
+                            cursorShape: root.themeUpdChecking ? Qt.ArrowCursor : Qt.PointingHandCursor
+                            onClicked: root.themeCheckTick++
+                        }
+                    }
+                }
+            }
+            // ══════════ END THEMES TAB ══════════
         }
     }
 }

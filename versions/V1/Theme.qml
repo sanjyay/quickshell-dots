@@ -1267,6 +1267,23 @@ Item {
     property string shellUpdateVersion: ""
     property real shellUpdateBarX: 0
 
+    // ── Theme Updater state (fed by ArchUpdaterPanel's FileView over
+    //    ~/.cache/qs-theme-updates.json; the panel owns the check Process so it
+    //    runs ONCE, not per-monitor). The bar/tooltip only read these counts;
+    //    the panel renders themeUpdList. Display-only: actual updates are
+    //    delegated to visible Omarchy terminal commands. ──
+    property int    themeUpdOutdated: 0
+    property int    themeUpdLocalEdits: 0
+    property int    themeUpdTotal: 0
+    property int    themeUpdReachable: 0
+    property bool   themeUpdDegraded: false
+    property bool   themeUpdCurrentStale: false
+    property string themeUpdChecked: ""      // ISO timestamp of the last check, "" = never
+    property var    themeUpdList: []          // outdated/unreachable entries shown in the panel
+    property bool   themeUpdChecking: false   // a check is in flight (button disabled)
+    property int    themeCheckTick: 0         // ++ from the panel button to trigger a check
+    property string activeUpdateTab: "packages"   // which ArchUpdaterPanel tab is shown
+
     // ── Tray state ──
     property bool trayVisible: false
     onTrayVisibleChanged: popupOpened("trayVisible")

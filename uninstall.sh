@@ -88,6 +88,14 @@ if compgen -G "$unitdir/qs-shell-update-check.*" >/dev/null 2>&1 || [[ -e "$qsbi
   info "Removed shell self-updater (scripts, timer, cache, updater clone)"
 fi
 
+# 1c.1 remove the theme update checker, if installed (idempotent).
+if [[ -e "$qsbindir/qs-theme-update-check.sh" || -e "$HOME/.cache/qs-theme-updates.json" ]]; then
+  rm -f "$qsbindir"/qs-theme-update-check.sh \
+        "$HOME/.cache/qs-theme-updates.json" \
+        "$HOME/.cache/qs-theme-update.lock"
+  info "Removed theme update checker (script, cache, lock)"
+fi
+
 # 1d. remove the ArchUpdater security gate (script, fetch timer, list)
 if [[ -f "$bindir/qs-arch-security-gate.sh" || -f "$bindir/qs-aur-blacklist-fetch.sh" ]]; then
   systemctl --user disable --now qs-aur-blacklist-fetch.timer >/dev/null 2>&1 || true

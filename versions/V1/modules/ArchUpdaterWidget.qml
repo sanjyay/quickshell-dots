@@ -129,10 +129,13 @@ Item {
 
     readonly property string tooltipText: {
         if (rootMod.refreshing) return ""
-        if (rootMod.updateCount === 0) return "Up to date"
         var parts = []
         if (rootMod.systemCount) parts.push(rootMod.systemCount + " system")
         if (rootMod.aurCount) parts.push(rootMod.aurCount + " AUR")
+        // themes are a separate source (badge stays packages-only); show the count
+        // in the tooltip when a theme check has found outdated repos
+        if (root.themeUpdOutdated > 0) parts.push(root.themeUpdOutdated + " themes")
+        if (parts.length === 0) return "Up to date"
         return parts.join(" \u00B7 ") + "\nClick to view details"
     }
 

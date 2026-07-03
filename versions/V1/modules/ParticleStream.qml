@@ -11,7 +11,7 @@ Item {
     Behavior on opacity { NumberAnimation { duration: 500; easing.type: Easing.InOutCubic } }
 
     Timer {
-        interval: 33
+        interval: (root.mode === 5 || root.mode === 6) ? 16 : 33
         repeat: true
         running: root.active
         onTriggered: canvas.requestPaint()

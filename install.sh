@@ -144,6 +144,22 @@ install_shell_updater() {
   info "Shell self-updater installed (badge appears when this repo has updates)"
 }
 
+# ── theme update checker (read-only badge/panel signal) ─────────
+# Installs the helper the ArchUpdaterPanel runs on demand. It only checks theme
+# remotes and writes ~/.cache/qs-theme-updates.json; actual updates stay delegated
+# to Omarchy's visible terminal commands.
+install_theme_updater() {
+  local src="$1"
+  local bindst="$HOME/.config/quickshell/bin"
+
+  [[ -f "$src/scripts/qs-theme-update-check.sh" ]] || return 0
+
+  mkdir -p "$bindst"
+  install -m 755 "$src/scripts/qs-theme-update-check.sh" "$bindst/qs-theme-update-check.sh"
+
+  info "Theme update checker installed (panel check uses Omarchy theme repos)"
+}
+
 # ── 1. dependencies ─────────────────────────────────────────────
 need=(qs git jq curl)
 opt=(pamixer brightnessctl powerprofilesctl bluetoothctl iwctl makoctl hypridle)
@@ -230,6 +246,9 @@ if [[ -f "$tmp/repo/scripts/qs-arch-security-gate.sh" ]]; then
   fi
   info "ArchUpdater security gate installed (weekly blacklist refresh)"
 fi
+
+# ── 4c. Theme update checker (panel "Check themes" helper) ─────
+install_theme_updater "$tmp/repo" || warn "Theme update checker setup incomplete — the bar is fine; the themes tab just cannot scan yet."
 
 # ── 5. theme hook (live color updates on Omarchy theme switch) ──
 hookdst="$HOME/.config/omarchy/hooks/theme-set.d"
