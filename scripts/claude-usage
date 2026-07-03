@@ -63,10 +63,11 @@ def iso_ts(s: str) -> int:
         return 0
 
 
-def count_tokens_since(since_ts: int) -> tuple[int, int]:
-    """(tokens_in_window, tokens_in_last_hour) from local JSONL — own lightweight scan."""
+def count_tokens_since(since_ts: int) -> tuple[int, int, int]:
+    """(tokens_in_window, tokens_in_last_hour, tokens_today) from local JSONL."""
     now = datetime.now(timezone.utc).timestamp()
-    total = recent = 0
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    total = recent = today_total = 0
     for f in PROJECTS.glob("**/*.jsonl"):
         try:
             if f.stat().st_mtime < since_ts:      # untouched before the window → skip fast
@@ -88,9 +89,11 @@ def count_tokens_since(since_ts: int) -> tuple[int, int]:
                 total += tok
                 if ts >= now - 3600:
                     recent += tok
+                if e.get("timestamp", "")[:10] == today:
+                    today_total += tok
         except Exception:
             continue
-    return total, recent
+    return total, recent, today_total
 
 
 def main():
@@ -114,7 +117,7 @@ def main():
     reset7d = iso_ts(sd.get("resets_at", ""))
 
     window_start = reset5h - 5 * 3600 if reset5h else int(datetime.now().timestamp()) - 5 * 3600
-    tokens, recent = count_tokens_since(window_start)
+    tokens, recent, today_tokens = count_tokens_since(window_start)
     limit = int(tokens / util5h) if util5h > 0 and tokens else 0
 
     out = {
@@ -127,6 +130,7 @@ def main():
         "_tokens_used":   tokens,
         "_window_limit":  limit,
         "_rate_per_hour": recent,
+        "_today_tokens":  today_tokens,
         "status": "rejected" if util5h >= 1.0
                   else "allowed_warning" if util5h >= 0.9
                   else "allowed",

@@ -145,7 +145,7 @@ Item {
     }
 
     Timer {
-        interval: 2000; running: true; repeat: true; triggeredOnStart: true
+        interval: 2000; running: root.modCpu; repeat: true; triggeredOnStart: true
         onTriggered: { cpuProc.running = false; cpuProc.running = true }
     }
 

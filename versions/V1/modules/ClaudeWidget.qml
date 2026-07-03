@@ -3,9 +3,9 @@ import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 
-// Combined AI-usage pill (Claude Code + OpenAI Codex). The bar shows ONE tool
+// Combined AI-usage pill (Claude Code + OpenAI Codex + OpenCode). The bar shows ONE tool
 // (root.aiTool) as a themed-tinted SVG with a bottom-up usage fill; the tooltip
-// shows BOTH; clicking opens the AiUsagePanel where the tool can be switched.
+// shows all tracked tools; clicking opens the AiUsagePanel where the tool can be switched.
 // Gating is unchanged: root.modClaude is the on/off toggle for the whole pill.
 Item {
     id: rootMod
@@ -13,6 +13,12 @@ Item {
 
     // ── which tool the bar pill displays ──
     readonly property bool isCodex: root.aiTool === "codex"
+    readonly property bool isOpenCode: root.aiTool === "opencode"
+    readonly property bool isLogo: isCodex || isOpenCode
+    readonly property url  logoSource: Qt.resolvedUrl(isOpenCode ? "../assets/opencode-mark.svg" : "../assets/codex.svg")
+    readonly property var  logoSourceSize: isOpenCode ? Qt.size(22, 14) : Qt.size(48, 48)
+    readonly property int  ocMarkW: 22
+    readonly property int  ocMarkH: 14
 
     // ── Claude: process detection is local (drives the pill's visibility); all
     //    usage data comes from root.ai* — the single shared parse in Theme.qml that
@@ -25,6 +31,8 @@ Item {
     readonly property string clTokens:    root.aiClTokens
     readonly property string clRate:      root.aiClRate
     readonly property int    clReset5hTs: root.aiClReset5hTs
+    readonly property int    clReset7dTs: root.aiClReset7dTs
+    readonly property int    clToday:     root.aiClToday
     readonly property bool   clHas:       root.aiClHas
 
     // ── Codex ──
@@ -39,20 +47,33 @@ Item {
     readonly property int    cxReset7dTs: root.aiCxReset7dTs
     readonly property bool   cxHas:       root.aiCxHas
 
+    // ── OpenCode ──
+    property bool ocActive: false
+    readonly property bool   ocFresh:     root.aiOcFresh
+    readonly property int    ocPct5h:     root.aiOcPct5h
+    readonly property int    ocPct7d:     root.aiOcPct7d
+    readonly property string ocPlan:      root.aiOcPlan
+    readonly property string ocTokens:    root.aiOcTokens
+    readonly property string ocRate:      root.aiOcRate
+    readonly property string ocModel:     root.aiOcModel
+    readonly property int    ocToday:     root.aiOcToday
+    readonly property bool   ocHas:       root.aiOcHas
+
     // ── per-tool signal (active OR fresh non-zero usage) ──
     readonly property bool clSignal: clActive || (clPct5h > 0 && clFresh)
     readonly property bool cxSignal: cxActive || (cxPct5h > 0 && cxFresh)
+    readonly property bool ocSignal: ocActive || ((ocPct5h > 0 || ocToday > 0) && ocFresh)
 
     // ── selected-tool display values ──
-    readonly property int  pct5h:   isCodex ? cxPct5h : clPct5h
+    readonly property int  pct5h:   isOpenCode ? ocPct5h : (isCodex ? cxPct5h : clPct5h)
     readonly property int  pct5hStep: Math.round(pct5h / 5) * 5
-    readonly property bool selFresh: isCodex ? cxFresh : clFresh
-    readonly property bool selSignal: isCodex ? cxSignal : clSignal
-    readonly property bool blocked:  isCodex ? false : clBlocked
+    readonly property bool selFresh: isOpenCode ? ocFresh : (isCodex ? cxFresh : clFresh)
+    readonly property bool selSignal: isOpenCode ? ocSignal : (isCodex ? cxSignal : clSignal)
+    readonly property bool blocked:  (isCodex || isOpenCode) ? false : clBlocked
 
     // show whenever the gate is on AND either tool has a signal — the pill stays
     // reachable (to open the panel + switch) even if the selected tool is idle
-    readonly property bool shown: (clSignal || cxSignal) && root.modClaude
+    readonly property bool shown: (clSignal || cxSignal || ocSignal) && root.modClaude
 
     readonly property string tooltipText: {
         var lines = []
@@ -60,8 +81,10 @@ Item {
             lines.push("Claude Code")
             var cr = root.aiFmtReset(clReset5hTs)
             lines.push("5h: " + clPct5h + "%" + (cr ? "  (reset in " + cr + ")" : ""))
-            if (clPct7d > 0) lines.push("7d: " + clPct7d + "%")
+            var c7 = root.aiFmtReset(clReset7dTs)
+            if (clPct7d > 0) lines.push("7d: " + clPct7d + "%" + (c7 ? "  (reset in " + c7 + ")" : ""))
             if (clTokens)    lines.push(clTokens + " tokens" + (clRate ? "  · " + clRate : ""))
+            if (clToday > 0) lines.push("today: " + (clToday / 1e6).toFixed(2) + "M tok")
         }
         if (cxHas || cxActive) {
             if (lines.length) lines.push("")
@@ -71,6 +94,14 @@ Item {
             var x7 = root.aiFmtReset(cxReset7dTs)
             lines.push("7d: " + cxPct7d + "%" + (x7 ? "  (reset in " + x7 + ")" : ""))
             if (cxTokens) lines.push(cxTokens + " tokens" + (cxRate ? "  · " + cxRate : ""))
+        }
+        if (ocHas || ocActive) {
+            if (lines.length) lines.push("")
+            lines.push("OpenCode" + (ocPlan ? "  (" + ocPlan + ")" : ""))
+            lines.push("5h: " + ocPct5h + "%  ·  7d: " + ocPct7d + "%")
+            if (ocTokens) lines.push(ocTokens + " tokens" + (ocRate ? "  · " + ocRate : ""))
+            if (ocToday > 0) lines.push("today: " + (ocToday / 1e6).toFixed(2) + "M tok")
+            if (ocModel) lines.push(ocModel)
         }
         return lines.length ? lines.join("\n") : "AI usage"
     }
@@ -97,11 +128,17 @@ Item {
         command: ["bash", "-c", "pgrep -xa codex 2>/dev/null | grep -vq app-server && echo 1 || echo 0"]
         stdout: StdioCollector { onStreamFinished: { rootMod.cxActive = (this.text.trim() === "1") } }
     }
+    Process {
+        id: detectOpenCode
+        command: ["bash", "-c", "ps -eo args | grep -E '(^|/| )opencode( |$)|opencode-ai' | grep -vE 'grep|opencode-usage' >/dev/null && echo 1 || echo 0"]
+        stdout: StdioCollector { onStreamFinished: { rootMod.ocActive = (this.text.trim() === "1") } }
+    }
     Timer {
-        interval: 5000; running: true; repeat: true; triggeredOnStart: true
+        interval: 5000; running: root.modClaude || root.aiUsageVisible; repeat: true; triggeredOnStart: true
         onTriggered: {
             detectClaude.running = false; detectClaude.running = true
             detectCodex.running = false;  detectCodex.running = true
+            detectOpenCode.running = false; detectOpenCode.running = true
         }
     }
 
@@ -122,17 +159,19 @@ Item {
         spacing: 5
 
         // icon with bottom-to-top usage fill. Claude keeps its nerd-font glyph;
-        // Codex uses its logo SVG (no glyph exists) themed via the shared logo-tint
-        // shader (keeps alpha, recolors to a flat color). Both fill bottom→top.
+        // Codex/OpenCode use vector marks themed via the shared logo tint shader.
         Item {
             id: iconItem
             anchors.verticalCenter: parent.verticalCenter
-            implicitWidth: 15; implicitHeight: 15
+            implicitWidth: rootMod.isOpenCode ? rootMod.ocMarkW : 15
+            implicitHeight: rootMod.isOpenCode ? rootMod.ocMarkH : 15
+            width: implicitWidth
+            height: implicitHeight
 
             // ── Claude: nerd-font glyph (original look) ──
             Item {
                 anchors.centerIn: parent
-                visible: !rootMod.isCodex
+                visible: !rootMod.isLogo
                 implicitWidth: glyphBase.implicitWidth
                 implicitHeight: glyphBase.implicitHeight
 
@@ -164,18 +203,19 @@ Item {
                 }
             }
 
-            // ── Codex: tinted SVG ──
+            // ── Logo tools: tinted SVG ──
             Item {
                 anchors.fill: parent
-                visible: rootMod.isCodex
+                visible: rootMod.isLogo
 
                 Image {
                     id: codexBase
                     anchors.fill: parent
-                    source: Qt.resolvedUrl("../assets/codex.svg")
-                    sourceSize: Qt.size(48, 48)
+                    source: rootMod.logoSource
+                    sourceSize: rootMod.logoSourceSize
                     fillMode: Image.PreserveAspectFit
-                    smooth: true; mipmap: true
+                    smooth: !rootMod.isOpenCode
+                    mipmap: !rootMod.isOpenCode
                     // thinner-stroked than the Claude glyph → needs more presence
                     // than the glyph's 0.25 faint base to stay recognizable
                     opacity: 0.5
@@ -197,10 +237,11 @@ Item {
                     Image {
                         width: iconItem.width; height: iconItem.height
                         anchors.bottom: parent.bottom
-                        source: Qt.resolvedUrl("../assets/codex.svg")
-                        sourceSize: Qt.size(48, 48)
+                        source: rootMod.logoSource
+                        sourceSize: rootMod.logoSourceSize
                         fillMode: Image.PreserveAspectFit
-                        smooth: true; mipmap: true
+                        smooth: !rootMod.isOpenCode
+                        mipmap: !rootMod.isOpenCode
                         layer.enabled: true
                         layer.smooth: true
                         layer.effect: ShaderEffect {

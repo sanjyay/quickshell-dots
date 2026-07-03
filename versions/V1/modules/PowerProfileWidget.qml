@@ -83,7 +83,7 @@ Item {
     }
 
     Timer {
-        interval: 5000; running: true; repeat: true; triggeredOnStart: true
+        interval: 5000; running: root.modPower || root.powerProfileVisible; repeat: true; triggeredOnStart: true
         onTriggered: { profileProc.running = false; profileProc.running = true }
     }
 

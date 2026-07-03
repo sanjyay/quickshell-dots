@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # QS-Shell apply update.
 #
-# Topology: the live bar dir is a *copy* of versions/<V>/ from the SEPARATE git
-# repo at ~/Projects/Quickshell-Dots. Updating = pull that repo, redeploy the
-# installed version into the live dir, restart the bar.
+# Topology: the live bar dir is a *copy* of versions/<V>/ from the deploy clone
+# at ~/.local/share/quickshell-dots by default (override with QS_SHELL_REPO).
+# Updating = pull that repo, redeploy the installed version, restart the bar.
 #
 # MUST be launched DETACHED from the bar (the QML button uses `setsid`), because
 # this script restarts the bar.

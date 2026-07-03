@@ -4,3 +4,7 @@
 
 # Local qs-proj / qsrise active-version marker
 **/.qsrise
+
+# Python helper script test/import artifacts
+__pycache__/
+*.pyc

@@ -100,7 +100,7 @@ Item {
     }
 
     Timer {
-        interval: 5000; running: true; repeat: true; triggeredOnStart: true
+        interval: 5000; running: rootMod.shown; repeat: true; triggeredOnStart: true
         onTriggered: { btProc.result = ""; btProc.running = false; btProc.running = true }
     }
 

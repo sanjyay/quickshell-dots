@@ -61,6 +61,19 @@ if compgen -G "$unitdir/codex-usage*" >/dev/null 2>&1 || compgen -G "$bindir/cod
   info "Removed Codex usage backend (script, timer, cache; nothing left running)"
 fi
 
+# 1b3. remove the OpenCode usage backend, if it was installed (idempotent).
+if compgen -G "$unitdir/opencode-usage*" >/dev/null 2>&1 || compgen -G "$bindir/opencode-usage*" >/dev/null 2>&1; then
+  systemctl --user disable --now opencode-usage.timer >/dev/null 2>&1 || true
+  systemctl --user stop opencode-usage.service >/dev/null 2>&1 || true
+  rm -f "$unitdir"/opencode-usage.service "$unitdir"/opencode-usage.timer
+  rm -f "$bindir"/opencode-usage
+  rm -f "$HOME/.cache/opencode-usage.json"
+  systemctl --user daemon-reload >/dev/null 2>&1 || true
+  systemctl --user reset-failed 'opencode-usage*' >/dev/null 2>&1 || true
+  pkill -f "$bindir/opencode-usage" 2>/dev/null || true
+  info "Removed OpenCode usage backend (script, timer, cache; nothing left running)"
+fi
+
 # 1c. remove the shell self-updater, if installed (idempotent).
 qsbindir="$HOME/.config/quickshell/bin"
 if compgen -G "$unitdir/qs-shell-update-check.*" >/dev/null 2>&1 || [[ -e "$qsbindir/qs-shell-check-update.sh" ]]; then

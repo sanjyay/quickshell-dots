@@ -490,7 +490,7 @@ Item {
         popupOpened("aiUsageVisible")
         if (aiUsageVisible) refreshAiUsage()
     }
-    property string aiTool: "claude"   // "claude" or "codex" — icon shown in the bar
+    property string aiTool: "claude"   // "claude", "codex", or "opencode" — icon shown in the bar
 
     // ── AI usage data (single source of truth) ───────────────────
     // The bar pill (ClaudeWidget) and the AiUsagePanel both render from these —
@@ -504,6 +504,8 @@ Item {
     property string aiClTokens: ""
     property string aiClRate: ""
     property int    aiClReset5hTs: 0
+    property int    aiClReset7dTs: 0
+    property int    aiClToday: 0
 
     property bool   aiCxHas: false
     property bool   aiCxFresh: false
@@ -515,6 +517,17 @@ Item {
     property int    aiCxReset5hTs: 0
     property int    aiCxReset7dTs: 0
     property int    aiCxToday: 0
+
+    property bool   aiOcHas: false
+    property bool   aiOcFresh: false
+    property int    aiOcPct5h: 0
+    property int    aiOcPct7d: 0
+    property string aiOcPlan: ""
+    property string aiOcTokens: ""
+    property string aiOcRate: ""
+    property string aiOcModel: ""
+    property int    aiOcToday: 0
+    property var    aiOcModels: []
     property int    aiClockTick: 0
 
     // F15: clamp an external 0..1 utilization to a 0–100 int (a negative/over-range value would
@@ -549,15 +562,17 @@ Item {
                     theme.aiClPct7d = theme.aiPct(d["7d-utilization"])
                     theme.aiClBlocked = d.status === "rejected" || d.status === "blocked"
                     theme.aiClReset5hTs = parseInt(d["5h-reset"]) || 0
+                    theme.aiClReset7dTs = parseInt(d["7d-reset"]) || 0
                     var used = (d["_tokens_used"] || 0), lim = (d["_window_limit"] || 0)
                     theme.aiClTokens = used ? (used / 1e6).toFixed(2) + "M / " + (lim / 1e6).toFixed(1) + "M" : ""
                     var rateH = Math.round((d["_rate_per_hour"] || 0) / 1000)
                     theme.aiClRate = rateH > 0 ? rateH + "k tok/h" : ""
+                    theme.aiClToday = parseInt(d._today_tokens) || 0
                 } catch (e) {
                     theme.aiClHas = false; theme.aiClFresh = false
                     theme.aiClPct5h = 0; theme.aiClPct7d = 0
                     theme.aiClBlocked = false; theme.aiClTokens = ""; theme.aiClRate = ""
-                    theme.aiClReset5hTs = 0
+                    theme.aiClReset5hTs = 0; theme.aiClReset7dTs = 0; theme.aiClToday = 0
                 }
             }
         }
@@ -596,17 +611,58 @@ Item {
         }
     }
 
-    function refreshAiUsage() {
+    Process {
+        id: aiReadOpenCode
+        command: ["bash", "-c",
+            "f=\"$HOME/.cache/opencode-usage.json\"; stat -c %Y \"$f\" 2>/dev/null; cat \"$f\" 2>/dev/null"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var raw = this.text, nl = raw.indexOf("\n")
+                var mtime = nl > 0 ? (parseInt(raw.substring(0, nl)) || 0) : 0
+                var ageOk = mtime > 0 && (Date.now() / 1000 - mtime) < 900
+                try {
+                    var d = JSON.parse((nl > 0 ? raw.substring(nl + 1) : "").trim())
+                    theme.aiOcHas = true
+                    theme.aiOcFresh = ageOk && d._source !== "stale"
+                    theme.aiOcPct5h = theme.aiPct(d["5h-utilization"])
+                    theme.aiOcPct7d = theme.aiPct(d["7d-utilization"])
+                    theme.aiOcPlan = d._plan || ""
+                    var ocUsed = (d["_tokens_used"] || 0), ocLim = (d["_window_limit"] || 0)
+                    theme.aiOcTokens = ocUsed ? (ocUsed / 1e6).toFixed(2) + "M / " + (ocLim / 1e6).toFixed(1) + "M" : ""
+                    var ocRateH = Math.round((d["_rate_per_hour"] || 0) / 1000)
+                    theme.aiOcRate = ocRateH > 0 ? ocRateH + "k tok/h" : ""
+                    theme.aiOcToday = parseInt(d._today_tokens) || 0
+                    theme.aiOcModel = d._model || ""
+                    theme.aiOcModels = d._models instanceof Array ? d._models : []
+                } catch (e) {
+                    theme.aiOcHas = false; theme.aiOcFresh = false
+                    theme.aiOcPct5h = 0; theme.aiOcPct7d = 0
+                    theme.aiOcPlan = ""; theme.aiOcTokens = ""; theme.aiOcRate = ""; theme.aiOcModel = ""
+                    theme.aiOcToday = 0; theme.aiOcModels = []
+                }
+            }
+        }
+    }
+
+    function refreshAiUsage(selectedOnly) {
         aiClockTick++
-        aiReadClaude.running = false; aiReadClaude.running = true
-        aiReadCodex.running = false;  aiReadCodex.running = true
+        var only = selectedOnly === true
+        if (!only || aiTool === "claude") {
+            aiReadClaude.running = false; aiReadClaude.running = true
+        }
+        if (!only || aiTool === "codex") {
+            aiReadCodex.running = false;  aiReadCodex.running = true
+        }
+        if (!only || aiTool === "opencode") {
+            aiReadOpenCode.running = false; aiReadOpenCode.running = true
+        }
     }
 
     Timer {
         // 30s normally; 5s while the AI panel is open (responsive when looked at)
         interval: theme.aiUsageVisible ? 5000 : 30000
         running: true; repeat: true; triggeredOnStart: true
-        onTriggered: theme.refreshAiUsage()
+        onTriggered: theme.refreshAiUsage(theme.aiUsageVisible)
     }
 
     // ── Memory panel state ──
@@ -642,12 +698,9 @@ Item {
     property bool splitsSubVisible: false
     property bool wwSubVisible: false   // "Widgets & Workspaces" fly-out
 
-    readonly property bool anySplit: splitLeft || splitRight || splitArch
-                                  || splitMon  || splitNet  || splitMprisL
-    onAnySplitChanged: if (!anySplit) barAnim = 0
-
-    // splitLeft/splitRight kept as constant-false (toggles removed); the clean
-    // content-edge cuts are splitMon (Left) and splitMprisL (Right).
+    // Legacy split booleans are kept only for cache compatibility. The active
+    // split system lives in BarSlot's per-gap arrays; ParticleStream is gated by
+    // the real run count there, so barAnim no longer follows these old flags.
     function mergeAllSplits() {
         splitLeft = false; splitRight = false; splitArch = false;
         splitMon = false; splitNet = false; splitMprisL = false;
@@ -816,7 +869,7 @@ Item {
                  + (modCpu    ? "1" : "0") + " "          // +13
                  + (modVolume ? "1" : "0") + " "          // +14
                  + (modMpris  ? "1" : "0") + " "          // +15 now-playing / mpris
-                 + aiTool + " "                           // +16 AI tool shown in bar (claude/codex)
+                 + aiTool + " "                           // +16 AI tool shown in bar (claude/codex/opencode)
                  + (styleFrost ? "1" : "0") + " "         // +17 frost / lowered island opacity
                  + launcherLogoMode + " "                 // +18 launcher logo mode (text/icon)
                  + launcherLogoText + " "                 // +19 text logo id
@@ -997,7 +1050,7 @@ Item {
                     if (parts.length > wsField + 15) theme.modMpris  = parts[wsField + 15] !== "0"
                     if (parts.length > wsField + 16) {
                         var at = parts[wsField + 16]
-                        if (at === "claude" || at === "codex") theme.aiTool = at
+                        if (at === "claude" || at === "codex" || at === "opencode") theme.aiTool = at
                     }
                     if (parts.length > wsField + 17) theme.styleFrost = parts[wsField + 17] === "1"
                     if (parts.length > wsField + 18) {

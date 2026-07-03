@@ -252,13 +252,14 @@ Item {
     // also the only one that spawns `iw`). Slow (15 s) ONLY when the module is hidden AND the
     // panel is closed AND we're on Ethernet or offline — so the saving (fewer idle bash/ip/awk
     // spawns) is limited to a hidden Ethernet module or the offline state; Wi-Fi always polls
-    // fast. Changing a Timer's interval does not force a tick, so refresh once immediately on
-    // becoming relevant.
+    // fast. When hidden on Ethernet/offline, poll only once per minute to catch a later Wi-Fi
+    // connection without keeping the old high-rate hidden poller alive. Changing a Timer's
+    // interval does not force a tick, so refresh once immediately on becoming relevant.
     readonly property bool fastPoll: root.modNetwork || root.networkVisible || mode === "wifi"
     onFastPollChanged: if (fastPoll) { netProc.running = false; netProc.running = true }
 
     Timer {
-        interval: rootMod.fastPoll ? 2000 : 15000
+        interval: rootMod.fastPoll ? 2000 : 60000
         running: true; repeat: true; triggeredOnStart: true
         onTriggered: { netProc.running = false; netProc.running = true }
     }

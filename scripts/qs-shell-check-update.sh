@@ -2,9 +2,9 @@
 # QS-Shell update check (writes a state file the bar watches; no apply here).
 #
 # Topology of THIS setup: the live bar dir is a *copy* of versions/<V>/ from the
-# SEPARATE git repo at ~/Projects/Quickshell-Dots. We never run git in the live
-# dir — we compare the repo's tracking branch against origin, scoped to the
-# installed version's directory.
+# deploy clone at ~/.local/share/quickshell-dots by default (override with
+# QS_SHELL_REPO). We never run git in the live dir — we compare the deploy
+# repo's tracking branch against origin, scoped to the installed version.
 #
 # State contract: ~/.cache/qs-shell/update-available.json ALWAYS exists.
 #   "up to date" = {"behind": 0}.  Pending   = {"behind": N, "version", "summary", "checked"}.

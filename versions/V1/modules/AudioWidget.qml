@@ -90,9 +90,20 @@ Item {
 
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
 
-    Process { id: muteRunner;    command: ["bash", "-c", "pamixer -t"] }
-    Process { id: volUpRunner;   command: ["bash", "-c", "pamixer --increase 5"] }
-    Process { id: volDownRunner; command: ["bash", "-c", "pamixer --decrease 5"] }
+    property bool audioErrorNotified: false
+    function notifyAudioError(action, exitCode) {
+        if (exitCode === 0 || audioErrorNotified) return
+        audioErrorNotified = true
+        audioErrNotify.command = ["bash", "-c",
+            "notify-send -a 'QS-Shell' 'Audio command failed' '" + action + " failed; pamixer may be missing.' 2>/dev/null || true"]
+        audioErrNotify.running = false
+        audioErrNotify.running = true
+    }
+
+    Process { id: audioErrNotify }
+    Process { id: muteRunner;    command: ["bash", "-c", "pamixer -t"];          onExited: (code) => rootMod.notifyAudioError("Mute", code) }
+    Process { id: volUpRunner;   command: ["bash", "-c", "pamixer --increase 5"]; onExited: (code) => rootMod.notifyAudioError("Volume up", code) }
+    Process { id: volDownRunner; command: ["bash", "-c", "pamixer --decrease 5"]; onExited: (code) => rootMod.notifyAudioError("Volume down", code) }
 
     MouseArea {
         anchors.fill: parent

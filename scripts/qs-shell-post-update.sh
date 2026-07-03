@@ -8,7 +8,7 @@
 #
 # Idempotent and defensive: a missing source file is skipped, a failing step
 # warns the caller via exit code but must never break the already-applied
-# update. Opt-in components (Claude backend) are refreshed only if present.
+# update. Opt-in AI backends are refreshed only when installed or discoverable.
 set -uo pipefail
 
 repo="${1:-${QS_SHELL_REPO:-$HOME/.local/share/quickshell-dots}}"
@@ -58,6 +58,24 @@ systemctl --user try-restart qs-shell-update-check.timer qs-aur-blacklist-fetch.
 # ── opt-in components: refresh only if the user installed them ──
 if [ -x "$bin/claude-usage" ]; then
   put "$repo/scripts/claude-usage" "$bin/claude-usage" 755 || rc=1
+fi
+if [ -x "$bin/codex-usage" ]; then
+  put "$repo/scripts/codex-usage" "$bin/codex-usage" 755 || rc=1
+fi
+ai_backend_installed=0
+if [ -x "$bin/claude-usage" ] || [ -x "$bin/codex-usage" ] || [ -x "$bin/opencode-usage" ]; then
+  ai_backend_installed=1
+fi
+opencode_available=0
+if command -v opencode >/dev/null 2>&1 || [ -e "$HOME/.local/share/opencode/opencode.db" ]; then
+  opencode_available=1
+fi
+if [ -x "$bin/opencode-usage" ] || { [ "$ai_backend_installed" -eq 1 ] && [ "$opencode_available" -eq 1 ]; }; then
+  put "$repo/scripts/opencode-usage" "$bin/opencode-usage" 755 || rc=1
+  put "$repo/systemd/opencode-usage.service" "$units/opencode-usage.service" 644 || rc=1
+  put "$repo/systemd/opencode-usage.timer"   "$units/opencode-usage.timer"   644 || rc=1
+  systemctl --user daemon-reload >/dev/null 2>&1 || true
+  systemctl --user enable --now opencode-usage.timer >/dev/null 2>&1 || true
 fi
 
 exit "$rc"

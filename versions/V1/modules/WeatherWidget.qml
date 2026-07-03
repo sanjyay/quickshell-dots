@@ -24,7 +24,7 @@ Item {
             ? (weatherPlace ? weatherPlace + " · " : "") + weatherTempStr + (weatherDesc ? " / " + weatherDesc : "")
             : "Weather…")
 
-    implicitWidth: ico.implicitWidth
+    implicitWidth: root.modWeather ? ico.implicitWidth : 0
     implicitHeight: 28
 
     Process {
@@ -61,7 +61,7 @@ Item {
 
     Timer {
         interval: 1800000
-        running: true
+        running: root.modWeather || root.weatherVisible
         repeat: true
         triggeredOnStart: true
         onTriggered: { weatherProc.running = false; weatherProc.running = true }

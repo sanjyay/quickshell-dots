@@ -41,16 +41,27 @@ function parse(text) {
     return mapKeys(parseAll(text));
 }
 
+function validColor(value) {
+    return typeof value === "string" && /^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(value);
+}
+
+function setColor(theme, key, value) {
+    if (validColor(value)) theme[key] = value;
+}
+
 // Write a parsed palette onto a Theme.qml instance. Missing slots are left
-// at their current value so a partial palette never blanks the live theme.
+// at their current value so a partial or malformed palette never blanks the
+// live theme. Omarchy colors.toml values used by this shell are #RRGGBB; accept
+// #RRGGBBAA too for forward-compatible alpha colours.
 function apply(theme, palette) {
-    if (palette.paper)   theme.paper   = palette.paper;
-    if (palette.ink)     theme.ink     = palette.ink;
-    if (palette.inkDeep) theme.inkDeep = palette.inkDeep;
-    if (palette.sumi)    theme.sumi    = palette.sumi;
-    if (palette.indigo)      theme.indigo      = palette.indigo;
-    if (palette.sealRaw)     theme.sealRaw     = palette.sealRaw;
-    if (palette.color02)     theme.color02     = palette.color02;
-    if (palette.color03)     theme.color03     = palette.color03;
-    if (palette.accentHint)  theme.accentHint  = palette.accentHint;
+    if (!palette) return;
+    setColor(theme, "paper",      palette.paper);
+    setColor(theme, "ink",        palette.ink);
+    setColor(theme, "inkDeep",    palette.inkDeep);
+    setColor(theme, "sumi",       palette.sumi);
+    setColor(theme, "indigo",     palette.indigo);
+    setColor(theme, "sealRaw",    palette.sealRaw);
+    setColor(theme, "color02",    palette.color02);
+    setColor(theme, "color03",    palette.color03);
+    setColor(theme, "accentHint", palette.accentHint);
 }

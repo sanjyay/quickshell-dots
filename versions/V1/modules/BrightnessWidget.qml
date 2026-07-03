@@ -138,7 +138,7 @@ Item {
     }
 
     Timer {
-        interval: 3000; running: rootMod.hasBacklight; repeat: true; triggeredOnStart: true
+        interval: 3000; running: rootMod.shown; repeat: true; triggeredOnStart: true
         onTriggered: { briProc.running = false; briProc.running = true }
     }
 

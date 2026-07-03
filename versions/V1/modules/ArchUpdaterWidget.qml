@@ -44,7 +44,7 @@ Item {
     }
 
     Timer {
-        interval: 1800000; running: true; repeat: true; triggeredOnStart: true
+        interval: 1800000; running: root.modStatus || root.archVisible; repeat: true; triggeredOnStart: true
         onTriggered: root.archRefreshTick++
     }
 

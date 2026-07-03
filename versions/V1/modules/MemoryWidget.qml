@@ -118,7 +118,7 @@ Item {
     }
 
     Timer {
-        interval: 3000; running: true; repeat: true; triggeredOnStart: true
+        interval: 3000; running: root.modMemory; repeat: true; triggeredOnStart: true
         onTriggered: { memProc.running = false; memProc.running = true }
     }
 
