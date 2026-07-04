@@ -26,13 +26,35 @@ PanelWindow {
 
     // ── per-app mixer + device switcher state ──
     property var    apps:        []   // [{idx, name, vol, muted}]
-    property var    sinks:       []   // [{name, desc}]
+    property var    sinks:       []   // [{index, name, desc}]
     property string defaultSink: ""
     property string _appsRaw:    ""
     property string _sinksRaw:   ""
 
     function shq(s) { return "'" + String(s).replace(/'/g, "'\\''") + "'" }
-    function run(cmd) { actProc.command = ["bash", "-c", cmd]; actProc.running = false; actProc.running = true }
+    function run(cmd, refreshAfter) {
+        actProc.running = false
+        actProc.refreshAfterExit = refreshAfter === true
+        actProc.command = ["bash", "-c", cmd]
+        actProc.running = true
+    }
+
+    function setDefaultSink(dev) {
+        if (!dev || !dev.name) return
+
+        var sinkName = volPanel.shq(dev.name)
+        var nodeId = (dev.index !== undefined && dev.index !== null) ? String(dev.index).replace(/[^0-9]/g, "") : ""
+        var cmd = ""
+        if (nodeId.length > 0)
+            cmd += "timeout 2 wpctl set-default " + nodeId + " 2>/dev/null || true\n"
+        cmd += "timeout 2 pactl set-default-sink " + sinkName + " 2>/dev/null || true\n"
+        cmd += "timeout 2 pactl list short sink-inputs 2>/dev/null | awk '{ print $1 }' | while read -r input; do\n"
+        cmd += "  [ -n \"$input\" ] && timeout 2 pactl move-sink-input \"$input\" " + sinkName + " 2>/dev/null || true\n"
+        cmd += "done"
+
+        volPanel.defaultSink = dev.name
+        volPanel.run(cmd, true)
+    }
 
     function refreshAll() {
         audio.refresh()
@@ -200,9 +222,7 @@ PanelWindow {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                volPanel.run("pactl set-default-sink " + volPanel.shq(devTile.modelData.name))
-                                volPanel.defaultSink = devTile.modelData.name
-                                Qt.callLater(function() { volPanel.refreshAll() })
+                                volPanel.setDefaultSink(devTile.modelData)
                             }
                         }
                     }
@@ -417,7 +437,17 @@ PanelWindow {
     Process { id: muteRunner;    command: ["bash", "-c", "pamixer -t"] }
     Process { id: micMuteRunner; command: ["bash", "-c", "pamixer --default-source -t"] }
     Process { id: audioRunner;   command: ["bash", "-c", "omarchy-launch-audio"] }
-    Process { id: actProc;       command: [] }
+    Process {
+        id: actProc
+        property bool refreshAfterExit: false
+        command: []
+        onExited: {
+            if (refreshAfterExit) {
+                refreshAfterExit = false
+                volPanel.refreshAll()
+            }
+        }
+    }
 
     Process {
         id: micData
@@ -477,7 +507,7 @@ PanelWindow {
                             var p = j[i].properties || {}
                             d = p["device.description"] || p["alsa.card_name"] || j[i].name
                         }
-                        out.push({ name: j[i].name, desc: d })
+                        out.push({ index: j[i].index, name: j[i].name, desc: d })
                     }
                 } catch (e) {}
                 volPanel.sinks = out
