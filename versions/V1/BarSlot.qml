@@ -99,7 +99,7 @@ PanelWindow {
             var rep = rows[r].rep
             for (var k = 0; k < rep.count; k++) {
                 var it = rep.itemAt(k)
-                if (!it || !it.visible) continue
+                if (!it || !it.visible || !it.autoShown) continue
                 var p = it.mapToItem(null, 0, 0)
                 if (wx >= p.x && wx <= p.x + it.width && wy >= p.y && wy <= p.y + it.height)
                     return { model: rows[r].rmodel, index: k }
@@ -281,8 +281,56 @@ PanelWindow {
     Component {
         id: compCenter                                   // G8: weather·clock·date·indicators
         Item {
+            id: g8
             implicitWidth: Math.round(centerRow.implicitWidth) + 18
             implicitHeight: 28
+
+            // ── responsive stage (narrow-monitor overlap fix) ──
+            // Presentation-only inside G8 — never touches root.mod* user toggles.
+            // Mutable state with hysteresis, NOT a computed property: downshift when
+            // the CURRENT stage no longer fits (24px slack), upshift only when the
+            // LARGER stage would fit with 48px slack — measured against that stage's
+            // own needed width, else minimal⇄compact oscillates.
+            property int stage: 0                        // 0 normal · 1 compact · 2 minimal
+            readonly property bool showWeather: stage === 0
+            readonly property bool showDate:    stage === 0
+            readonly property bool showIcons:   stage <= 1
+            // needed widths per stage: reactive bindings over the UNCOLLAPSED content
+            // (the stage-gated wrapper widths shrink and would mislead the upshift
+            // decision). 18 = pill padding, 8 = row spacing per visible neighbour.
+            readonly property real needMinimal: 18 + clock.implicitWidth
+            readonly property real needCompact: needMinimal
+                + (iconsRow.implicitWidth > 0.5 ? 8 + iconsRow.implicitWidth : 0)
+            readonly property real needNormal: needCompact
+                + (weather.implicitWidth > 0.5 ? 8 + weather.implicitWidth : 0)
+                + (dateLabel.implicitWidth > 0.5 ? 8 + dateLabel.implicitWidth : 0)
+            function updateStage() {
+                // compact only while G8 actually occupies the center slot: after a
+                // drag swap G8 can sit in a SIDE row — its own width then feeds the
+                // very side-row width that centerAvail is measured from, and the
+                // stage delta (~weather+date) exceeds the 24/48px hysteresis window
+                // → boundary-width flutter. As a side widget G8 stays at normal.
+                if (centerModel.count < 1 || centerModel.get(0).gid !== "G8") {
+                    if (stage !== 0) stage = 0
+                    return
+                }
+                var avail = island.centerAvail
+                var s = stage
+                if (s === 0 && needNormal  + 24 > avail) s = 1
+                if (s === 1 && needCompact + 24 > avail) s = 2
+                if (s === 2 && needCompact + 48 <= avail) s = 1
+                if (s === 1 && needNormal  + 48 <= avail) s = 0
+                if (s !== stage) stage = s
+            }
+            // publish the clock-only floor width for the side-row budget
+            Binding { target: island; property: "g8FloorWidth"; value: g8.needMinimal }
+            // 80ms one-shot coalesces width flutter (track changes, tray churn)
+            Timer { id: restageTimer; interval: 80; repeat: false; onTriggered: g8.updateStage() }
+            onNeedNormalChanged:  restageTimer.restart()
+            onNeedCompactChanged: restageTimer.restart()
+            Connections { target: island; function onCenterAvailChanged() { restageTimer.restart() } }
+            Component.onCompleted: restageTimer.restart()
+
             Rectangle {
                 anchors.centerIn: parent
                 width: parent.implicitWidth; height: barSlot.root.pillH; radius: barSlot.root.pillRadius
@@ -294,14 +342,32 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 x: Math.round((parent.width - width) / 2)   // integer center → sharp text
                 spacing: 8
-                WeatherWidget { id: weather; root: barSlot.root }
+                Item {                                   // weather wrapper (stage-gated)
+                    visible: width > 0.5
+                    width: g8.showWeather ? weather.implicitWidth : 0
+                    height: 28
+                    clip: true
+                    opacity: g8.showWeather ? 1 : 0
+                    Behavior on width   { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                    Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                    WeatherWidget {
+                        id: weather
+                        anchors.fill: parent
+                        root: barSlot.root
+                    }
+                }
                 ClockWidget   { id: clock;   root: barSlot.root }
-                Item {
-                    implicitWidth: dateLabel.implicitWidth
-                    implicitHeight: 28
+                Item {                                   // date (stage-gated)
+                    visible: width > 0.5
+                    width: g8.showDate ? dateLabel.implicitWidth : 0
+                    height: 28
+                    clip: true
+                    opacity: g8.showDate ? 1 : 0
+                    Behavior on width   { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                    Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                     UiText {
                         id: dateLabel
-                        anchors.centerIn: parent
+                        anchors.verticalCenter: parent.verticalCenter
                         text: {
                             clock.now;
                             var days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -323,12 +389,26 @@ PanelWindow {
                         }
                     }
                 }
-                IdleWidget               { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
-                NotificationSilenceWidget{ root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
-                ScreenRecordWidget       { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
-                VoxtypeWidget            { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
-                UpdateWidget             { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
-                ShellUpdateWidget        { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                Item {                                   // indicator icons wrapper (stage-gated)
+                    visible: width > 0.5
+                    width: g8.showIcons ? iconsRow.implicitWidth : 0
+                    height: 28
+                    clip: true
+                    opacity: g8.showIcons ? 1 : 0
+                    Behavior on width   { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                    Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                    Row {
+                        id: iconsRow
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 8
+                        IdleWidget               { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                        NotificationSilenceWidget{ root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                        ScreenRecordWidget       { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                        VoxtypeWidget            { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                        UpdateWidget             { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                        ShellUpdateWidget        { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                    }
+                }
             }
         }
     }
@@ -382,14 +462,15 @@ PanelWindow {
         property alias rep: repeater
         spacing: 6
         height: 32
-        // index of the LAST slot with content (skips 0-width/disabled widgets) —
+        // index of the LAST currently shown slot (skips disabled and auto-hidden
+        // narrow-stage widgets) —
         // a split/grow only makes sense BEFORE this (else it opens a gap to nowhere)
         readonly property int lastVisibleIndex: {
             void(width)
             var last = -1
             for (var k = 0; k < repeater.count; k++) {
                 var it = repeater.itemAt(k)
-                if (it && it.hasContent) last = k
+                if (it && it.hasContent && it.autoShown) last = k
             }
             return last
         }
@@ -408,12 +489,27 @@ PanelWindow {
                 // split AFTER this slot → grow it so the group separates (gap opens).
                 // ONLY for widgets with content — a 0-width widget (battery/brightness on
                 // a desktop) must NOT grow, else it shows up as an empty pill.
-                readonly property bool splitAfter: hasGapAfter && splitsArr[index]
+                readonly property bool splitAfter: autoShown && hasGapAfter && splitsArr[index]
                 readonly property real grow: (splitAfter && hasContent && index < lastVisibleIndex) ? 16 : 0
                 readonly property real cr: pad + Math.round(ldr.implicitWidth)
-                width: Math.round(ldr.implicitWidth) + 2 * pad + grow
+                // display width: follows the stage (grow via splitAfter is
+                // autoShown-aware so hidden slots also drop their split growth)
+                readonly property real naturalSlotWidth: Math.round(ldr.implicitWidth) + 2 * pad + grow
+                // budget width: the ONLY width the narrow-stage decision may read.
+                // MUST stay stage-independent (no autoShown/lastVisibleIndex terms,
+                // which flip with the stage): a stage-dependent budget feeds back
+                // into its own decision and oscillates once ≥2 split-grows (2×16px)
+                // exceed the 24px hysteresis window. Conservative: counts the split
+                // grow even for hidden/trailing slots (≤16px overestimate, fail-safe).
+                readonly property real budgetSlotWidth: Math.round(ldr.implicitWidth) + 2 * pad
+                    + ((hasGapAfter && splitsArr[index] && hasContent) ? 16 : 0)
+                readonly property bool autoShown: island.groupVisibleAtStage(slot.gid, island.narrowStage)
+                onBudgetSlotWidthChanged: island.scheduleNarrowUpdate()
+                width: autoShown ? naturalSlotWidth : 0
                 height: 32
-                visible: hasContent
+                visible: hasContent && (autoShown || width > 0.5)   // stays visible while collapsing
+                opacity: autoShown ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                 Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                 Loader {
                     id: ldr
@@ -426,8 +522,8 @@ PanelWindow {
                 // ── drag-catcher: only in unlock mode, overlays the widget ──
                 MouseArea {
                     anchors.fill: parent
-                    enabled: barSlot.root.barUnlocked
-                    visible: barSlot.root.barUnlocked
+                    enabled: barSlot.root.barUnlocked && slot.autoShown
+                    visible: barSlot.root.barUnlocked && slot.autoShown
                     z: 25
                     preventStealing: true
                     cursorShape: Qt.OpenHandCursor
@@ -457,7 +553,7 @@ PanelWindow {
                 }
                 // ── split toggle for the gap AFTER this slot (child of slot → tracks it) ──
                 Item {
-                    visible: slot.hasGapAfter && slot.index < lastVisibleIndex
+                    visible: slot.autoShown && slot.hasGapAfter && slot.index < lastVisibleIndex
                     width: 14
                     height: slot.height
                     x: (slot.cr + slot.pad + slot.width + 6) / 2 - width / 2   // centered in the gap (cr+pad = pill-right, matches gapInterval)
@@ -531,6 +627,72 @@ PanelWindow {
         readonly property real lcBoundaryX: leftRowItem.x + leftRowItem.width + 9    // just right of Claude
         readonly property real crBoundaryX: rightRowItem.x - 9                       // just left of Mpris
 
+        // ── G8 collision handling (narrow-monitor overlap fix) ──
+        // free span between the side rows; the only stage-decision input — reads
+        // ONLY left/right geometry (never the center row), so stage changes that
+        // resize G8 cannot feed back into this value (no binding loop).
+        readonly property int centerGap: 12
+        readonly property int rowMargin: 4    // single source for the side-row edge margins + budget math
+        readonly property real centerAvail: rightRowItem.x - (leftRowItem.x + leftRowItem.width) - 2 * centerGap
+        // centered while space allows; clamped between the rows when squeezed.
+        // If even the current G8 width cannot fit (max < min), fall back to the
+        // screen-clamped ideal — the documented extreme case may overlap.
+        readonly property real idealCenterX: Math.round((width - centerRowItem.width) / 2)
+        readonly property real minCenterX: Math.round(leftRowItem.x + leftRowItem.width + centerGap)
+        readonly property real maxCenterX: Math.round(rightRowItem.x - centerGap - centerRowItem.width)
+        readonly property real centerTargetX: maxCenterX < minCenterX
+            ? Math.max(4, Math.min(idealCenterX, width - centerRowItem.width - 4))
+            : Math.max(minCenterX, Math.min(idealCenterX, maxCenterX))
+
+        // ── side-row auto-compact (portrait/narrow) ──
+        // Presentation-only stages that hide low-priority side groups when the bar
+        // would otherwise overflow. Never touches root.mod* toggles, models, order
+        // or split persistence. Budgets are summed from stage-independent budgetSlotWidth
+        // values — never from the collapsed row widths — so hiding a group cannot
+        // feed back into its own decision (same anti-flutter rule as the G8 stage).
+        property int narrowStage: 0            // 0 normal · 1 compact · 2 portrait · 3 emergency
+        property real g8FloorWidth: 80         // published by G8: its clock-only minimal width
+        function groupVisibleAtStage(gid, stage) {
+            if (gid === "G8") return true                                        // clock has its own stages
+            if (stage <= 0) return true
+            if (stage === 1) return ["G7", "G9", "G10"].indexOf(gid) < 0         // drop AI · MPRIS · Quick
+            if (stage === 2) return ["G4", "G5", "G7", "G9", "G10"].indexOf(gid) < 0   // also MEM · CPU
+            return ["G1", "G2", "G6", "G8", "G11", "G14"].indexOf(gid) >= 0      // emergency whitelist
+        }
+        function sideNaturalWidth(row, stage) {
+            var sum = 0, n = 0
+            for (var k = 0; k < row.rep.count; k++) {
+                var it = row.rep.itemAt(k)
+                if (!it || !it.hasContent) continue
+                if (!groupVisibleAtStage(it.gid, stage)) continue
+                sum += it.budgetSlotWidth; n++
+            }
+            return sum + Math.max(0, n - 1) * row.spacing
+        }
+        function narrowCandidateWidth(stage) {
+            // side rows + G8 floor + row margins + both center gaps
+            return sideNaturalWidth(leftRowItem, stage) + sideNaturalWidth(rightRowItem, stage)
+                 + g8FloorWidth + 2 * centerGap + 2 * rowMargin
+        }
+        function updateNarrowStage() {
+            var s = narrowStage, W = island.width
+            if (W < 1) return                              // no layout yet
+            // downshift while the CURRENT stage no longer fits (24px slack)…
+            if (s === 0 && narrowCandidateWidth(0) + 24 > W) s = 1
+            if (s === 1 && narrowCandidateWidth(1) + 24 > W) s = 2
+            if (s === 2 && narrowCandidateWidth(2) + 24 > W) s = 3
+            // …upshift only when the NEXT-LARGER stage fits with 48px slack,
+            // measured against that stage's own candidate width.
+            if (s === 3 && narrowCandidateWidth(2) + 48 <= W) s = 2
+            if (s === 2 && narrowCandidateWidth(1) + 48 <= W) s = 1
+            if (s === 1 && narrowCandidateWidth(0) + 48 <= W) s = 0
+            if (s !== narrowStage) narrowStage = s
+        }
+        function scheduleNarrowUpdate() { narrowTimer.restart() }
+        Timer { id: narrowTimer; interval: 80; repeat: false; onTriggered: island.updateNarrowStage() }
+        onWidthChanged: scheduleNarrowUpdate()
+        onG8FloorWidthChanged: scheduleNarrowUpdate()
+
         // ── split persistence (survives restart) ──
         readonly property string splitCachePath: Quickshell.env("HOME") + "/.cache/quickshell_barsplits"
         property bool _splitsLoaded: false
@@ -573,9 +735,9 @@ PanelWindow {
         // content-right of slot i, 4px before the next VISIBLE slot's content-left.
         function gapInterval(rep, i) {
             var a = rep.itemAt(i)
-            if (!a || !a.visible) return null
+            if (!a || !a.hasContent || !a.autoShown) return null
             var b = null                                   // next VISIBLE slot (skip 0-width)
-            for (var k = i + 1; k < rep.count; k++) { var it = rep.itemAt(k); if (it && it.visible) { b = it; break } }
+            for (var k = i + 1; k < rep.count; k++) { var it = rep.itemAt(k); if (it && it.hasContent && it.autoShown) { b = it; break } }
             if (!b) return null
             // a.width - a.grow = slot's pill-right edge (handles workspace ±4 overflow);
             // 0 = next slot's pill-left edge. 4px padding on each side.
@@ -617,6 +779,8 @@ PanelWindow {
         readonly property var runs: {
             void(leftSplits); void(rightSplits); void(boundarySplits);
             void(leftRowItem.width); void(rightRowItem.width); void(centerRowItem.width); void(island.width);
+            void(centerRowItem.x);   // clamped center can move without any width change
+            // (left x is anchor-constant; right x is derived from width + island.width above)
             return computeRuns()
         }
 
@@ -669,19 +833,22 @@ PanelWindow {
 
         SlotRow {
             id: leftRowItem
-            anchors { left: parent.left; leftMargin: 4; verticalCenter: parent.verticalCenter }
+            anchors { left: parent.left; leftMargin: island.rowMargin; verticalCenter: parent.verticalCenter }
             rmodel: leftModel
             splitsArr: island.leftSplits
             toggleGap: function (i) { var a = island.leftSplits.slice(); a[i] = !a[i]; island.leftSplits = a }
         }
         SlotRow {
             id: centerRowItem
-            anchors.centerIn: parent
+            // no centerIn: x is clamped between the side rows on narrow monitors
+            anchors.verticalCenter: parent.verticalCenter
+            x: island.centerTargetX
+            Behavior on x { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
             rmodel: centerModel
         }
         SlotRow {
             id: rightRowItem
-            anchors { right: parent.right; rightMargin: 4; verticalCenter: parent.verticalCenter }
+            anchors { right: parent.right; rightMargin: island.rowMargin; verticalCenter: parent.verticalCenter }
             rmodel: rightModel
             splitsArr: island.rightSplits
             toggleGap: function (i) { var a = island.rightSplits.slice(); a[i] = !a[i]; island.rightSplits = a }

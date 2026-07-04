@@ -723,7 +723,7 @@ PanelWindow {
                     UiText {
                         anchors.centerIn: parent
                         text: archPanel.repoOkPackages === 0
-                            ? "No repo updates"
+                            ? "No pacman updates"
                             : (archPanel.aurReviewPackages > 0 || root.archGateFail > 0)
                                 ? "Update " + archPanel.repoOkPackages + " OK only"
                                 : "Update " + archPanel.repoOkPackages
