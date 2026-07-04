@@ -394,7 +394,7 @@ PanelWindow {
                     }
                     UiText {
                         anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        text: "all-time"
+                        text: "recent"
                         color: root.sumi
                         font.family: root.mono; font.pixelSize: 10
                     }

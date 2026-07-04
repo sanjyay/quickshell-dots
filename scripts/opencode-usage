@@ -3,9 +3,9 @@
 OpenCode local usage for the Quickshell AI usage widget.
 
 OpenCode does not expose a Claude/Codex-style 5h/7d quota locally. This script
-reads OpenCode's local SQLite session aggregates and writes the same cache shape
-the widget already understands, using configurable soft caps for the visual
-usage bars. It never reads API tokens and never makes network calls.
+reads OpenCode's local SQLite messages and writes the same cache shape the
+widget already understands, using configurable soft caps for the visual usage
+bars. It never reads API tokens and never makes network calls.
 """
 import json
 import os
@@ -51,42 +51,91 @@ def connect() -> sqlite3.Connection:
     return con
 
 
-def total_expr() -> str:
-    return (
-        "coalesce(tokens_input,0) + coalesce(tokens_output,0) + "
-        "coalesce(tokens_reasoning,0) + coalesce(tokens_cache_read,0) + "
-        "coalesce(tokens_cache_write,0)"
-    )
-
-
-def sum_since(con: sqlite3.Connection, since_ms: int) -> tuple[int, float]:
-    expr = total_expr()
-    row = con.execute(
-        f"select coalesce(sum({expr}),0), coalesce(sum(cost),0) "
-        "from session where time_updated >= ?",
-        (since_ms,),
-    ).fetchone()
-    return int(row[0] or 0), float(row[1] or 0.0)
-
-
-def model_label(raw: str) -> str:
+def as_int(value) -> int:
     try:
-        model = json.loads(raw)
-        mid = model.get("id") or ""
-        provider = model.get("providerID") or ""
-        variant = model.get("variant") or ""
-        name = mid + (":" + variant if variant else "")
-        return name + (f" ({provider})" if provider else "")
+        return int(value or 0)
     except Exception:
-        return str(raw or "")
+        return 0
+
+
+def as_float(value) -> float:
+    try:
+        return float(value or 0.0)
+    except Exception:
+        return 0.0
+
+
+def model_label(model_id: str, provider_id: str = "") -> str:
+    model_id = str(model_id or "")
+    provider_id = str(provider_id or "")
+    return model_id + (f" ({provider_id})" if provider_id else "")
+
+
+def assistant_messages(con: sqlite3.Connection, since_ms: int = 0) -> list[dict]:
+    rows = con.execute(
+        """
+        select session_id, time_created, time_updated, data
+        from message
+        where time_updated >= ?
+        order by time_updated asc
+        """,
+        (since_ms,),
+    ).fetchall()
+    out = []
+    for session_id, time_created, time_updated, raw in rows:
+        try:
+            data = json.loads(raw or "{}")
+        except Exception:
+            continue
+        if data.get("role") != "assistant":
+            continue
+        model_id = data.get("modelID") or ""
+        if not model_id:
+            continue
+        tokens = data.get("tokens") or {}
+        cache = tokens.get("cache") or {}
+        inp = as_int(tokens.get("input"))
+        output = as_int(tokens.get("output"))
+        reasoning = as_int(tokens.get("reasoning"))
+        cache_read = as_int(cache.get("read"))
+        cache_write = as_int(cache.get("write"))
+        # cache_read is server-side context replay. Keep it visible in the model
+        # breakdown, but exclude it from usage caps so the 5h bar can move.
+        total = inp + output + reasoning + cache_write
+        out.append({
+            "session_id": session_id,
+            "model_id": model_id,
+            "provider_id": data.get("providerID") or "",
+            "input": inp,
+            "output": output,
+            "reasoning": reasoning,
+            "cache_read": cache_read,
+            "cache_write": cache_write,
+            "total": total,
+            "total_with_cache_read": total + cache_read,
+            "cost": as_float(data.get("cost")),
+            "time": as_int(time_updated or time_created),
+        })
+    return out
+
+
+def sum_since(con: sqlite3.Connection, since_ms: int) -> tuple[int, float, int]:
+    usage = 0
+    cost = 0.0
+    with_cache_read = 0
+    for msg in assistant_messages(con, since_ms):
+        usage += msg["total"]
+        with_cache_read += msg["total_with_cache_read"]
+        cost += msg["cost"]
+    return usage, cost, with_cache_read
 
 
 def newest_model(con: sqlite3.Connection) -> str:
-    row = con.execute(
-        "select model from session where model is not null and model != '' "
-        "order by time_updated desc limit 1"
-    ).fetchone()
-    return model_label(row[0]) if row else ""
+    msgs = assistant_messages(con)
+    if not msgs:
+        return ""
+    msg = max(msgs, key=lambda item: item["time"])
+    return model_label(msg["model_id"], msg["provider_id"])
 
 
 def fmt_tokens(value: int) -> str:
@@ -98,57 +147,56 @@ def fmt_tokens(value: int) -> str:
 
 
 def model_rows(con: sqlite3.Connection, today_ms: int, limit: int = 6) -> list[dict]:
-    rows = con.execute(
-        """
-        select model,
-               count(*) as sessions,
-               coalesce(sum(tokens_input),0) as input,
-               coalesce(sum(tokens_output),0) as output,
-               coalesce(sum(tokens_reasoning),0) as reasoning,
-               coalesce(sum(tokens_cache_read),0) as cache_read,
-               coalesce(sum(tokens_cache_write),0) as cache_write,
-               coalesce(sum(cost),0) as cost,
-               max(time_updated) as last_seen
-        from session
-        where model is not null and model != ''
-        group by model
-        order by (
-          coalesce(sum(tokens_input),0) + coalesce(sum(tokens_output),0) +
-          coalesce(sum(tokens_reasoning),0) + coalesce(sum(tokens_cache_read),0) +
-          coalesce(sum(tokens_cache_write),0)
-        ) desc
-        limit ?
-        """,
-        (limit,),
-    ).fetchall()
-    today_by_model = {
-        row[0]: int(row[1] or 0)
-        for row in con.execute(
-            f"""
-            select model, coalesce(sum({total_expr()}),0)
-            from session
-            where time_updated >= ? and model is not null and model != ''
-            group by model
-            """,
-            (today_ms,),
-        ).fetchall()
-    }
+    by_model = {}
+    for msg in assistant_messages(con):
+        key = (msg["provider_id"], msg["model_id"])
+        cur = by_model.setdefault(key, {
+            "name": model_label(msg["model_id"], msg["provider_id"]),
+            "session_ids": set(),
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache_read": 0,
+            "cache_write": 0,
+            "cost": 0.0,
+            "last_seen": 0,
+            "today": 0,
+            "total": 0,
+            "total_with_cache_read": 0,
+        })
+        cur["session_ids"].add(msg["session_id"])
+        cur["input"] += msg["input"]
+        cur["output"] += msg["output"]
+        cur["reasoning"] += msg["reasoning"]
+        cur["cache_read"] += msg["cache_read"]
+        cur["cache_write"] += msg["cache_write"]
+        cur["cost"] += msg["cost"]
+        cur["last_seen"] = max(cur["last_seen"], msg["time"])
+        cur["total"] += msg["total"]
+        cur["total_with_cache_read"] += msg["total_with_cache_read"]
+        if msg["time"] >= today_ms:
+            cur["today"] += msg["total"]
+
+    rows = sorted(by_model.values(), key=lambda item: item["last_seen"], reverse=True)[:limit]
     totals = []
-    for raw, sessions, inp, out, reasoning, cache_read, cache_write, cost, last_seen in rows:
-        total = int(inp or 0) + int(out or 0) + int(reasoning or 0) + int(cache_read or 0) + int(cache_write or 0)
+    for row in rows:
+        total = int(row["total"])
+        cost = float(row["cost"])
         totals.append({
-            "name": model_label(raw),
-            "sessions": int(sessions or 0),
+            "name": row["name"],
+            "sessions": len(row["session_ids"]),
             "total": total,
             "totalLabel": fmt_tokens(total),
-            "inputLabel": fmt_tokens(int(inp or 0)),
-            "outputLabel": fmt_tokens(int(out or 0)),
-            "reasoningLabel": fmt_tokens(int(reasoning or 0)),
-            "cacheReadLabel": fmt_tokens(int(cache_read or 0)),
-            "cacheWriteLabel": fmt_tokens(int(cache_write or 0)),
-            "todayLabel": fmt_tokens(today_by_model.get(raw, 0)),
-            "costLabel": f"${float(cost or 0.0):.2f}" if float(cost or 0.0) > 0 else "",
-            "lastSeen": int(last_seen or 0),
+            "inputLabel": fmt_tokens(int(row["input"])),
+            "outputLabel": fmt_tokens(int(row["output"])),
+            "reasoningLabel": fmt_tokens(int(row["reasoning"])),
+            "cacheReadLabel": fmt_tokens(int(row["cache_read"])),
+            "cacheWriteLabel": fmt_tokens(int(row["cache_write"])),
+            "todayLabel": fmt_tokens(int(row["today"])),
+            "costLabel": f"${cost:.2f}" if cost > 0 else "",
+            "lastSeen": int(row["last_seen"]),
+            "totalWithCacheRead": int(row["total_with_cache_read"]),
+            "totalWithCacheReadLabel": fmt_tokens(int(row["total_with_cache_read"])),
         })
     max_total = max((row["total"] for row in totals), default=0)
     for row in totals:
@@ -177,10 +225,10 @@ def main() -> None:
     try:
         con = connect()
         with con:
-            tok_5h, cost_5h = sum_since(con, five_h_ms)
-            tok_7d, cost_7d = sum_since(con, seven_d_ms)
-            tok_1h, _ = sum_since(con, hour_ms)
-            tok_today, cost_today = sum_since(con, today_ms)
+            tok_5h, cost_5h, tok_5h_with_cache = sum_since(con, five_h_ms)
+            tok_7d, cost_7d, tok_7d_with_cache = sum_since(con, seven_d_ms)
+            tok_1h, _, tok_1h_with_cache = sum_since(con, hour_ms)
+            tok_today, cost_today, tok_today_with_cache = sum_since(con, today_ms)
             model = newest_model(con)
             models = model_rows(con, today_ms)
     except sqlite3.Error:
@@ -194,14 +242,18 @@ def main() -> None:
         "7d-reset": "0",
         "updated_at": datetime.now().strftime("%H:%M:%S"),
         "_source": "sqlite",
-        "_plan": "local",
+        "_plan": "local messages",
         "_model": model,
         "_models": models,
         "_tokens_used": tok_5h,
+        "_tokens_used_with_cache_read": tok_5h_with_cache,
         "_window_limit": LIMIT_5H,
         "_rate_per_hour": tok_1h,
+        "_rate_per_hour_with_cache_read": tok_1h_with_cache,
         "_today_tokens": tok_today,
+        "_today_tokens_with_cache_read": tok_today_with_cache,
         "_7d_tokens": tok_7d,
+        "_7d_tokens_with_cache_read": tok_7d_with_cache,
         "_7d_limit": LIMIT_7D,
         "_cost_5h": cost_5h,
         "_cost_7d": cost_7d,
