@@ -177,6 +177,9 @@ ls -1dt "$BACKUP_ROOT"/bar.* 2>/dev/null | tail -n +4 | xargs -r rm -rf
 stage="$(mktemp -d -p "$(dirname "$DEST")" .qs-stage.XXXXXX)"
 trap 'rm -rf "$stage" 2>/dev/null || true' EXIT
 cp -r "$REPO/versions/$ver/." "$stage/"
+if [ -f "$backup/quotes.txt" ]; then
+  cp -p "$backup/quotes.txt" "$stage/quotes.txt"
+fi
 printf '%s\n' "$ver" > "$stage/.qsrise"
 
 # Stop the bar before swapping, and WAIT for it to actually exit (don't trust a

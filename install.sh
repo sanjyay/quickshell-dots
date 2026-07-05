@@ -204,7 +204,17 @@ if ((${#fontmiss[@]})); then
 fi
 
 # ── 2. fetch repo ───────────────────────────────────────────────
-tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+tmp="$(mktemp -d)"
+stage=""
+restore_src=""
+cleanup_install() {
+  [[ -n "${stage:-}" && -d "$stage" ]] && rm -rf "$stage"
+  if [[ -n "${restore_src:-}" && -d "$restore_src" && ! -e "$DEST" ]]; then
+    mv "$restore_src" "$DEST" 2>/dev/null || true
+  fi
+  rm -rf "$tmp"
+}
+trap cleanup_install EXIT
 info "Downloading…"
 git clone --depth 1 "$REPO_URL" "$tmp/repo" >/dev/null 2>&1
 
@@ -220,20 +230,37 @@ fi
 printf '%s\n' "${versions[@]}" | grep -qx "$choice" || { err "Unknown version: $choice"; exit 1; }
 
 # ── 4. install ──────────────────────────────────────────────────
-# back up only a FOREIGN config (no .qsrise marker). Re-installing our own
-# bar just replaces it — no redundant backups.
+# back up only a FOREIGN config (no .qsrise marker). Re-installing our own bar
+# uses a same-parent stage/rename so custom quotes are never held only in /tmp.
+mkdir -p "$(dirname "$DEST")"
+# Sweep install stages orphaned by SIGKILL / power loss before creating a new one.
+rm -rf "$(dirname "$DEST")"/.qs-install-stage.* 2>/dev/null || true
+ts="$(date +%Y%m%d-%H%M%S)"
+stage="$(mktemp -d -p "$(dirname "$DEST")" .qs-install-stage.XXXXXX)"
+cp -r "$tmp/repo/versions/$choice/." "$stage/"
+echo "$choice" > "$stage/.qsrise"
+
 if [[ -d "$DEST" ]]; then
   if [[ -e "$DEST/.qsrise" ]]; then
-    rm -rf "$DEST"
+    if [[ -f "$DEST/quotes.txt" ]]; then
+      cp -p "$DEST/quotes.txt" "$stage/quotes.txt"
+      info "Preserved custom quotes.txt"
+    fi
+    restore_src="$DEST.old.$ts"
+    mv "$DEST" "$restore_src"
   else
-    bak="$DEST.bak.$(date +%Y%m%d-%H%M%S)"
+    bak="$DEST.bak.$ts"
     info "Backing up your existing config → $bak"
     mv "$DEST" "$bak"
+    restore_src="$bak"
   fi
 fi
-mkdir -p "$DEST"
-cp -r "$tmp/repo/versions/$choice/." "$DEST/"
-echo "$choice" > "$DEST/.qsrise"
+mv "$stage" "$DEST"
+stage=""
+if [[ -n "$restore_src" && "$restore_src" == "$DEST.old."* ]]; then
+  rm -rf "$restore_src"
+fi
+restore_src=""
 info "Installed '${c_b}$choice${c_0}' → $DEST"
 
 # ── 4b. ArchUpdater security gate (pre-install package verdicts) ─
