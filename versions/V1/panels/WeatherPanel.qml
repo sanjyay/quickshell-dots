@@ -28,7 +28,11 @@ PanelWindow {
     property var    forecastDays: []
     property bool   refreshing: false
 
-    function refresh() { refreshing = true; wxData.running = false; wxData.running = true }
+    function refresh() {
+        if (wxData.running) return
+        refreshing = true
+        wxData.running = true
+    }
 
     // data is fetched in °C / km·h; convert on display per root.weatherImperial
     function tConv(c) {
@@ -63,6 +67,49 @@ PanelWindow {
     function dayRange(day) {
         var unit = root.weatherImperial ? "°F" : "°C"
         return tConv(day.min) + "°/" + tConv(day.max) + unit
+    }
+    function chanceOfRain(day) {
+        var hourly = day && day.hourly ? day.hourly : []
+        var maxRain = 0
+        for (var i = 0; i < hourly.length; i++) {
+            var rain = parseFloat(hourly[i].chanceofrain)
+            if (!isNaN(rain) && rain > maxRain) maxRain = rain
+        }
+        return maxRain
+    }
+    function forecastCode(day) {
+        var hourly = day && day.hourly ? day.hourly : []
+        var noon = hourly.length > 4 ? hourly[4] : (hourly.length > 0 ? hourly[0] : null)
+        return noon ? (noon.weatherCode || "") : ""
+    }
+    function parseReport(raw) {
+        var d = JSON.parse(raw)
+        var current = d.current_condition && d.current_condition[0] ? d.current_condition[0] : null
+        var area = d.nearest_area && d.nearest_area[0] ? d.nearest_area[0] : null
+        if (!current) return false
+
+        wxPanel.temp = current.temp_C || ""
+        wxPanel.feels = current.FeelsLikeC || ""
+        wxPanel.desc = current.weatherDesc && current.weatherDesc[0] ? current.weatherDesc[0].value || "" : ""
+        wxPanel.humidity = current.humidity || ""
+        wxPanel.wind = current.windspeedKmph || ""
+        wxPanel.location = area && area.areaName && area.areaName[0] ? area.areaName[0].value || "" : ""
+
+        var days = []
+        var reportDays = d.weather || []
+        for (var i = 0; i < reportDays.length && i < 3; i++) {
+            var day = reportDays[i]
+            days.push({
+                date: day.date || "",
+                min: day.mintempC || "",
+                max: day.maxtempC || "",
+                code: forecastCode(day),
+                desc: "",
+                rain: chanceOfRain(day)
+            })
+        }
+        wxPanel.forecastDays = days
+        return true
     }
 
     property real reveal: root.weatherVisible ? 1 : 0
@@ -287,26 +334,15 @@ PanelWindow {
 
     Process {
         id: wxData
-        command: ["bash", "-c",
-            "curl -fsS --max-time 5 'https://wttr.in?format=j1' 2>/dev/null | " +
-            "jq -c '{temp:.current_condition[0].temp_C, feels:.current_condition[0].FeelsLikeC, " +
-            "desc:.current_condition[0].weatherDesc[0].value, humidity:.current_condition[0].humidity, " +
-            "wind:.current_condition[0].windspeedKmph, location:.nearest_area[0].areaName[0].value, " +
-            "days:[.weather[:3][] | {date:.date, min:.mintempC, max:.maxtempC, " +
-            "code:(.hourly[4].weatherCode // .hourly[0].weatherCode // \"\"), " +
-            "desc:(.hourly[4].weatherDesc[0].value // .hourly[0].weatherDesc[0].value // \"\"), " +
-            "rain:([.hourly[]?.chanceofrain | tonumber?] | max // 0)}]}' 2>/dev/null"
-        ]
+        command: ["curl", "-fs", "--max-time", "5", "https://wttr.in?format=j1"]
         running: false
         stdout: StdioCollector {
+            waitForEnd: true
             onStreamFinished: {
-                var txt = this.text.trim()
+                var txt = String(this.text || "").trim()
                 if (txt === "") return
                 try {
-                    var d = JSON.parse(txt)
-                    wxPanel.temp = d.temp || ""; wxPanel.feels = d.feels || ""; wxPanel.desc = d.desc || ""
-                    wxPanel.humidity = d.humidity || ""; wxPanel.wind = d.wind || ""; wxPanel.location = d.location || ""
-                    wxPanel.forecastDays = d.days || []
+                    wxPanel.parseReport(txt)
                 } catch (e) {
                     // Keep the last valid panel data on transient weather failures.
                 }
