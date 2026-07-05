@@ -292,17 +292,17 @@ PanelWindow {
             // LARGER stage would fit with 48px slack — measured against that stage's
             // own needed width, else minimal⇄compact oscillates.
             property int stage: 0                        // 0 normal · 1 compact · 2 minimal
-            readonly property bool showWeather: stage === 0
+            readonly property bool showWeather: stage <= 1
             readonly property bool showDate:    stage === 0
-            readonly property bool showIcons:   stage <= 1
+            readonly property bool showIcons:   iconsRow.hasActive
             // needed widths per stage: reactive bindings over the UNCOLLAPSED content
             // (the stage-gated wrapper widths shrink and would mislead the upshift
             // decision). 18 = pill padding, 8 = row spacing per visible neighbour.
             readonly property real needMinimal: 18 + clock.implicitWidth
+                + (showIcons && iconsRow.implicitWidth > 0.5 ? 8 + iconsRow.implicitWidth : 0)
             readonly property real needCompact: needMinimal
-                + (iconsRow.implicitWidth > 0.5 ? 8 + iconsRow.implicitWidth : 0)
-            readonly property real needNormal: needCompact
                 + (weather.implicitWidth > 0.5 ? 8 + weather.implicitWidth : 0)
+            readonly property real needNormal: needCompact
                 + (dateLabel.implicitWidth > 0.5 ? 8 + dateLabel.implicitWidth : 0)
             function updateStage() {
                 // compact only while G8 actually occupies the center slot: after a
@@ -322,7 +322,7 @@ PanelWindow {
                 if (s === 1 && needNormal  + 48 <= avail) s = 0
                 if (s !== stage) stage = s
             }
-            // publish the clock-only floor width for the side-row budget
+            // publish the clock + status-icon floor width for the side-row budget
             Binding { target: island; property: "g8FloorWidth"; value: g8.needMinimal }
             // 80ms one-shot coalesces width flutter (track changes, tray churn)
             Timer { id: restageTimer; interval: 80; repeat: false; onTriggered: g8.updateStage() }
@@ -390,7 +390,7 @@ PanelWindow {
                     }
                 }
                 Item {                                   // indicator icons wrapper (stage-gated)
-                    visible: width > 0.5
+                    visible: g8.showIcons || width > 0.5
                     width: g8.showIcons ? iconsRow.implicitWidth : 0
                     height: 28
                     clip: true
@@ -401,12 +401,19 @@ PanelWindow {
                         id: iconsRow
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 8
-                        IdleWidget               { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
-                        NotificationSilenceWidget{ root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
-                        ScreenRecordWidget       { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
-                        VoxtypeWidget            { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
-                        UpdateWidget             { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
-                        ShellUpdateWidget        { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                        readonly property bool hasActive: idleInd.awake
+                            || dndInd.silenced
+                            || screenRecInd.recording
+                            || voxInd.state === "recording"
+                            || voxInd.state === "transcribing"
+                            || omarchyUpdateInd.updateAvailable
+                            || shellUpdateInd.updateAvailable
+                        IdleWidget               { id: idleInd;          root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                        NotificationSilenceWidget{ id: dndInd;           root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                        ScreenRecordWidget       { id: screenRecInd;     root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                        VoxtypeWidget            { id: voxInd;           root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                        UpdateWidget             { id: omarchyUpdateInd; root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                        ShellUpdateWidget        { id: shellUpdateInd;   root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
                     }
                 }
             }
