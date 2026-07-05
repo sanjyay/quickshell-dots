@@ -7,6 +7,7 @@ Item {
     required property var root
 
     property bool silenced: false
+    onSilencedChanged: root.notifSilenced = silenced   // mirror for the swarm reactor
 
     visible: silenced
     implicitWidth: silenced ? 20 : 0

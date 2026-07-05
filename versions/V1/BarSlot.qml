@@ -821,6 +821,7 @@ PanelWindow {
             layout: island
             mode:   barSlot.root.barAnim
             active: barSlot.root.barAnim > 0 && island.runs.length > 1
+            monitor: barSlot.screen ? barSlot.screen.name : ""
         }
 
         // ── region models (physical L→R order) ──

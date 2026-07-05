@@ -371,6 +371,19 @@ PanelWindow {
                     }
                 }
             }
+            Tile {
+                width: parent.width
+                // Separate event-reactor mode; not part of the Surge 1→2 cycle.
+                label: "Reactor"
+                active: root.barAnim === 7
+                onActivated: root.barAnim = root.barAnim === 7 ? 0 : 7
+            }
+            Tile {
+                width: parent.width
+                label: "Quotes"
+                active: root.barAnim === 8
+                onActivated: root.barAnim = root.barAnim === 8 ? 0 : 8
+            }
         }
     }
 

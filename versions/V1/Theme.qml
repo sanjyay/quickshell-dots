@@ -687,7 +687,7 @@ Item {
     property bool splitMon:    false
     property bool splitNet:    false
     property bool splitMprisL: false
-    property int barAnim: 0   // 0=off, 1=stream, 2=surge, 3=bolt, 4=bolt2, 5=stream2, 6=surge2
+    property int barAnim: 0   // 0=off, 1=stream, 2=surge, 3=bolt, 4=bolt2, 5=stream2, 6=surge2, 7=reactor, 8=quotes
 
     // ── Bar layout / unlock (drag&drop reorder). barUnlocked is transient. ──
     property bool barUnlocked: false
@@ -747,7 +747,7 @@ Item {
                     theme.splitMon       = parts[1] === "1"
                     theme.splitMprisL    = parts[2] === "1"
                     theme.splitNet       = parts[3] === "1"
-                    var ba = parseInt(parts[4]); theme.barAnim = (ba >= 0 && ba <= 6) ? ba : 0
+                    var ba = parseInt(parts[4]); theme.barAnim = (ba >= 0 && ba <= 8) ? ba : 0
                     if (parts.length >= 6) {
                         var bc = parts[5]
                         if (bc === "1") theme.barColor = "accent"
@@ -772,6 +772,9 @@ Item {
     property bool modWeather:    true
     property bool modNetwork:    true
     property string networkMode: "none"   // mirrored from NetworkWidget: wifi/ethernet/none
+    property bool omarchyUpdateAvail: false   // mirrored from UpdateWidget (6h poll)
+    property bool notifSilenced: false        // mirrored from NotificationSilenceWidget (DND)
+    property string voxState: "idle"          // mirrored from VoxtypeWidget: idle/recording/transcribing
     // battery presence (laptop) — drives the Battery indicator tile's visibility (shown only
     // where a battery exists, like Brightness uses hasBacklight). Direct UPower check, event-driven.
     readonly property bool hasBattery: UPower.displayDevice !== null && UPower.displayDevice.isLaptopBattery

@@ -7,6 +7,7 @@ Item {
     required property var root
 
     property string state: "idle"   // idle | recording | transcribing
+    onStateChanged: root.voxState = state   // mirror for the swarm reactor
     property string hint:  ""
     property bool   hasVoxtype: true   // turns off polling entirely when absent
 

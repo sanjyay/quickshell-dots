@@ -7,6 +7,7 @@ Item {
     required property var root
 
     property bool updateAvailable: false
+    onUpdateAvailableChanged: root.omarchyUpdateAvail = updateAvailable   // mirror for the swarm reactor
 
     visible: updateAvailable
     implicitWidth: updateAvailable ? 20 : 0
