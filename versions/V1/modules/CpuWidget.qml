@@ -57,22 +57,16 @@ Item {
                 var h = rootMod.history
                 if (h.length < 2) return
 
-                var minV = h[0], maxV = h[0]
-                for (var n = 1; n < h.length; n++) {
-                    if (h[n] < minV) minV = h[n]
+                var maxV = 0.25
+                for (var n = 0; n < h.length; n++) {
                     if (h[n] > maxV) maxV = h[n]
                 }
-                var range = maxV - minV
-                if (range < 0.04) { minV = Math.max(0, minV - 0.02); maxV = Math.min(1, maxV + 0.02); range = maxV - minV }
-                var pad = range * 0.2
-                minV = Math.max(0, minV - pad)
-                maxV = Math.min(1, maxV + pad)
-                range = maxV - minV
+                maxV = Math.min(1, Math.max(0.25, maxV * 1.15))
 
                 var pts = []
                 for (var i = 0; i < h.length; i++) {
                     var x = (i / (maxSamples - 1)) * width
-                    var y = height - ((h[i] - minV) / range) * height
+                    var y = height - (h[i] / maxV) * height
                     pts.push({ x: x, y: y })
                 }
 
