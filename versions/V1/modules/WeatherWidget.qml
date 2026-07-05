@@ -19,7 +19,9 @@ Item {
         ? (Math.round((parseFloat(weatherTemp) || 0) * 9 / 5 + 32) + "°F")
         : (weatherTemp + "°C")
     readonly property string tooltipText: weatherUnavailable
-        ? "Weather offline"
+        ? (weatherLoaded
+            ? "Weather stale · " + ((weatherPlace ? weatherPlace + " · " : "") + weatherTempStr + (weatherDesc ? " / " + weatherDesc : ""))
+            : "Weather offline")
         : (weatherLoaded
             ? (weatherPlace ? weatherPlace + " · " : "") + weatherTempStr + (weatherDesc ? " / " + weatherDesc : "")
             : "Weather…")
@@ -40,13 +42,11 @@ Item {
                 const txt = this.text.trim()
                 if (txt === "ERR" || txt === "") {
                     rootMod.weatherUnavailable = true
-                    rootMod.weatherLoaded = false
                     return
                 }
                 const p = txt.split("|")
                 if (p.length < 5) {
                     rootMod.weatherUnavailable = true
-                    rootMod.weatherLoaded = false
                     return
                 }
                 rootMod.weatherIcon = rootMod.glyphForCode(p[0])
@@ -73,11 +73,11 @@ Item {
         if (n === 116) return String.fromCodePoint(0xe302)
         if (n === 119 || n === 122) return String.fromCodePoint(0xe33d)
         if (n === 143 || n === 248 || n === 260) return String.fromCodePoint(0xe313)
-        if (n === 176 || n === 263 || n === 353) return String.fromCodePoint(0xe308)
-        if (n === 266 || n === 293 || n === 296) return String.fromCodePoint(0xe318)
+        if (n === 176 || n === 263 || n === 266 || n === 293 || n === 296 || n === 353) return String.fromCodePoint(0xe308)
         if (n === 179 || n === 227 || n === 230 || n === 323 || n === 326 || n === 368) return String.fromCodePoint(0xe30a)
         if (n === 182 || n === 185 || n === 281 || n === 284 || n === 311 || n === 314 || n === 317 || n === 320 || n === 350 || n === 362 || n === 365 || n === 374 || n === 377) return String.fromCodePoint(0xe3ad)
         if (n === 200 || n === 386 || n === 389 || n === 392 || n === 395) return String.fromCodePoint(0xe31d)
+        if (n === 299 || n === 302 || n === 305 || n === 308 || n === 356 || n === 359) return String.fromCodePoint(0xe318)
         if (n === 329 || n === 332 || n === 335 || n === 338 || n === 371) return String.fromCodePoint(0xe31a)
         return String.fromCodePoint(0xe33d)
     }
@@ -85,9 +85,9 @@ Item {
     Text {
         id: ico
         anchors.centerIn: parent
-        text: rootMod.weatherUnavailable ? "?"
-              : (rootMod.weatherLoaded ? rootMod.weatherIcon : "·")
-        color: rootMod.weatherUnavailable
+        text: rootMod.weatherLoaded ? rootMod.weatherIcon
+              : (rootMod.weatherUnavailable ? "?" : "·")
+        color: rootMod.weatherUnavailable && !rootMod.weatherLoaded
                ? Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.4)
                : root.ink
         font.family: root.mono

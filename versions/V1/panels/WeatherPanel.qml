@@ -25,6 +25,7 @@ PanelWindow {
     property string location: ""
     property string humidity: ""
     property string wind: ""
+    property var    forecastDays: []
     property bool   refreshing: false
 
     function refresh() { refreshing = true; wxData.running = false; wxData.running = true }
@@ -37,6 +38,31 @@ PanelWindow {
     function wConv(kmh) {
         var n = parseFloat(kmh); if (isNaN(n)) return kmh
         return root.weatherImperial ? (Math.round(n * 0.621371) + " mph") : (kmh + " km/h")
+    }
+    function glyphForCode(code) {
+        var n = parseInt(code) || 0
+        if (n === 113) return String.fromCodePoint(0xe30d)
+        if (n === 116) return String.fromCodePoint(0xe302)
+        if (n === 119 || n === 122) return String.fromCodePoint(0xe33d)
+        if (n === 143 || n === 248 || n === 260) return String.fromCodePoint(0xe313)
+        if (n === 176 || n === 263 || n === 266 || n === 293 || n === 296 || n === 353) return String.fromCodePoint(0xe308)
+        if (n === 179 || n === 227 || n === 230 || n === 323 || n === 326 || n === 368) return String.fromCodePoint(0xe30a)
+        if (n === 182 || n === 185 || n === 281 || n === 284 || n === 311 || n === 314 || n === 317 || n === 320 || n === 350 || n === 362 || n === 365 || n === 374 || n === 377) return String.fromCodePoint(0xe3ad)
+        if (n === 200 || n === 386 || n === 389 || n === 392 || n === 395) return String.fromCodePoint(0xe31d)
+        if (n === 299 || n === 302 || n === 305 || n === 308 || n === 356 || n === 359) return String.fromCodePoint(0xe318)
+        if (n === 329 || n === 332 || n === 335 || n === 338 || n === 371) return String.fromCodePoint(0xe31a)
+        return String.fromCodePoint(0xe33d)
+    }
+    function dayLabel(dateStr, index) {
+        if (index === 0) return "Today"
+        if (index === 1) return "Tomorrow"
+        var d = new Date(dateStr + "T00:00:00")
+        if (isNaN(d.getTime())) return dateStr
+        return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()]
+    }
+    function dayRange(day) {
+        var unit = root.weatherImperial ? "°F" : "°C"
+        return tConv(day.min) + "°/" + tConv(day.max) + unit
     }
 
     property real reveal: root.weatherVisible ? 1 : 0
@@ -145,6 +171,71 @@ PanelWindow {
 
             Rectangle { width: parent.width; height: 1; color: root.sep }
 
+            Column {
+                width: parent.width
+                spacing: 5
+                visible: wxPanel.forecastDays.length > 0
+
+                UiText {
+                    text: "3-DAY FORECAST"
+                    color: root.sumiHi
+                    font.family: root.mono
+                    font.pixelSize: 10
+                    font.letterSpacing: 1
+                }
+
+                Repeater {
+                    model: wxPanel.forecastDays
+                    delegate: Item {
+                        width: col.width
+                        height: 24
+                        property var day: modelData
+
+                        UiText {
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 66
+                            text: wxPanel.dayLabel(day.date || "", index)
+                            color: root.ink
+                            font.family: root.mono
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                        }
+                        Text {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 76
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: wxPanel.glyphForCode(day.code)
+                            color: root.seal
+                            font.family: root.mono
+                            font.pixelSize: 14
+                        }
+                        UiText {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 106
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 76
+                            text: wxPanel.dayRange(day)
+                            color: root.ink
+                            font.family: root.mono
+                            font.pixelSize: 11
+                        }
+                        UiText {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 76
+                            text: (day.rain !== undefined ? Math.round(day.rain) + "% rain" : "")
+                            color: root.sumiHi
+                            font.family: root.mono
+                            font.pixelSize: 10
+                            horizontalAlignment: Text.AlignRight
+                        }
+                    }
+                }
+            }
+
+            Rectangle { width: parent.width; height: 1; color: root.sep; visible: wxPanel.forecastDays.length > 0 }
+
             Row {
                 width: parent.width
                 height: 28
@@ -197,18 +288,27 @@ PanelWindow {
     Process {
         id: wxData
         command: ["bash", "-c",
-            "curl -s --max-time 5 'wttr.in/?format=j1' 2>/dev/null | " +
-            "jq -r '[.current_condition[0].temp_C, .current_condition[0].FeelsLikeC, " +
-            ".current_condition[0].weatherDesc[0].value, .current_condition[0].humidity, " +
-            ".current_condition[0].windspeedKmph, (.nearest_area[0].areaName[0].value)] | @tsv' 2>/dev/null"
+            "curl -fsS --max-time 5 'https://wttr.in?format=j1' 2>/dev/null | " +
+            "jq -c '{temp:.current_condition[0].temp_C, feels:.current_condition[0].FeelsLikeC, " +
+            "desc:.current_condition[0].weatherDesc[0].value, humidity:.current_condition[0].humidity, " +
+            "wind:.current_condition[0].windspeedKmph, location:.nearest_area[0].areaName[0].value, " +
+            "days:[.weather[:3][] | {date:.date, min:.mintempC, max:.maxtempC, " +
+            "code:(.hourly[4].weatherCode // .hourly[0].weatherCode // \"\"), " +
+            "desc:(.hourly[4].weatherDesc[0].value // .hourly[0].weatherDesc[0].value // \"\"), " +
+            "rain:([.hourly[]?.chanceofrain | tonumber?] | max // 0)}]}' 2>/dev/null"
         ]
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
-                var p = this.text.trim().split("\t")
-                if (p.length >= 6) {
-                    wxPanel.temp = p[0]; wxPanel.feels = p[1]; wxPanel.desc = p[2]
-                    wxPanel.humidity = p[3]; wxPanel.wind = p[4]; wxPanel.location = p[5]
+                var txt = this.text.trim()
+                if (txt === "") return
+                try {
+                    var d = JSON.parse(txt)
+                    wxPanel.temp = d.temp || ""; wxPanel.feels = d.feels || ""; wxPanel.desc = d.desc || ""
+                    wxPanel.humidity = d.humidity || ""; wxPanel.wind = d.wind || ""; wxPanel.location = d.location || ""
+                    wxPanel.forecastDays = d.days || []
+                } catch (e) {
+                    // Keep the last valid panel data on transient weather failures.
                 }
             }
         }
