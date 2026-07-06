@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Quickshell Rise — uninstaller (version-agnostic; removes whatever is installed)
 # Usage:
-#   bash <(curl -fsSL https://raw.githubusercontent.com/HANCORE-linux/quickshell-dots/main/uninstall.sh)
+#   bash <(curl -fsSL https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/uninstall.sh)
 set -euo pipefail
 
 DEST="$HOME/.config/quickshell/bar"

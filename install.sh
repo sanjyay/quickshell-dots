@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Quickshell Rise — one-command installer
 # Usage:
-#   bash <(curl -fsSL https://raw.githubusercontent.com/HANCORE-linux/quickshell-dots/main/install.sh)
+#   bash <(curl -fsSL https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/install.sh)
 #   bash <(curl -fsSL .../install.sh) V1          # install a specific version non-interactively
 #   bash <(curl -fsSL .../install.sh) V1 --autostart
 # Autostart via Omarchy post-boot hook (opt-in).
 set -euo pipefail
 
-REPO_URL="https://github.com/HANCORE-linux/quickshell-dots.git"
+REPO_URL="https://github.com/sanjyay/quickshell-dots.git"
 DEST="$HOME/.config/quickshell/bar"
 
 # args: optional version name + flags
@@ -306,7 +306,7 @@ info "Bar started — try it out."
 install_shell_updater "$tmp/repo" || warn "Self-updater setup incomplete — the bar is fine; the update badge just won't appear."
 
 # ── 7. autostart hook / hint ─────────────────────────────────────
-RAW="https://raw.githubusercontent.com/HANCORE-linux/quickshell-dots/main"
+RAW="https://raw.githubusercontent.com/sanjyay/quickshell-dots/main"
 autostart_dir="$HOME/.config/omarchy/hooks/post-boot.d"
 autostart_hook="$autostart_dir/quickshell-rise"
 case "$WANT_AUTOSTART" in

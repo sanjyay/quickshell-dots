@@ -3,9 +3,9 @@
 <h4 align="center"> My Quickshell bar for Omarchy — my new Rise journey into Quickshell starts here. Enjoy! </h4>
 <div align="center">
 
-[![Stars](https://img.shields.io/github/stars/HANCORE-linux/quickshell-dots?style=for-the-badge&labelColor=000000&color=209edb&logo=github&logoColor=209edb&cacheSeconds=21600)](https://github.com/HANCORE-linux/quickshell-dots)
-[![Forks](https://img.shields.io/github/forks/HANCORE-linux/quickshell-dots?style=for-the-badge&labelColor=000000&color=209edb&logo=github&logoColor=209edb&cacheSeconds=21600)](https://github.com/HANCORE-linux/quickshell-dots/network)
-[![Issues](https://img.shields.io/github/issues/HANCORE-linux/quickshell-dots?style=for-the-badge&labelColor=000000&color=209edb&logo=github&logoColor=209edb&cacheSeconds=21600)](https://github.com/HANCORE-linux/quickshell-dots/issues)
+[![Stars](https://img.shields.io/github/stars/sanjyay/quickshell-dots?style=for-the-badge&labelColor=000000&color=209edb&logo=github&logoColor=209edb&cacheSeconds=21600)](https://github.com/sanjyay/quickshell-dots)
+[![Forks](https://img.shields.io/github/forks/sanjyay/quickshell-dots?style=for-the-badge&labelColor=000000&color=209edb&logo=github&logoColor=209edb&cacheSeconds=21600)](https://github.com/sanjyay/quickshell-dots/network)
+[![Issues](https://img.shields.io/github/issues/sanjyay/quickshell-dots?style=for-the-badge&labelColor=000000&color=209edb&logo=github&logoColor=209edb&cacheSeconds=21600)](https://github.com/sanjyay/quickshell-dots/issues)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-SUPPORT-000000?style=for-the-badge&labelColor=000000&color=209edb&logo=buymeacoffee&logoColor=209edb)](https://buymeacoffee.com/hancore)
 
 </div>
@@ -28,19 +28,19 @@
 Install and start the bar for the current session:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/HANCORE-linux/quickshell-dots/main/install.sh | bash -s V1
+curl -fsSL https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/install.sh | bash -s V1
 ```
 
 Install and keep the bar after reboot:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/HANCORE-linux/quickshell-dots/main/install.sh | bash -s V1 --autostart
+curl -fsSL https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/install.sh | bash -s V1 --autostart
 ```
 
 Remove the bar and restore your previous config:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/HANCORE-linux/quickshell-dots/main/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/uninstall.sh | bash
 ```
 
 The installer backs up an existing config to `~/.config/quickshell/bar.bak.<timestamp>`.
@@ -191,7 +191,7 @@ If you did not install with `--autostart`, add the Omarchy post-boot hook manual
 ```bash
 mkdir -p ~/.config/omarchy/hooks/post-boot.d
 curl -fsSL -o ~/.config/omarchy/hooks/post-boot.d/quickshell-rise \
-  https://raw.githubusercontent.com/HANCORE-linux/quickshell-dots/main/contrib/post-boot.d/quickshell-rise
+  https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/contrib/post-boot.d/quickshell-rise
 chmod +x ~/.config/omarchy/hooks/post-boot.d/quickshell-rise
 ```
 
