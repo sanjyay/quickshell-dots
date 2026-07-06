@@ -273,7 +273,7 @@ PanelWindow {
             }
         }
     }
-    Component { id: compMem;    MemoryWidget { root: barSlot.root } }
+    Component { id: compMem;    Item { implicitWidth: 0; implicitHeight: 28 } }
     Component { id: compCpu;    CpuWidget    { root: barSlot.root } }
     Component { id: compVol;    AudioWidget  { root: barSlot.root } }
     Component { id: compClaude; ClaudeWidget { root: barSlot.root } }
@@ -423,29 +423,7 @@ PanelWindow {
     Component { id: compMpris; MprisWidget { root: barSlot.root } }
     Component {
         id: compQuick                                    // G10: idle-inhib · media · theme
-        Item {
-            visible: implicitWidth > 0.5
-            implicitWidth: barSlot.root.modQuick ? Math.round(qcRow.implicitWidth) + 16 : 0
-            implicitHeight: 28
-            opacity: barSlot.root.modQuick ? 1 : 0
-            Behavior on implicitWidth { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-            Behavior on opacity      { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-            Rectangle {
-                anchors.centerIn: parent
-                width: parent.implicitWidth; height: barSlot.root.pillH; radius: barSlot.root.pillRadius
-                color: barSlot.root.pill; border.color: barSlot.root.pillBorder; border.width: barSlot.root.pillBorderW
-                PillShadow { theme: barSlot.root }
-            }
-            Row {
-                id: qcRow
-                anchors.verticalCenter: parent.verticalCenter
-                x: Math.round((parent.width - width) / 2)
-                spacing: 4
-                IdleInhibitorWidget { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
-                MediaBrowserWidget  { root: barSlot.root; screen: barSlot.screen; anchors.verticalCenter: parent.verticalCenter }
-                ThemeDisplayWidget  { root: barSlot.root; screen: barSlot.screen; anchors.verticalCenter: parent.verticalCenter }
-            }
-        }
+        Item { implicitWidth: 0; implicitHeight: 28 }
     }
     Component {
         id: compNetwork
@@ -673,13 +651,7 @@ PanelWindow {
         property int narrowStage: 0            // 0 normal · 1 compact · 2 portrait · 3 emergency
         property real g8FloorWidth: 80         // published by G8: its clock-only minimal width
         function groupVisibleAtStage(gid, stage) {
-            if (gid === "G8") return true                                        // clock has its own stages
-            if (gid === "G9" && barSlot.root.mprisActive) return true            // keep active media controls visible
-            if (gid === "G7" && barSlot.root.modClaude) return true              // keep enabled AI usage visible
-            if (stage <= 0) return true
-            if (stage === 1) return ["G7", "G9", "G10"].indexOf(gid) < 0         // drop AI · MPRIS · Quick
-            if (stage === 2) return ["G4", "G5", "G7", "G9", "G10"].indexOf(gid) < 0   // also MEM · CPU
-            return ["G1", "G2", "G6", "G8", "G11", "G14"].indexOf(gid) >= 0      // emergency whitelist
+            return true
         }
         function sideNaturalWidth(row, stage) {
             var sum = 0, n = 0

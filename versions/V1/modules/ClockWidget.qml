@@ -60,12 +60,17 @@ Item {
         onExited: { tip.hide(); }
         onClicked: (e) => {
             if (e.button === Qt.LeftButton) {
-                root.clock12h = !root.clock12h;          // toggle 24h / 12h
+                tip.hide();
+                root.openCalendar();
             } else if (e.button === Qt.RightButton) {
                 tip.hide();
                 tzRunner.running = false;                // timezone picker (unchanged)
                 tzRunner.running = true;
             }
+        }
+        onWheel: (wheel) => {
+            root.clock12h = !root.clock12h;              // scroll toggles 24h / 12h
+            wheel.accepted = true;
         }
     }
 }

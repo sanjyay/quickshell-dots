@@ -53,7 +53,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Bar layout | unlock mode, drag/drop widget groups, persistent order, split groups, top/bottom position |
 | Control center | quick actions, widget toggles, workspace modes, bar style, split controls, animation controls |
 | Pickers | theme, wallpaper, screenshot, and video pickers with Tanzaku, Hearthstone, and Carousel styles |
-| Core widgets | workspaces, volume, CPU, memory, battery, power profile, network, Bluetooth, weather, MPRIS, tray, notifications |
+| Core widgets | workspaces, volume, System info (CPU/GPU/RAM), battery, power profile, network, Bluetooth, weather, MPRIS, tray, notifications |
 | Privacy tools | microphone mute indicator/toggle and camera status/block toggle |
 | Updates | shell update badge, weekly scheduled package update badge, Arch/AUR counter, known-infected AUR safety check |
 | AI usage | Claude, Codex, and OpenCode usage pill with provider switcher and detail panel |
@@ -70,10 +70,10 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | AI usage | combined Claude, Codex, and OpenCode usage pill |
 | Workspaces | switch, overview, 10 / 5 / active-only modes, dots / numbers / magic styles |
 | Weather | current conditions, metric / imperial toggle |
-| Clock | time, calendar, 24h / 12h toggle |
+| Clock | time, calendar, scroll 24h / 12h toggle, timezone picker |
 | MPRIS | media controls |
 | Notifications | mako history, unread count, clear |
-| System monitors | CPU, RAM, battery, network, Bluetooth |
+| System monitors | compact System info widget with CPU/GPU temperatures, CPU/GPU usage, VRAM, and RAM usage |
 | Privacy tools | microphone mute state, active microphone clients, camera status, active camera processes |
 | Speed test | manual Cloudflare speed test in the network panel |
 | Control center | quick toggles, power, Bar Functions fly-out |
@@ -139,6 +139,7 @@ Common actions:
 - Open the launcher/control widget to change bar style, widgets, privacy module visibility, workspaces, logo, splits, and animations.
 - Use `Control > Actions > Schedule Update` to choose the weekday for the package-update badge. Friday is the default.
 - Use the self-update badge when it appears to update this shell from inside the bar.
+- Use the System info widget for quick CPU/GPU temperatures; click it for CPU, GPU, VRAM, and RAM details.
 - Use the network cluster for network, Bluetooth, microphone, and camera privacy controls.
 - The AI pill shows remaining 5h Codex allowance in the bar. Click it to open the usage panel, which shows the weekly Codex window and other AI providers.
 
@@ -148,7 +149,8 @@ Common actions:
 | Widget | Left | Middle | Right | Scroll |
 |---|---|---|---|---|
 | Audio | panel | - | mute toggle | volume |
-| Clock | toggle 24h / 12h | - | timezone picker | - |
+| Clock | calendar | - | timezone picker | toggle 24h / 12h |
+| System info | CPU/GPU/RAM panel | - | - | - |
 | Power Profile | panel | - | cycle profile | - |
 | Network | panel | - | open system manager | - |
 | Bluetooth | panel with up to 3 paired devices | - | open Bluetooth manager | - |
