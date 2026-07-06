@@ -6,9 +6,10 @@
 [![Stars](https://img.shields.io/github/stars/sanjyay/quickshell-dots?style=for-the-badge&labelColor=000000&color=209edb&logo=github&logoColor=209edb&cacheSeconds=21600)](https://github.com/sanjyay/quickshell-dots)
 [![Forks](https://img.shields.io/github/forks/sanjyay/quickshell-dots?style=for-the-badge&labelColor=000000&color=209edb&logo=github&logoColor=209edb&cacheSeconds=21600)](https://github.com/sanjyay/quickshell-dots/network)
 [![Issues](https://img.shields.io/github/issues/sanjyay/quickshell-dots?style=for-the-badge&labelColor=000000&color=209edb&logo=github&logoColor=209edb&cacheSeconds=21600)](https://github.com/sanjyay/quickshell-dots/issues)
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-SUPPORT-000000?style=for-the-badge&labelColor=000000&color=209edb&logo=buymeacoffee&logoColor=209edb)](https://buymeacoffee.com/hancore)
 
 </div>
+
+> This project is based on [HANCORE-linux/quickshell-dots](https://github.com/HANCORE-linux/quickshell-dots). Credit goes to HANCORE-linux for the original Quickshell Rise work; this repository is my maintained version with my own changes on top.
 
 <table>
   <tr>
@@ -49,12 +50,13 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 
 | Area | Highlights |
 |---|---|
-| Bar layout | unlock mode, widget-group drag/drop, persistent order, top/bottom position |
-| Visual style | theme-aware colors, border, shadow, frost, split groups, gap animations |
-| Pickers | theme, wallpaper, screenshots, videos, with Tanzaku, Hearthstone, and Carousel styles |
-| Widgets | workspaces, audio, battery, CPU, memory, network, Bluetooth, microphone/camera privacy, weather, MPRIS, tray, notifications |
-| Updates | in-bar shell update badge, Arch/AUR counter, known-infected AUR safety check |
-| AI usage | Claude + Codex usage pill with switchable provider and detail panel |
+| Bar layout | unlock mode, drag/drop widget groups, persistent order, split groups, top/bottom position |
+| Control center | quick actions, widget toggles, workspace modes, bar style, split controls, animation controls |
+| Pickers | theme, wallpaper, screenshot, and video pickers with Tanzaku, Hearthstone, and Carousel styles |
+| Core widgets | workspaces, volume, CPU, memory, battery, power profile, network, Bluetooth, weather, MPRIS, tray, notifications |
+| Privacy tools | microphone mute indicator/toggle and camera status/block toggle |
+| Updates | shell update badge, weekly scheduled package update badge, Arch/AUR counter, known-infected AUR safety check |
+| AI usage | Claude, Codex, and OpenCode usage pill with provider switcher and detail panel |
 
 <details>
 <summary>Full feature list</summary>
@@ -64,14 +66,15 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Unlock &amp; reorder | unlock the bar, drag widget-groups to swap positions, persistent |
 | Image pickers | theme, wallpaper, screenshots, videos, 3 selectable styles, cached thumbnails |
 | Self-update | in-bar badge when a new version ships, one-click update and restart |
-| Package updates | system + AUR counter with pre-install security check |
-| AI usage | combined Claude + Codex token-usage pill |
+| Package updates | system + AUR counter, scheduled weekday display, pre-install security check |
+| AI usage | combined Claude, Codex, and OpenCode usage pill |
 | Workspaces | switch, overview, 10 / 5 / active-only modes, dots / numbers / magic styles |
 | Weather | current conditions, metric / imperial toggle |
 | Clock | time, calendar, 24h / 12h toggle |
 | MPRIS | media controls |
 | Notifications | mako history, unread count, clear |
-| System monitors | CPU, RAM, battery health, network, Bluetooth, microphone/camera privacy |
+| System monitors | CPU, RAM, battery, network, Bluetooth |
+| Privacy tools | microphone mute state, active microphone clients, camera status, active camera processes |
 | Speed test | manual Cloudflare speed test in the network panel |
 | Control center | quick toggles, power, Bar Functions fly-out |
 | Bar style | border, shadow, frost, pill radius, top/bottom position |
@@ -83,7 +86,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 
 ## Requirements
 
-Built for **Omarchy / Hyprland**. It integrates with `omarchy-*` helpers, Omarchy theme files, Hyprland, mako, and Omarchy's hook system.
+Built for **Omarchy / Hyprland**. It integrates with `omarchy-*` helpers, Omarchy theme files, Hyprland, mako, MPRIS players, and Omarchy's hook system.
 
 Required packages are checked by the installer:
 
@@ -102,8 +105,12 @@ sudo pacman -S pamixer power-profiles-daemon bluez-utils iwd impala hypridle gpu
 
 Notes:
 
+- `pamixer`, `pactl`, or `wpctl` support the audio and microphone controls. Most PipeWire setups already provide `wpctl`.
 - `bluez-utils` provides `bluetoothctl`, which the Bluetooth widget currently uses.
 - `psmisc` provides `fuser`, used by the camera privacy indicator.
+- `power-profiles-daemon` is needed for the power-profile widget.
+- `iwd` and `impala` are used by the Wi-Fi panel on classic Omarchy setups. If NetworkManager is active, the panel opens `nmtui` instead.
+- `gpu-screen-recorder` enables the screen-recording widget.
 - `voxtype` is optional for the Voxtype widget.
 - The install script checks required tools and warns about missing optional tools.
 
@@ -128,8 +135,10 @@ Common actions:
 
 - Double-click an empty bar area to unlock drag/drop mode.
 - Press `Esc` or click the dimmed backdrop to lock again.
-- Open the launcher/control widget to change bar style, widgets, workspaces, logo, splits, and animations.
-- Use the self-update badge when it appears to update the shell from inside the bar.
+- Open the launcher/control widget to change bar style, widgets, privacy module visibility, workspaces, logo, splits, and animations.
+- Use `Control > Actions > Schedule Update` to choose the weekday for the package-update badge. Friday is the default.
+- Use the self-update badge when it appears to update this shell from inside the bar.
+- Use the network cluster for network, Bluetooth, microphone, and camera privacy controls.
 
 <details>
 <summary>Click bindings</summary>
@@ -139,7 +148,8 @@ Common actions:
 | Audio | panel | - | mute toggle | volume |
 | Clock | toggle 24h / 12h | - | timezone picker | - |
 | Power Profile | panel | - | cycle profile | - |
-| Network / Bluetooth | panel | - | open system manager | - |
+| Network | panel | - | open system manager | - |
+| Bluetooth | panel with up to 3 paired devices | - | open Bluetooth manager | - |
 | Microphone | mute toggle | - | - | - |
 | Camera | block / unblock in terminal | - | - | - |
 | Weather | panel | - | force refresh | - |
@@ -241,7 +251,9 @@ versions/V1/
 
 ## Credits
 
-Parts of this project are adapted from [Omarchy Shell](https://github.com/basecamp/omarchy/tree/omarchy-shell) and modified to integrate with Quickshell Rise. This includes the Carousel picker and selected widget functionality.
+This repository is based on [HANCORE-linux/quickshell-dots](https://github.com/HANCORE-linux/quickshell-dots). Thanks to HANCORE-linux for the original Quickshell Rise project and design foundation.
+
+Parts of the original project are adapted from [Omarchy Shell](https://github.com/basecamp/omarchy/tree/omarchy-shell) and modified to integrate with Quickshell Rise. This includes the Carousel picker and selected widget functionality.
 
 The Tanzaku and Hearthstone pickers are original implementations created for this project.
 
