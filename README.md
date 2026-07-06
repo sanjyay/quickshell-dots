@@ -113,6 +113,7 @@ Notes:
 - `gpu-screen-recorder` enables the screen-recording widget.
 - `voxtype` is optional for the Voxtype widget.
 - The install script checks required tools and warns about missing optional tools.
+- AI usage backends are local-only. They write usage numbers to `~/.cache/*.json`, do not store API keys, and refresh on timers.
 
 </details>
 
@@ -139,6 +140,7 @@ Common actions:
 - Use `Control > Actions > Schedule Update` to choose the weekday for the package-update badge. Friday is the default.
 - Use the self-update badge when it appears to update this shell from inside the bar.
 - Use the network cluster for network, Bluetooth, microphone, and camera privacy controls.
+- The AI pill shows remaining 5h Codex allowance in the bar. Click it to open the usage panel, which shows the weekly Codex window and other AI providers.
 
 <details>
 <summary>Click bindings</summary>
@@ -152,6 +154,7 @@ Common actions:
 | Bluetooth | panel with up to 3 paired devices | - | open Bluetooth manager | - |
 | Microphone | mute toggle | - | - | - |
 | Camera | block / unblock in terminal | - | - | - |
+| AI usage | open quota panel | - | switch provider | - |
 | Weather | panel | - | force refresh | - |
 | Voxtype | cycle model | - | config | - |
 | Workspace | switch workspace | - | overview | - |

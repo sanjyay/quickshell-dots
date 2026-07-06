@@ -257,7 +257,7 @@ PanelWindow {
                     height: 28
                     spacing: 6
                     Repeater {
-                        model: [ { id: "claude", label: "Claude" }, { id: "codex", label: "Codex" }, { id: "opencode", label: "OpenCode" } ]
+                        model: [ { id: "codex", label: "Codex" }, { id: "claude", label: "Claude" }, { id: "opencode", label: "OpenCode" } ]
                         Rectangle {
                             required property var modelData
                             width: root.evenW((parent.width - 12) / 3)
@@ -343,10 +343,10 @@ PanelWindow {
                     text: "no data — run codex"
                     color: root.sumiHi; font.family: root.mono; font.pixelSize: 11
                 }
+                UsageRow { visible: aiPanel.showCodex && aiPanel.cxHas; label: "weekly"; pct: aiPanel.cxPct7d; dim: !aiPanel.cxFresh }
                 UsageRow { visible: aiPanel.showCodex && aiPanel.cxHas; label: "5h"; pct: aiPanel.cxPct5h; dim: !aiPanel.cxFresh }
-                UsageRow { visible: aiPanel.showCodex && aiPanel.cxHas; label: "7d"; pct: aiPanel.cxPct7d; dim: !aiPanel.cxFresh }
+                DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas; k: "weekly resets in"; v: root.aiFmtReset(aiPanel.cxReset7dTs) || "—" }
                 DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas; k: "5h resets in"; v: root.aiFmtReset(aiPanel.cxReset5hTs) || "—" }
-                DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas; k: "7d resets in"; v: root.aiFmtReset(aiPanel.cxReset7dTs) || "—" }
                 DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas && aiPanel.cxTokens !== ""; k: "Tokens"; v: aiPanel.cxTokens }
                 DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas && aiPanel.cxRate !== "";   k: "Rate"; v: aiPanel.cxRate }
                 DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas && aiPanel.cxToday > 0; k: "Today"; v: (aiPanel.cxToday / 1e6).toFixed(2) + "M tok" }

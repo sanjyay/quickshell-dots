@@ -362,7 +362,15 @@ if [[ "$do_claude" == "yes" ]]; then
   fi
   install_opencode_backend "$src_repo" || warn "OpenCode backend setup incomplete — re-run with --ai-backend to retry."
 else
-  info "Skipped AI usage backend (the quota widget stays hidden until it's installed)."
+  refreshed_ai=0
+  [[ -x "$HOME/.local/bin/claude-usage" ]] && { install_claude_backend "$src_repo" || warn "Claude backend refresh incomplete."; refreshed_ai=1; }
+  [[ -x "$HOME/.local/bin/codex-usage" ]] && { install_codex_backend "$src_repo" || warn "Codex backend refresh incomplete."; refreshed_ai=1; }
+  [[ -x "$HOME/.local/bin/opencode-usage" ]] && { install_opencode_backend "$src_repo" || warn "OpenCode backend refresh incomplete."; refreshed_ai=1; }
+  if [[ "$refreshed_ai" -eq 0 ]]; then
+    info "Skipped AI usage backend (install with --ai-backend to enable it)."
+  else
+    info "Refreshed already-installed AI usage backend scripts."
+  fi
 fi
 
 info "${c_b}Done — enjoy!${c_0}"

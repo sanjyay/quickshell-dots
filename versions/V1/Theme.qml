@@ -488,7 +488,7 @@ Item {
         popupOpened("aiUsageVisible")
         if (aiUsageVisible) refreshAiUsage()
     }
-    property string aiTool: "claude"   // "claude", "codex", or "opencode" — icon shown in the bar
+    property string aiTool: "codex"   // "claude", "codex", or "opencode" — icon shown in the bar
 
     // ── AI usage data (single source of truth) ───────────────────
     // The bar pill (ClaudeWidget) and the AiUsagePanel both render from these —
@@ -796,7 +796,7 @@ Item {
     property bool modMedia:      true
     property bool modQuick:      true    // G10 group pill (idle-inhibitor · media · theme)
     property bool modMpris:      true    // G9 now-playing / mpris pill
-    property bool modClaude:     false   // default off (toggle in ControlPanel)
+    property bool modClaude:     true    // default on (toggle in ControlPanel)
     property bool modPrivacy:    true    // microphone/camera privacy pills
     property bool modBattery:    true    // battery pill, shown only when hardware exists
 

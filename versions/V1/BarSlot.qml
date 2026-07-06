@@ -675,6 +675,7 @@ PanelWindow {
         function groupVisibleAtStage(gid, stage) {
             if (gid === "G8") return true                                        // clock has its own stages
             if (gid === "G9" && barSlot.root.mprisActive) return true            // keep active media controls visible
+            if (gid === "G7" && barSlot.root.modClaude) return true              // keep enabled AI usage visible
             if (stage <= 0) return true
             if (stage === 1) return ["G7", "G9", "G10"].indexOf(gid) < 0         // drop AI · MPRIS · Quick
             if (stage === 2) return ["G4", "G5", "G7", "G9", "G10"].indexOf(gid) < 0   // also MEM · CPU
@@ -716,6 +717,7 @@ PanelWindow {
         Connections {
             target: barSlot.root
             function onMprisActiveChanged() { island.scheduleNarrowUpdate() }
+            function onModClaudeChanged() { island.scheduleNarrowUpdate() }
         }
 
         // ── split persistence (survives restart) ──

@@ -31,6 +31,23 @@ def runtime_env() -> dict:
 ENV = runtime_env()
 
 
+def write_cache(data: dict) -> None:
+    """Write only non-secret usage numbers, atomically and readable by this user."""
+    CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = CACHE_FILE.with_suffix(".json.tmp")
+    old_umask = os.umask(0o177)
+    try:
+        tmp.write_text(json.dumps(data, separators=(",", ":")))
+        os.replace(tmp, CACHE_FILE)
+        os.chmod(CACHE_FILE, 0o600)
+    finally:
+        os.umask(old_umask)
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+
+
 def find_codex() -> str | None:
     return shutil.which("codex", path=ENV.get("PATH"))
 
@@ -227,7 +244,7 @@ def main():
             try:
                 cur = json.loads(CACHE_FILE.read_text())
                 cur["_source"] = "stale"
-                CACHE_FILE.write_text(json.dumps(cur))
+                write_cache(cur)
             except Exception:
                 pass
         return
@@ -260,8 +277,7 @@ def main():
                   else "allowed_warning" if util5h >= 0.9
                   else "allowed",
     }
-    CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    CACHE_FILE.write_text(json.dumps(out))
+    write_cache(out)
 
 
 if __name__ == "__main__":

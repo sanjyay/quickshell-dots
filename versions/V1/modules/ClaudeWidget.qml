@@ -12,8 +12,10 @@ Item {
     required property var root
 
     // ── which tool the bar pill displays ──
-    readonly property bool isCodex: root.aiTool === "codex"
-    readonly property bool isOpenCode: root.aiTool === "opencode"
+    readonly property string effectiveTool: (root.aiTool === "claude" && !clHas && !clActive && cxHas)
+        ? "codex" : root.aiTool
+    readonly property bool isCodex: effectiveTool === "codex"
+    readonly property bool isOpenCode: effectiveTool === "opencode"
     readonly property bool isLogo: isCodex || isOpenCode
     readonly property url  logoSource: Qt.resolvedUrl(isOpenCode ? "../assets/opencode-mark.svg" : "../assets/codex.svg")
     readonly property var  logoSourceSize: isOpenCode ? Qt.size(22, 14) : Qt.size(48, 48)
@@ -67,8 +69,10 @@ Item {
     // ── selected-tool display values ──
     readonly property int  pct5h:   isOpenCode ? ocPct5h : (isCodex ? cxPct5h : clPct5h)
     readonly property int  pct5hStep: Math.round(pct5h / 5) * 5
+    readonly property int  pct5hRemaining: Math.max(0, 100 - pct5h)
     readonly property bool selFresh: isOpenCode ? ocFresh : (isCodex ? cxFresh : clFresh)
     readonly property bool selSignal: isOpenCode ? ocSignal : (isCodex ? cxSignal : clSignal)
+    readonly property bool barHasData: isCodex ? (cxHas || cxActive) : selSignal
     readonly property bool blocked:  (isCodex || isOpenCode) ? false : clBlocked
 
     // The widget toggle controls visibility. Signal still drives the usage fill/tooltip,
@@ -77,6 +81,19 @@ Item {
 
     readonly property string tooltipText: {
         var lines = []
+        if (isCodex) {
+                lines.push("OpenAI Codex" + (cxPlan ? "  (" + cxPlan + ")" : ""))
+                if (cxHas || cxActive) {
+                    var cx5 = root.aiFmtReset(cxReset5hTs)
+                    var cx7 = root.aiFmtReset(cxReset7dTs)
+                    lines.push("5h remaining: " + (100 - cxPct5h) + "%" + (cx5 ? "  resets in " + cx5 : ""))
+                    lines.push("weekly limit: " + cxPct7d + "%" + (cx7 ? "  resets in " + cx7 : ""))
+                    if (cxTokens) lines.push(cxTokens + " tokens" + (cxRate ? "  · " + cxRate : ""))
+            } else {
+                lines.push("no data yet - run codex or install the AI backend")
+            }
+            return lines.join("\n")
+        }
         if (clHas || clActive) {
             lines.push("Claude Code")
             var cr = root.aiFmtReset(clReset5hTs)
@@ -257,7 +274,9 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: rootMod.blocked
                 ? "BLK"
-                : (rootMod.selSignal ? String(rootMod.pct5h).padStart(2, "0") + "%" : "··")
+                : rootMod.isCodex
+                    ? (rootMod.barHasData ? String(rootMod.pct5hRemaining).padStart(2, "0") + "%" : "··")
+                    : (rootMod.barHasData ? String(rootMod.pct5h).padStart(2, "0") + "%" : "··")
             color: rootMod.blocked
                 ? root.seal
                 : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.85)
@@ -274,6 +293,11 @@ Item {
         hoverEnabled: true; cursorShape: Qt.PointingHandCursor
         onEntered: if (shown) { root.refreshAiUsage(); tip.show() }
         onExited: { tip.hide() }
-        onClicked: { tip.hide(); root.aiUsageVisible = !root.aiUsageVisible }
+        onClicked: {
+            tip.hide()
+            root.aiTool = "codex"
+            root.refreshAiUsage(true)
+            root.aiUsageVisible = !root.aiUsageVisible
+        }
     }
 }
