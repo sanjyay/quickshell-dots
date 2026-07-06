@@ -750,7 +750,8 @@ PanelWindow {
                                 prompt += " (security feed degraded)";
                             var updateCommand = archPanel.themedGumConfirmEnv()
                                 + " gum confirm " + archPanel.shellQuote(prompt)
-                                + " && sudo pacman -Syu" + ign;
+                                + " && sudo pacman -Syu" + ign
+                                + "; qs -c bar ipc call omarchy.system-update refresh >/dev/null 2>&1 || true";
                             panelUpdateRunner.command = ["bash", "-c",
                                 "omarchy-launch-floating-terminal-with-presentation "
                                     + archPanel.shellQuote(updateCommand)];

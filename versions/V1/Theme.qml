@@ -819,6 +819,8 @@ Item {
     property string launcherLogoIcon: "omarchy"  // see launcherLogoIconGlyph()
     property bool   weatherImperial: false   // false = °C / km·h, true = °F / mph
     property bool   clock12h:        false   // false = 24h, true = 12h (AM/PM)
+    property string archUpdateDay:   "friday" // weekday when the package update pill is shown
+    property bool   archUpdateScheduleActive: false // keep the pill visible after scheduled updates are found
 
     // ── widget/workspace state persistence ──
     readonly property string widgetsCachePath: Quickshell.env("HOME") + "/.cache/quickshell_widgets"
@@ -851,6 +853,44 @@ Item {
     onStyleRadiusSmallChanged: if (_widgetsLoaded) saveWidgets()
     onWorkspaceStyleChanged:   if (_widgetsLoaded) saveWidgets()
     onBarPositionChanged:      if (_widgetsLoaded) saveWidgets()
+    onArchUpdateDayChanged:    if (_widgetsLoaded) saveWidgets()
+    onArchUpdateScheduleActiveChanged: if (_widgetsLoaded) saveWidgets()
+
+    readonly property var archUpdateDayOptions: [
+        { id: "monday",    label: "Mon", index: 1 },
+        { id: "tuesday",   label: "Tue", index: 2 },
+        { id: "wednesday", label: "Wed", index: 3 },
+        { id: "thursday",  label: "Thu", index: 4 },
+        { id: "friday",    label: "Fri", index: 5 },
+        { id: "saturday",  label: "Sat", index: 6 },
+        { id: "sunday",    label: "Sun", index: 0 }
+    ]
+    property int currentWeekday: new Date().getDay()
+    readonly property bool archUpdateDue: currentWeekday === archUpdateDayIndex(archUpdateDay)
+
+    Timer {
+        interval: 3600000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: theme.currentWeekday = new Date().getDay()
+    }
+
+    function archUpdateDayIndex(id) {
+        for (var i = 0; i < archUpdateDayOptions.length; i++)
+            if (archUpdateDayOptions[i].id === id) return archUpdateDayOptions[i].index
+        return 5
+    }
+    function archUpdateDayValid(id) {
+        for (var i = 0; i < archUpdateDayOptions.length; i++)
+            if (archUpdateDayOptions[i].id === id) return true
+        return false
+    }
+    function archUpdateDayLabel(id) {
+        for (var i = 0; i < archUpdateDayOptions.length; i++)
+            if (archUpdateDayOptions[i].id === id) return archUpdateDayOptions[i].label
+        return "Fri"
+    }
 
     function saveWidgets() {
         var line = (modMemory    ? "1" : "0") + " "
@@ -880,7 +920,9 @@ Item {
                  + launcherLogoText + " "                 // +19 text logo id
                  + launcherLogoIcon + " "                 // +20 icon logo id
                  + (archBadgePackages ? "1" : "0") + " "  // +21 updater package badge
-                 + (archBadgeThemes   ? "1" : "0")        // +22 updater clean-theme badge
+                 + (archBadgeThemes   ? "1" : "0") + " "  // +22 updater clean-theme badge
+                 + archUpdateDay + " "                    // +23 package updater weekday
+                 + (archUpdateScheduleActive ? "1" : "0") // +24 scheduled updater is active until no packages remain
         widgetSaveProc.command = ["bash", "-c",
             "echo '" + line + "' > '" + widgetsCachePath + "'"]
         widgetSaveProc.running = false
@@ -1076,6 +1118,9 @@ Item {
                     }
                     if (parts.length > wsField + 21) theme.archBadgePackages = parts[wsField + 21] !== "0"
                     if (parts.length > wsField + 22) theme.archBadgeThemes   = parts[wsField + 22] !== "0"
+                    if (parts.length > wsField + 23 && theme.archUpdateDayValid(parts[wsField + 23]))
+                        theme.archUpdateDay = parts[wsField + 23]
+                    if (parts.length > wsField + 24) theme.archUpdateScheduleActive = parts[wsField + 24] === "1"
                 }
                 theme._widgetsLoaded = true
             }

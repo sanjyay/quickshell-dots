@@ -28,9 +28,14 @@ Item {
     readonly property int badgeCount: rootMod.packageBadgeCount + rootMod.themeBadgeCount
     readonly property bool hasBadge: rootMod.badgeCount > 0
     readonly property bool hasNotice: rootMod.hasUpdates || rootMod.hasThemeUpdates || root.themeUpdLocalEdits > 0
+    readonly property bool showToday: root.archUpdateDue || root.archUpdateScheduleActive || root.archVisible
 
-    implicitWidth: 26
+    visible: rootMod.showToday || implicitWidth > 0.5
+    implicitWidth: rootMod.showToday ? 26 : 0
     implicitHeight: 28
+    opacity: rootMod.showToday ? 1 : 0
+    Behavior on implicitWidth { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    Behavior on opacity { NumberAnimation { duration: 120 } }
 
     Process {
         id: checkProc
@@ -59,13 +64,13 @@ Item {
     }
 
     Timer {
-        interval: 1800000; running: root.modStatus || root.archVisible; repeat: true; triggeredOnStart: true
+        interval: 1800000; running: (root.modStatus && (root.archUpdateDue || root.archUpdateScheduleActive)) || root.archVisible; repeat: true; triggeredOnStart: true
         onTriggered: root.archRefreshTick++
     }
 
     property int extTrigger: root.archRefreshTick
     onExtTriggerChanged: {
-        if (!rootMod.refreshing) rootMod.doRefresh()
+        if (!rootMod.refreshing && (root.archUpdateDue || root.archUpdateScheduleActive || root.archVisible)) rootMod.doRefresh()
     }
 
     function doRefresh() {
@@ -102,6 +107,7 @@ Item {
         rootMod.aurCount = aCount
         rootMod.updateCount = sysCount + aCount
         root.archUpdates = updates
+        root.archUpdateScheduleActive = updates.length > 0
     }
 
     Item {

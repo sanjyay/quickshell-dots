@@ -21,6 +21,7 @@ PanelWindow {
 
     // power sub-menu starts CLOSED — no destructive tile is ever pre-shown
     property bool powerOpen: false
+    property bool scheduleOpen: false
     property bool wsOpen: false   // Workspaces collapsible inside the WW fly-out
 
     property real reveal: root.controlVisible ? 1 : 0
@@ -31,7 +32,7 @@ PanelWindow {
         }
     }
     visible: reveal > 0.001
-    onRevealChanged: if (reveal < 0.01) { powerOpen = false; wsOpen = false; root.splitsSubVisible = false; root.wwSubVisible = false }  // reset when closed
+    onRevealChanged: if (reveal < 0.01) { powerOpen = false; scheduleOpen = false; wsOpen = false; root.splitsSubVisible = false; root.wwSubVisible = false }  // reset when closed
     WlrLayershell.keyboardFocus: root.controlVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // ── reusable tile: neutral by default, highlights only on hover ──
@@ -120,6 +121,54 @@ PanelWindow {
                 width: parent.width
                 label: "Reload QS-Config"
                 onActivated: { root.controlVisible = false; Quickshell.reload(false) }
+            }
+            Tile {
+                width: parent.width
+                label: ctrlPanel.scheduleOpen ? "Schedule Update  ▾" : "Schedule Update  ▸"
+                active: root.archUpdateScheduleActive
+                accent: root.seal
+                onActivated: ctrlPanel.scheduleOpen = !ctrlPanel.scheduleOpen
+            }
+            Grid {
+                width: parent.width
+                columns: 4
+                columnSpacing: 4
+                rowSpacing: 4
+                visible: ctrlPanel.scheduleOpen
+                Repeater {
+                    model: root.archUpdateDayOptions
+                    delegate: Rectangle {
+                        id: actionDayTile
+                        required property var modelData
+                        readonly property bool on: root.archUpdateDay === modelData.id
+                        readonly property bool hovered: actionDayMa.containsMouse
+                        width: root.evenW((col.width - 12) / 4)
+                        height: 25
+                        radius: root.tileRadius
+                        color: on ? root.fillActive : hovered ? root.fillHover : root.fillIdle
+                        border.color: (on || hovered) ? root.seal : root.sep
+                        border.width: 1
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                        UiText {
+                            anchors.centerIn: parent
+                            text: actionDayTile.modelData.label
+                            color: (actionDayTile.on || actionDayTile.hovered) ? root.seal : root.ink
+                            font.family: root.mono
+                            font.pixelSize: 10
+                            font.weight: actionDayTile.on ? Font.Medium : Font.Normal
+                        }
+                        MouseArea {
+                            id: actionDayMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                root.archUpdateDay = actionDayTile.modelData.id
+                                root.archUpdateScheduleActive = false
+                            }
+                        }
+                    }
+                }
             }
 
             // ── POWER (collapsed sub-menu; nothing destructive pre-shown) ──
@@ -439,8 +488,6 @@ PanelWindow {
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Now playing"; active: root.modMpris;   onActivated: root.modMpris = !root.modMpris }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Battery";     visible: root.hasBattery; active: true; enabled: false }
             }
-
-            Rectangle { width: parent.width; height: 1; color: root.sep }
 
             // ── WORKSPACES (collapsible, like the old widgets group) ──
             Tile {

@@ -203,7 +203,7 @@ if ((${#fontmiss[@]})); then
   fi
 fi
 
-# ── 2. fetch repo ───────────────────────────────────────────────
+# ── 2. choose install source ────────────────────────────────────
 tmp="$(mktemp -d)"
 stage=""
 restore_src=""
@@ -215,10 +215,22 @@ cleanup_install() {
   rm -rf "$tmp"
 }
 trap cleanup_install EXIT
-info "Downloading…"
-git clone --depth 1 "$REPO_URL" "$tmp/repo" >/dev/null 2>&1
+src_repo=""
+script_path="${BASH_SOURCE[0]:-$0}"
+script_dir=""
+if [[ -n "$script_path" && -f "$script_path" ]]; then
+  script_dir="$(cd "$(dirname "$script_path")" && pwd -P)"
+fi
+if [[ -n "$script_dir" && -d "$script_dir/versions" ]]; then
+  src_repo="$script_dir"
+  info "Installing from local checkout → $src_repo"
+else
+  info "Downloading…"
+  git clone --depth 1 "$REPO_URL" "$tmp/repo" >/dev/null 2>&1
+  src_repo="$tmp/repo"
+fi
 
-mapfile -t versions < <(cd "$tmp/repo/versions" && ls -d */ | sed 's#/##')
+mapfile -t versions < <(cd "$src_repo/versions" && ls -d */ | sed 's#/##')
 ((${#versions[@]})) || { err "No versions found in repo"; exit 1; }
 
 # ── 3. choose version ───────────────────────────────────────────
@@ -237,7 +249,7 @@ mkdir -p "$(dirname "$DEST")"
 rm -rf "$(dirname "$DEST")"/.qs-install-stage.* 2>/dev/null || true
 ts="$(date +%Y%m%d-%H%M%S)"
 stage="$(mktemp -d -p "$(dirname "$DEST")" .qs-install-stage.XXXXXX)"
-cp -r "$tmp/repo/versions/$choice/." "$stage/"
+cp -r "$src_repo/versions/$choice/." "$stage/"
 echo "$choice" > "$stage/.qsrise"
 
 if [[ -d "$DEST" ]]; then
@@ -267,14 +279,14 @@ info "Installed '${c_b}$choice${c_0}' → $DEST"
 # Pure bash, no extra deps. The weekly fetch timer keeps the known-infected
 # list current; without any list the updater panel fail-closes to
 # "protection limited" instead of claiming packages are clean.
-if [[ -f "$tmp/repo/scripts/qs-arch-security-gate.sh" ]]; then
+if [[ -f "$src_repo/scripts/qs-arch-security-gate.sh" ]]; then
   mkdir -p "$HOME/.local/bin"
-  install -m 755 "$tmp/repo/scripts/qs-arch-security-gate.sh" "$HOME/.local/bin/qs-arch-security-gate.sh"
-  if [[ -f "$tmp/repo/scripts/qs-aur-blacklist-fetch.sh" ]]; then
-    install -m 755 "$tmp/repo/scripts/qs-aur-blacklist-fetch.sh" "$HOME/.local/bin/qs-aur-blacklist-fetch.sh"
+  install -m 755 "$src_repo/scripts/qs-arch-security-gate.sh" "$HOME/.local/bin/qs-arch-security-gate.sh"
+  if [[ -f "$src_repo/scripts/qs-aur-blacklist-fetch.sh" ]]; then
+    install -m 755 "$src_repo/scripts/qs-aur-blacklist-fetch.sh" "$HOME/.local/bin/qs-aur-blacklist-fetch.sh"
     mkdir -p "$HOME/.config/systemd/user"
-    install -m 644 "$tmp/repo/systemd/qs-aur-blacklist-fetch.service" "$HOME/.config/systemd/user/qs-aur-blacklist-fetch.service"
-    install -m 644 "$tmp/repo/systemd/qs-aur-blacklist-fetch.timer"   "$HOME/.config/systemd/user/qs-aur-blacklist-fetch.timer"
+    install -m 644 "$src_repo/systemd/qs-aur-blacklist-fetch.service" "$HOME/.config/systemd/user/qs-aur-blacklist-fetch.service"
+    install -m 644 "$src_repo/systemd/qs-aur-blacklist-fetch.timer"   "$HOME/.config/systemd/user/qs-aur-blacklist-fetch.timer"
     systemctl --user daemon-reload
     systemctl --user enable --now qs-aur-blacklist-fetch.timer >/dev/null 2>&1 || true
     "$HOME/.local/bin/qs-aur-blacklist-fetch.sh" >/dev/null 2>&1 || true   # prime the list now
@@ -283,13 +295,13 @@ if [[ -f "$tmp/repo/scripts/qs-arch-security-gate.sh" ]]; then
 fi
 
 # ── 4c. Theme update checker (panel "Check themes" helper) ─────
-install_theme_updater "$tmp/repo" || warn "Theme update checker setup incomplete — the bar is fine; the themes tab just cannot scan yet."
+install_theme_updater "$src_repo" || warn "Theme update checker setup incomplete — the bar is fine; the themes tab just cannot scan yet."
 
 # ── 5. theme hook (live color updates on Omarchy theme switch) ──
 hookdst="$HOME/.config/omarchy/hooks/theme-set.d"
-if [[ -f "$tmp/repo/hooks/50-quickshell-bar.sh" ]]; then
+if [[ -f "$src_repo/hooks/50-quickshell-bar.sh" ]]; then
   mkdir -p "$hookdst"
-  install -m 0755 "$tmp/repo/hooks/50-quickshell-bar.sh" "$hookdst/50-quickshell-bar.sh"
+  install -m 0755 "$src_repo/hooks/50-quickshell-bar.sh" "$hookdst/50-quickshell-bar.sh"
   info "Theme hook installed (bar follows Omarchy themes)"
 fi
 
@@ -303,7 +315,7 @@ setsid qs -n -d -c bar >/dev/null 2>&1 < /dev/null &
 info "Bar started — try it out."
 
 # ── 6b. shell self-updater (never blocks the bar install) ───────
-install_shell_updater "$tmp/repo" || warn "Self-updater setup incomplete — the bar is fine; the update badge just won't appear."
+install_shell_updater "$src_repo" || warn "Self-updater setup incomplete — the bar is fine; the update badge just won't appear."
 
 # ── 7. autostart hook / hint ─────────────────────────────────────
 RAW="https://raw.githubusercontent.com/sanjyay/quickshell-dots/main"
@@ -312,7 +324,7 @@ autostart_hook="$autostart_dir/quickshell-rise"
 case "$WANT_AUTOSTART" in
   yes)
     mkdir -p "$autostart_dir"
-    install -m 0755 "$tmp/repo/contrib/post-boot.d/quickshell-rise" "$autostart_hook"
+    install -m 0755 "$src_repo/contrib/post-boot.d/quickshell-rise" "$autostart_hook"
     info "Autostart hook installed → $autostart_hook"
     ;;
   no)
@@ -333,22 +345,22 @@ esac
 # ── 8. AI usage backends (opt-in; never block the bar install) ──
 do_claude="$WANT_CLAUDE"
 if [[ -z "$do_claude" ]]; then
-  if [[ -t 0 || -e /dev/tty ]]; then
-    read -p "Install the AI usage backend for the quota widget (Claude + Codex + OpenCode, 0 tokens)? [y/N] " ans </dev/tty || ans=""
+  if [[ -t 0 ]]; then
+    read -p "Install the AI usage backend for the quota widget (Claude + Codex + OpenCode, 0 tokens)? [y/N] " ans || ans=""
     case "${ans,,}" in y|yes) do_claude="yes" ;; *) do_claude="no" ;; esac
   else
     do_claude="no"
   fi
 fi
 if [[ "$do_claude" == "yes" ]]; then
-  install_claude_backend "$tmp/repo" || warn "Claude backend setup incomplete — the bar is installed and fine; re-run with --ai-backend to retry."
+  install_claude_backend "$src_repo" || warn "Claude backend setup incomplete — the bar is installed and fine; re-run with --ai-backend to retry."
   # Codex side of the same AI usage widget — installed alongside when present.
   if command -v codex >/dev/null 2>&1; then
-    install_codex_backend "$tmp/repo" || warn "Codex backend setup incomplete — re-run with --ai-backend to retry."
+    install_codex_backend "$src_repo" || warn "Codex backend setup incomplete — re-run with --ai-backend to retry."
   else
     info "Skipped Codex usage backend (codex CLI not found; the bar still shows Claude)."
   fi
-  install_opencode_backend "$tmp/repo" || warn "OpenCode backend setup incomplete — re-run with --ai-backend to retry."
+  install_opencode_backend "$src_repo" || warn "OpenCode backend setup incomplete — re-run with --ai-backend to retry."
 else
   info "Skipped AI usage backend (the quota widget stays hidden until it's installed)."
 fi
