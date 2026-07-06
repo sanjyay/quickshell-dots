@@ -476,17 +476,16 @@ PanelWindow {
                 columnSpacing: 8
                 rowSpacing: 8
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Memory";      active: root.modMemory;    onActivated: root.modMemory = !root.modMemory }
-                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Brightness";  visible: root.hasBacklight; active: root.modBrightness; onActivated: root.modBrightness = !root.modBrightness }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "AI usage";    active: root.modClaude;    onActivated: root.modClaude = !root.modClaude }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Power Prof."; active: root.modPower;     onActivated: root.modPower = !root.modPower }
-                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Bluetooth";   active: root.modBluetooth; onActivated: root.modBluetooth = !root.modBluetooth }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Network";     active: root.modNetwork; enabled: root.networkMode !== "wifi"; onActivated: root.modNetwork = !root.modNetwork }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Quick tools"; active: root.modQuick;   onActivated: root.modQuick = !root.modQuick }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Status";      active: root.modStatus;  onActivated: root.modStatus = !root.modStatus }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "CPU";         active: root.modCpu;     onActivated: root.modCpu = !root.modCpu }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Volume";      active: root.modVolume;  onActivated: root.modVolume = !root.modVolume }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Now playing"; active: root.modMpris;   onActivated: root.modMpris = !root.modMpris }
-                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Battery";     visible: root.hasBattery; active: true; enabled: false }
+                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Privacy";     active: root.modPrivacy; onActivated: root.modPrivacy = !root.modPrivacy }
+                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Battery";     visible: root.hasBattery; active: root.modBattery; onActivated: root.modBattery = !root.modBattery }
             }
 
             // ── WORKSPACES (collapsible, like the old widgets group) ──

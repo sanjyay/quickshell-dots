@@ -46,9 +46,14 @@ Item {
         : (low ? root.seal
         : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.7))
 
-    implicitWidth:  hasBattery ? (row.implicitWidth + 18) : 0
+    readonly property bool shown: hasBattery && root.modBattery
+
+    implicitWidth:  shown ? (row.implicitWidth + 18) : 0
     implicitHeight: 28
-    visible: hasBattery
+    visible: implicitWidth > 0.5
+    opacity: shown ? 1 : 0
+
+    Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
 
     Rectangle {
@@ -65,22 +70,13 @@ Item {
     Row {
         id: row
         anchors.centerIn: parent
-        spacing: 5
-
-        UiText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: "BAT"
-            color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.6)
-            font.family: root.mono
-            font.pixelSize: 12
-            font.letterSpacing: 0.5
-        }
+        spacing: 0
 
         // drawn landscape battery — body + stepless fill + terminal nub
         Item {
             id: batt
-            width: 19
-            height: 10
+            width: 36
+            height: 14
             anchors.verticalCenter: parent.verticalCenter
 
             readonly property real ratio: Math.max(0, Math.min(1, rootMod.percent / 100))
@@ -89,7 +85,7 @@ Item {
             property real pulse: 1.0
             opacity: rootMod.low ? pulse : 1.0
             SequentialAnimation {
-                running: rootMod.visible && rootMod.low   // defensive: never animate while hidden / batteryless
+                running: rootMod.shown && rootMod.low   // defensive: never animate while hidden / batteryless
                 loops: Animation.Infinite
                 NumberAnimation { target: batt; property: "pulse"; from: 1.0; to: 0.3; duration: 1100; easing.type: Easing.InOutSine }
                 NumberAnimation { target: batt; property: "pulse"; from: 0.3; to: 1.0; duration: 1100; easing.type: Easing.InOutSine }
@@ -99,8 +95,8 @@ Item {
                 id: body
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                width: 16
-                height: 9
+                width: 32
+                height: 13
                 radius: 2.5
                 color: "transparent"
                 border.width: 1.2
@@ -148,32 +144,16 @@ Item {
                     }
                 }
 
-                // charging bolt overlay — clear "is charging" cue
-                Canvas {
-                    id: bolt
-                    visible: rootMod.charging && !rootMod.full
+                UiText {
                     anchors.centerIn: parent
-                    width: 6
-                    height: 8
-                    onPaint: {
-                        var ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
-                        ctx.beginPath()
-                        ctx.moveTo(width * 0.55, 0)
-                        ctx.lineTo(width * 0.12, height * 0.55)
-                        ctx.lineTo(width * 0.45, height * 0.55)
-                        ctx.lineTo(width * 0.38, height)
-                        ctx.lineTo(width * 0.88, height * 0.45)
-                        ctx.lineTo(width * 0.55, height * 0.45)
-                        ctx.closePath()
-                        ctx.fillStyle = root.paper
-                        ctx.fill()
-                    }
-                    Component.onCompleted: requestPaint()
-                    Connections {
-                        target: root
-                        function onPaperChanged() { bolt.requestPaint() }
-                    }
+                    text: rootMod.percent + "%"
+                    color: rootMod.percent >= 45
+                        ? root.paper
+                        : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.9)
+                    font.family: root.mono
+                    font.pixelSize: 8
+                    font.bold: true
+                    Behavior on color { ColorAnimation { duration: 200 } }
                 }
             }
 
@@ -182,25 +162,12 @@ Item {
                 anchors.left: body.right
                 anchors.leftMargin: -0.5
                 anchors.verticalCenter: parent.verticalCenter
-                width: 2.5
-                height: 5
+                width: 3
+                height: 6
                 radius: 1.2
                 color: rootMod.battColor
                 Behavior on color { ColorAnimation { duration: 200 } }
             }
-        }
-
-        UiText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: rootMod.percent + "%"
-            color: {
-                if (rootMod.charging || rootMod.full) return rootMod.battColor
-                if (rootMod.low) return root.seal
-                return Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.85)
-            }
-            font.family: root.mono
-            font.pixelSize: 12
-            Behavior on color { ColorAnimation { duration: 200 } }
         }
     }
 

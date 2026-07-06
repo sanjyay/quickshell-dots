@@ -21,9 +21,8 @@ PanelWindow {
     readonly property int gap: 8
 
     property bool btOn: false
-    property bool scanning: false
-    property var devices: []   // [{name, mac, connected, paired}]
-    readonly property var shownDevices: devices.slice(0, 8)
+    property var devices: []   // paired devices only: [{name, mac, connected, paired}]
+    readonly property var shownDevices: devices.slice(0, 3)
     readonly property int numConnected: {
         var n = 0
         for (var i = 0; i < devices.length; i++) if (devices[i].connected) n++
@@ -149,33 +148,6 @@ PanelWindow {
                 topPadding: 4; bottomPadding: 4
             }
 
-            // ── scan control (only when on) ──
-            Rectangle {
-                visible: btPanel.btOn
-                width: parent.width
-                height: 28; radius: root.tileRadius
-                readonly property bool hovered: scanMa.containsMouse
-                color: btPanel.scanning ? root.fillActive
-                       : hovered ? root.fillHover : root.fillIdle
-                border.color: (btPanel.scanning || hovered) ? root.seal : root.sep
-                border.width: 1
-                Behavior on color { ColorAnimation { duration: 120 } }
-                UiText {
-                    anchors.centerIn: parent
-                    text: btPanel.scanning ? "Scanning…" : "Scan for devices"
-                    color: btPanel.scanning ? root.seal : root.ink
-                    font.family: root.mono; font.pixelSize: 11
-                }
-                MouseArea {
-                    id: scanMa
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    enabled: !btPanel.scanning
-                    onClicked: { scanProc.running = false; scanProc.running = true }
-                }
-            }
-
             // ── device list ──
             Column {
                 width: parent.width
@@ -209,7 +181,7 @@ PanelWindow {
                             anchors.right: parent.right; anchors.rightMargin: 8
                             anchors.verticalCenter: parent.verticalCenter
                             text: devTile.modelData.connected ? "Connected"
-                                  : devTile.modelData.paired ? "Paired" : "Connect"
+                                  : "Paired"
                             color: devTile.modelData.connected ? root.seal
                                    : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.45)
                             font.family: root.mono; font.pixelSize: 9; font.letterSpacing: 0.5
@@ -223,12 +195,8 @@ PanelWindow {
                                 var m = devTile.modelData
                                 if (m.connected) {
                                     btPanel.connCmd = "bluetoothctl disconnect " + m.mac
-                                } else if (m.paired) {
-                                    btPanel.connCmd = "bluetoothctl connect " + m.mac
                                 } else {
-                                    btPanel.connCmd = "bluetoothctl trust " + m.mac
-                                        + " && bluetoothctl pair " + m.mac
-                                        + " && bluetoothctl connect " + m.mac
+                                    btPanel.connCmd = "bluetoothctl connect " + m.mac
                                 }
                                 connProc.running = false; connProc.running = true
                             }
@@ -238,7 +206,7 @@ PanelWindow {
                 UiText {
                     visible: btPanel.btOn && btPanel.devices.length === 0
                     width: parent.width; horizontalAlignment: Text.AlignHCenter
-                    text: btPanel.scanning ? "Searching…" : "No devices — tap Scan"
+                    text: "No paired devices"
                     color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.3)
                     font.family: root.mono; font.pixelSize: 11
                     topPadding: 2; bottomPadding: 2
@@ -262,19 +230,16 @@ PanelWindow {
         }
     }
 
-    // ── data: power state + device list with connected/paired flags ──
+    // ── data: power state + paired device list with connected flags ──
     Process {
         id: btData
         command: ["bash", "-c",
             "if bluetoothctl show 2>/dev/null | grep -q 'Powered: yes'; then " +
             "  echo ON; " +
             "  conn=$(bluetoothctl devices Connected 2>/dev/null | awk '{print $2}'); " +
-            "  paired=$(bluetoothctl devices Paired 2>/dev/null | awk '{print $2}'); " +
-            "  bluetoothctl devices 2>/dev/null | while read -r _ mac rest; do " +
-            "    c=0; p=0; " +
-            "    printf '%s\\n' \"$conn\"   | grep -qx \"$mac\" && c=1; " +
-            "    printf '%s\\n' \"$paired\" | grep -qx \"$mac\" && p=1; " +
-            "    echo \"$c|$p|$mac|$rest\"; " +
+            "  bluetoothctl devices Paired 2>/dev/null | while read -r _ mac rest; do " +
+            "    c=0; printf '%s\\n' \"$conn\" | grep -qx \"$mac\" && c=1; " +
+            "    echo \"$c|1|$mac|$rest\"; " +
             "  done; " +
             "else echo OFF; fi"
         ]
@@ -314,19 +279,6 @@ PanelWindow {
         command: ["bash", "-c", "bluetoothctl power " + (btPanel.btOn ? "off" : "on")]
         running: false
         onExited: btPanel.refresh()
-    }
-
-    // ── timed discovery scan ──
-    Process {
-        id: scanProc
-        command: ["bash", "-c", "bluetoothctl --timeout 10 scan on >/dev/null 2>&1"]
-        running: false
-        onRunningChanged: { btPanel.scanning = running; if (!running) btPanel.refresh() }
-    }
-    Timer {
-        interval: 1500; repeat: true
-        running: btPanel.scanning && btPanel.visible
-        onTriggered: btPanel.refresh()
     }
 
     // ── connect / disconnect / pair ──

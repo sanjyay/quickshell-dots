@@ -19,9 +19,9 @@ Item {
         ? "Bluetooth · " + numConnected + " connected"
         : (btOn ? "Bluetooth on" : "Bluetooth off")
 
-    readonly property bool shown: root.modBluetooth
+    readonly property bool shown: true
     visible: implicitWidth > 0.5
-    implicitWidth: shown ? row.implicitWidth + 18 : 0
+    implicitWidth: shown ? row.implicitWidth + 14 : 0
     implicitHeight: 28
     opacity: shown ? 1 : 0
 
@@ -29,7 +29,7 @@ Item {
 
     Rectangle {
         x: 0; anchors.verticalCenter: parent.verticalCenter
-        width: Math.round(row.width) + 18
+        width: Math.round(row.width) + 14
         height: root.pillH
         radius: root.pillRadius
         color: root.pill
@@ -41,16 +41,7 @@ Item {
     Row {
         id: row
         anchors.centerIn: parent
-        spacing: 5
-
-        UiText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: "BT"
-            color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.6)
-            font.family: root.mono
-            font.pixelSize: 12
-            font.letterSpacing: 0.5
-        }
+        spacing: 4
 
         IconText {
             anchors.verticalCenter: parent.verticalCenter
@@ -100,7 +91,7 @@ Item {
     }
 
     Timer {
-        interval: 5000; running: rootMod.shown; repeat: true; triggeredOnStart: true
+        interval: 5000; running: true; repeat: true; triggeredOnStart: true
         onTriggered: { btProc.result = ""; btProc.running = false; btProc.running = true }
     }
 

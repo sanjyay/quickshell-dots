@@ -187,7 +187,7 @@ PanelWindow {
     // reset the 3 region models back to the default group order
     function resetOrder() {
         var dL = ["G1","G2","G3","G4","G5","G6","G7"]
-        var dR = ["G9","G10","G11","G14","G12","G13","G15"]
+        var dR = ["G9","G10","G11","G14","G12"]
         for (var i = 0; i < dL.length; i++) leftModel.setProperty(i, "gid", dL[i])
         centerModel.setProperty(0, "gid", "G8")
         for (var j = 0; j < dR.length; j++) rightModel.setProperty(j, "gid", dR[j])
@@ -197,12 +197,12 @@ PanelWindow {
     property var layoutController: ({
         splitAll: function () {
             island.leftSplits     = [true, true, true, true, true, true]
-            island.rightSplits    = [true, true, true, true, true, true]
+            island.rightSplits    = [true, true, true, true]
             island.boundarySplits = [true, true]
         },
         mergeAll: function () {
             island.leftSplits     = [false, false, false, false, false, false]
-            island.rightSplits    = [false, false, false, false, false, false]
+            island.rightSplits    = [false, false, false, false]
             island.boundarySplits = [false, false]
             barSlot.root.barAnim  = 0
         },
@@ -447,18 +447,31 @@ PanelWindow {
             }
         }
     }
-    Component { id: compNetwork;    NetworkWidget      { root: barSlot.root } }
+    Component {
+        id: compNetwork
+        Item {
+            implicitWidth: networkPrivacyRow.implicitWidth
+            implicitHeight: 28
+            Row {
+                id: networkPrivacyRow
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 4
+                NetworkWidget       { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                BluetoothWidget     { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                PrivacyMicWidget    { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                PrivacyCameraWidget { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+            }
+        }
+    }
     Component { id: compPower;      PowerProfileWidget { root: barSlot.root } }
     Component { id: compBattery;    BatteryWidget      { root: barSlot.root } }
-    Component { id: compBrightness; BrightnessWidget   { root: barSlot.root } }
-    Component { id: compBluetooth;  BluetoothWidget    { root: barSlot.root } }
 
     readonly property var registry: ({
         "G1": compLauncher, "G2": compWorkspace, "G3": compStatus,
         "G4": compMem, "G5": compCpu, "G6": compVol, "G7": compClaude,
         "G8": compCenter,
         "G9": compMpris, "G10": compQuick, "G11": compNetwork,
-        "G12": compBattery, "G13": compBrightness, "G14": compPower, "G15": compBluetooth
+        "G12": compBattery, "G14": compPower
     })
 
     // ───────────────────── reusable region row of slots ─────────────────────
@@ -494,8 +507,8 @@ PanelWindow {
                 readonly property bool hasContent: Math.round(ldr.implicitWidth) > 0.5
                 readonly property bool hasGapAfter: splitsArr ? (index < splitsArr.length) : false
                 // split AFTER this slot → grow it so the group separates (gap opens).
-                // ONLY for widgets with content — a 0-width widget (battery/brightness on
-                // a desktop) must NOT grow, else it shows up as an empty pill.
+                // ONLY for widgets with content — a 0-width widget (battery on a
+                // desktop) must NOT grow, else it shows up as an empty pill.
                 readonly property bool splitAfter: autoShown && hasGapAfter && splitsArr[index]
                 readonly property real grow: (splitAfter && hasContent && index < lastVisibleIndex) ? 16 : 0
                 readonly property real cr: pad + Math.round(ldr.implicitWidth)
@@ -628,7 +641,7 @@ PanelWindow {
 
         // ── split state (positional, per within-region gap) ──
         property var leftSplits:  [false, false, false, false, false, false]   // gaps in leftModel
-        property var rightSplits: [false, false, false, false, false, false]   // gaps in rightModel
+        property var rightSplits: [false, false, false, false]   // gaps in rightModel
         property var boundarySplits: [false, false]   // [left↔center, center↔right]
 
         readonly property real lcBoundaryX: leftRowItem.x + leftRowItem.width + 9    // just right of Claude
@@ -661,6 +674,7 @@ PanelWindow {
         property real g8FloorWidth: 80         // published by G8: its clock-only minimal width
         function groupVisibleAtStage(gid, stage) {
             if (gid === "G8") return true                                        // clock has its own stages
+            if (gid === "G9" && barSlot.root.mprisActive) return true            // keep active media controls visible
             if (stage <= 0) return true
             if (stage === 1) return ["G7", "G9", "G10"].indexOf(gid) < 0         // drop AI · MPRIS · Quick
             if (stage === 2) return ["G4", "G5", "G7", "G9", "G10"].indexOf(gid) < 0   // also MEM · CPU
@@ -699,6 +713,10 @@ PanelWindow {
         Timer { id: narrowTimer; interval: 80; repeat: false; onTriggered: island.updateNarrowStage() }
         onWidthChanged: scheduleNarrowUpdate()
         onG8FloorWidthChanged: scheduleNarrowUpdate()
+        Connections {
+            target: barSlot.root
+            function onMprisActiveChanged() { island.scheduleNarrowUpdate() }
+        }
 
         // ── split persistence (survives restart) ──
         readonly property string splitCachePath: Quickshell.env("HOME") + "/.cache/quickshell_barsplits"
@@ -835,8 +853,7 @@ PanelWindow {
         ListModel {
             id: rightModel
             ListElement { gid: "G9" }  ListElement { gid: "G10" } ListElement { gid: "G11" }
-            ListElement { gid: "G14" } ListElement { gid: "G12" } ListElement { gid: "G13" }
-            ListElement { gid: "G15" }
+            ListElement { gid: "G14" } ListElement { gid: "G12" }
         }
 
         SlotRow {
@@ -898,8 +915,7 @@ PanelWindow {
                 ai:           island.groupX("G7",  0.5),
                 workspace:    island.groupX("G2",  0.5),
                 arch:         island.groupX("G3",  0.5),
-                bluetooth:    island.groupX("G15", 0.5),
-                brightness:   island.groupX("G13", 0.5),
+                bluetooth:    island.groupX("G11", 0.5),
                 power:        island.groupX("G14", 0.5),
                 mpris:        island.groupX("G9",  0.5),
                 weather:      island.groupX("G8",  0.5),

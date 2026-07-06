@@ -71,9 +71,9 @@ Item {
     readonly property bool selSignal: isOpenCode ? ocSignal : (isCodex ? cxSignal : clSignal)
     readonly property bool blocked:  (isCodex || isOpenCode) ? false : clBlocked
 
-    // show whenever the gate is on AND either tool has a signal — the pill stays
-    // reachable (to open the panel + switch) even if the selected tool is idle
-    readonly property bool shown: (clSignal || cxSignal || ocSignal) && root.modClaude
+    // The widget toggle controls visibility. Signal still drives the usage fill/tooltip,
+    // but an idle AI tool should not make the ControlPanel toggle look broken.
+    readonly property bool shown: root.modClaude
 
     readonly property string tooltipText: {
         var lines = []

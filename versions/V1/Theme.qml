@@ -90,7 +90,7 @@ Item {
 
     readonly property bool anyPopupVisible: calendarVisible || cpuVisible || aiUsageVisible
         || memVisible || volVisible || controlVisible || networkVisible || bluetoothVisible
-        || batteryVisible || brightnessVisible || mprisVisible || weatherVisible
+        || batteryVisible || mprisVisible || weatherVisible
         || workspaceVisible || imagePickerVisible || mediaBrowserVisible || notifVisible
         || powerProfileVisible || archVisible || shellUpdateVisible || trayVisible || trayMenuVisible
     readonly property bool keyboardPopupVisible: imagePickerVisible || mediaBrowserVisible
@@ -260,7 +260,6 @@ Item {
         else if (name === "workspace") workspaceBarX = x
         else if (name === "arch") archBarX = x
         else if (name === "bluetooth") bluetoothBarX = x
-        else if (name === "brightness") brightnessBarX = x
         else if (name === "power") powerBarX = x
         else if (name === "mpris") mprisBarX = x
         else if (name === "weather") weatherBarX = x
@@ -315,7 +314,6 @@ Item {
         if (except !== "networkVisible") networkVisible = false
         if (except !== "bluetoothVisible") bluetoothVisible = false
         if (except !== "batteryVisible") batteryVisible = false
-        if (except !== "brightnessVisible") brightnessVisible = false
         if (except !== "mprisVisible") mprisVisible = false
         if (except !== "weatherVisible") weatherVisible = false
         if (except !== "workspaceVisible") workspaceVisible = false
@@ -775,8 +773,9 @@ Item {
     property bool omarchyUpdateAvail: false   // mirrored from UpdateWidget (6h poll)
     property bool notifSilenced: false        // mirrored from NotificationSilenceWidget (DND)
     property string voxState: "idle"          // mirrored from VoxtypeWidget: idle/recording/transcribing
-    // battery presence (laptop) — drives the Battery indicator tile's visibility (shown only
-    // where a battery exists, like Brightness uses hasBacklight). Direct UPower check, event-driven.
+    property bool mprisActive: false          // mirrored from MprisWidget; keeps active media visible in compact layouts
+    // battery presence (laptop) — drives the Battery indicator tile's visibility.
+    // Direct UPower check, event-driven.
     readonly property bool hasBattery: UPower.displayDevice !== null && UPower.displayDevice.isLaptopBattery
     // NetworkManager active (Omarchy 4.0) → the panel's iwctl scan/connect won't work,
     // so it shows an "open nmtui" button instead of an empty list
@@ -793,16 +792,13 @@ Item {
     readonly property string launchWifiCmd: "if systemctl is-active --quiet NetworkManager 2>/dev/null; then omarchy-launch-or-focus-tui nmtui; else omarchy-launch-wifi; fi"
     readonly property string launchBtCmd:   "omarchy-launch-bluetooth"
     property bool modPower:      false   // default off (toggle in ControlPanel)
-    property bool modBluetooth:  false   // default off (toggle in ControlPanel)
-    property bool modBrightness: true
+    property bool modBluetooth:  true    // legacy cache field; Bluetooth is now part of the network/privacy group
     property bool modMedia:      true
     property bool modQuick:      true    // G10 group pill (idle-inhibitor · media · theme)
     property bool modMpris:      true    // G9 now-playing / mpris pill
     property bool modClaude:     false   // default off (toggle in ControlPanel)
-
-    // backlight presence — set by BrightnessWidget once it probes /sys/class/backlight.
-    // ControlPanel uses this to hide the Brightness toggle on desktops without one.
-    property bool hasBacklight:  false
+    property bool modPrivacy:    true    // microphone/camera privacy pills
+    property bool modBattery:    true    // battery pill, shown only when hardware exists
 
     // ── workspace display mode ──
     property string workspaceMode: "10"   // "10", "5", "active"
@@ -827,7 +823,6 @@ Item {
     property bool _widgetsLoaded: false
 
     onModMemoryChanged:     if (_widgetsLoaded) saveWidgets()
-    onModBrightnessChanged: if (_widgetsLoaded) saveWidgets()
     onModClaudeChanged:     if (_widgetsLoaded) saveWidgets()
     onModPowerChanged:      if (_widgetsLoaded) saveWidgets()
     onModBluetoothChanged:  if (_widgetsLoaded) saveWidgets()
@@ -837,6 +832,8 @@ Item {
     onModCpuChanged:        if (_widgetsLoaded) saveWidgets()
     onModVolumeChanged:     if (_widgetsLoaded) saveWidgets()
     onModMprisChanged:      if (_widgetsLoaded) saveWidgets()
+    onModPrivacyChanged:    if (_widgetsLoaded) saveWidgets()
+    onModBatteryChanged:    if (_widgetsLoaded) saveWidgets()
     onAiToolChanged:        if (_widgetsLoaded) saveWidgets()
     onWorkspaceModeChanged: if (_widgetsLoaded) saveWidgets()
     onPickerStyleChanged:   if (_widgetsLoaded) saveWidgets()
@@ -894,10 +891,10 @@ Item {
 
     function saveWidgets() {
         var line = (modMemory    ? "1" : "0") + " "
-                 + (modBrightness ? "1" : "0") + " "
+                 + "0 "                                  // legacy brightness field; module removed
                  + (modClaude    ? "1" : "0") + " "
                  + (modPower     ? "1" : "0") + " "
-                 + (modBluetooth ? "1" : "0") + " "
+                 + "1 "                                  // legacy Bluetooth field; module is always shown in network group
                  + workspaceMode + " "
                  + pickerStyle + " "
                  + (weatherImperial ? "1" : "0") + " "
@@ -922,7 +919,9 @@ Item {
                  + (archBadgePackages ? "1" : "0") + " "  // +21 updater package badge
                  + (archBadgeThemes   ? "1" : "0") + " "  // +22 updater clean-theme badge
                  + archUpdateDay + " "                    // +23 package updater weekday
-                 + (archUpdateScheduleActive ? "1" : "0") // +24 scheduled updater is active until no packages remain
+                 + (archUpdateScheduleActive ? "1" : "0") + " " // +24 scheduled updater is active until no packages remain
+                 + (modPrivacy ? "1" : "0") + " "         // +25 microphone/camera privacy pills
+                 + (modBattery ? "1" : "0")               // +26 battery pill
         widgetSaveProc.command = ["bash", "-c",
             "echo '" + line + "' > '" + widgetsCachePath + "'"]
         widgetSaveProc.running = false
@@ -1041,7 +1040,6 @@ Item {
                 var parts = this.text.trim().split(" ")
                 if (parts.length >= 4) {
                     theme.modMemory    = parts[0] !== "0"
-                    theme.modBrightness = parts[1] !== "0"
                     theme.modClaude    = parts[2] !== "0"
                     theme.modPower     = parts[3] !== "0"
                 }
@@ -1052,7 +1050,7 @@ Item {
                     if (parts[4] === "5" || parts[4] === "active" || parts[4] === "10") {
                         wsField = 4                         // old format: no bluetooth field
                     } else {
-                        theme.modBluetooth = parts[4] !== "0"
+                        theme.modBluetooth = parts[4] !== "0"  // legacy field only
                         wsField = 5
                     }
                 }
@@ -1121,6 +1119,8 @@ Item {
                     if (parts.length > wsField + 23 && theme.archUpdateDayValid(parts[wsField + 23]))
                         theme.archUpdateDay = parts[wsField + 23]
                     if (parts.length > wsField + 24) theme.archUpdateScheduleActive = parts[wsField + 24] === "1"
+                    if (parts.length > wsField + 25) theme.modPrivacy = parts[wsField + 25] !== "0"
+                    if (parts.length > wsField + 26) theme.modBattery = parts[wsField + 26] !== "0"
                 }
                 theme._widgetsLoaded = true
             }
@@ -1136,8 +1136,6 @@ Item {
     onBluetoothVisibleChanged: popupOpened("bluetoothVisible")
     property bool batteryVisible:   false
     onBatteryVisibleChanged: popupOpened("batteryVisible")
-    property bool brightnessVisible: false
-    onBrightnessVisibleChanged: popupOpened("brightnessVisible")
     property bool mprisVisible:     false
     onMprisVisibleChanged: popupOpened("mprisVisible")
     property bool weatherVisible:   false
@@ -1356,7 +1354,6 @@ Item {
     property real workspaceBarX:  0
     property real archBarX:       0
     property real bluetoothBarX:  0
-    property real brightnessBarX: 0
     property real powerBarX:      0
     property real mprisBarX:      0
     property real weatherBarX:    0

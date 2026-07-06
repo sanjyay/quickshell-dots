@@ -52,7 +52,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Bar layout | unlock mode, widget-group drag/drop, persistent order, top/bottom position |
 | Visual style | theme-aware colors, border, shadow, frost, split groups, gap animations |
 | Pickers | theme, wallpaper, screenshots, videos, with Tanzaku, Hearthstone, and Carousel styles |
-| Widgets | workspaces, audio, battery, CPU, memory, network, Bluetooth, weather, MPRIS, tray, notifications |
+| Widgets | workspaces, audio, battery, CPU, memory, network, Bluetooth, microphone/camera privacy, weather, MPRIS, tray, notifications |
 | Updates | in-bar shell update badge, Arch/AUR counter, known-infected AUR safety check |
 | AI usage | Claude + Codex usage pill with switchable provider and detail panel |
 
@@ -71,7 +71,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Clock | time, calendar, 24h / 12h toggle |
 | MPRIS | media controls |
 | Notifications | mako history, unread count, clear |
-| System monitors | CPU, RAM, battery health, network, Bluetooth |
+| System monitors | CPU, RAM, battery health, network, Bluetooth, microphone/camera privacy |
 | Speed test | manual Cloudflare speed test in the network panel |
 | Control center | quick toggles, power, Bar Functions fly-out |
 | Bar style | border, shadow, frost, pill radius, top/bottom position |
@@ -97,12 +97,13 @@ sudo pacman -S quickshell git jq curl ttf-jetbrains-mono-nerd ttf-material-symbo
 Optional packages enable specific widgets:
 
 ```bash
-sudo pacman -S pamixer brightnessctl power-profiles-daemon bluez-utils iwd impala hypridle gpu-screen-recorder
+sudo pacman -S pamixer power-profiles-daemon bluez-utils iwd impala hypridle gpu-screen-recorder psmisc
 ```
 
 Notes:
 
 - `bluez-utils` provides `bluetoothctl`, which the Bluetooth widget currently uses.
+- `psmisc` provides `fuser`, used by the camera privacy indicator.
 - `voxtype` is optional for the Voxtype widget.
 - The install script checks required tools and warns about missing optional tools.
 
@@ -136,10 +137,11 @@ Common actions:
 | Widget | Left | Middle | Right | Scroll |
 |---|---|---|---|---|
 | Audio | panel | - | mute toggle | volume |
-| Brightness | panel | - | - | brightness |
 | Clock | toggle 24h / 12h | - | timezone picker | - |
 | Power Profile | panel | - | cycle profile | - |
 | Network / Bluetooth | panel | - | open system manager | - |
+| Microphone | mute toggle | - | - | - |
+| Camera | block / unblock in terminal | - | - | - |
 | Weather | panel | - | force refresh | - |
 | Voxtype | cycle model | - | config | - |
 | Workspace | switch workspace | - | overview | - |

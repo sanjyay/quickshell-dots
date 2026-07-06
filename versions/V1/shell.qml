@@ -233,7 +233,6 @@ ShellRoot {
     NetworkPanel { root: theme }
     BluetoothPanel { root: theme }
     BatteryPanel { root: theme }
-    BrightnessPanel { root: theme }
     MprisPanel { root: theme }
     WeatherPanel { root: theme }
     WorkspacePanel { root: theme }

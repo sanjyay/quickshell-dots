@@ -13,6 +13,10 @@ Item {
     readonly property bool active:  sel.active
     readonly property bool playing: sel.playing
 
+    onActiveChanged: root.mprisActive = active
+    Component.onCompleted: root.mprisActive = active
+    Component.onDestruction: if (root) root.mprisActive = false
+
     readonly property string trackLabel: {
         if (!player) return ""
         var t = player.trackTitle  || ""
