@@ -1,41 +1,21 @@
 <h1 align="center"> Quickshell Rise </h1>
 
 <h4 align="center"> My Quickshell bar for Omarchy — my new Rise journey into Quickshell starts here. Enjoy! </h4>
-<div align="center">
-
-[![Stars](https://img.shields.io/github/stars/sanjyay/quickshell-dots?style=for-the-badge&labelColor=000000&color=209edb&logo=github&logoColor=209edb&cacheSeconds=21600)](https://github.com/sanjyay/quickshell-dots)
-[![Forks](https://img.shields.io/github/forks/sanjyay/quickshell-dots?style=for-the-badge&labelColor=000000&color=209edb&logo=github&logoColor=209edb&cacheSeconds=21600)](https://github.com/sanjyay/quickshell-dots/network)
-[![Issues](https://img.shields.io/github/issues/sanjyay/quickshell-dots?style=for-the-badge&labelColor=000000&color=209edb&logo=github&logoColor=209edb&cacheSeconds=21600)](https://github.com/sanjyay/quickshell-dots/issues)
-
-</div>
 
 > This project is based on [HANCORE-linux/quickshell-dots](https://github.com/HANCORE-linux/quickshell-dots). Credit goes to HANCORE-linux for the original Quickshell Rise work; this repository is my maintained version with my own changes on top.
-
-<table>
-  <tr>
-    <td align="center"><b>Theme Picker</b></td>
-    <td align="center"><b>Bar Functions &amp; Animations</b></td>
-    <td align="center"><b>Unlockbar + Widget Drag/Drop</b></td>
-  </tr>
-  <tr>
-    <td><video src="https://github.com/user-attachments/assets/160ca54f-defb-40de-a0e4-6d2e4139294d" controls="controls" style="max-width: 100%;"></video></td>
-    <td><video src="https://github.com/user-attachments/assets/5e91501e-e12c-4125-be10-caa26678098d" controls="controls" style="max-width: 100%;"></video></td>
-    <td><video src="https://github.com/user-attachments/assets/1971385a-6d8b-43ee-ab1d-763e2e40dbf7" controls="controls" style="max-width: 100%;"></video></td>
-  </tr>
-</table>
 
 ## Install / Remove
 
 Install and start the bar for the current session:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/install.sh | bash -s V1
+curl -fsSL https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/install.sh | bash
 ```
 
 Install and keep the bar after reboot:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/install.sh | bash -s V1 --autostart
+curl -fsSL https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/install.sh | bash -s -- --autostart
 ```
 
 Remove the bar and restore your previous config:
@@ -238,10 +218,10 @@ Package updates run through the ArchUpdater panel. It checks packages against th
 <details>
 <summary>Project layout</summary>
 
-Each folder under `versions/` is a complete, self-contained bar.
+The `versions/default/` folder is the complete, self-contained bar config.
 
 ```text
-versions/V1/
+versions/default/
 ├── shell.qml        # entry point
 ├── BarSlot.qml      # slot-based bar
 ├── Theme.qml        # colors, state, flags
@@ -264,4 +244,4 @@ The Tanzaku and Hearthstone pickers are original implementations created for thi
 
 ## License
 
-[MIT](LICENSE) © 2026 HANCORE-linux
+[MIT](LICENSE) © 2026 sanjyay
