@@ -27,6 +27,8 @@
 - Reduced the now-playing title width so the bar remains less cluttered.
 - Refined the narrow bar layout priority so lower-priority widgets hide before user-facing active widgets.
 - Refined the launcher widget trigger behavior for the new app launcher panel.
+- Added subtle magnetic hover animation for bar pills: hovered widgets scale slightly and nearby widgets pull inward without changing layout width.
+- Added one-place tuning values for magnetic hover scale, neighbor pull, second-neighbor pull, and animation duration.
 
 ### Theme And Color Controls
 
@@ -59,4 +61,3 @@
 - `17fde81` - `Refine system info widget`
 - `0ca8913` - `docs: clean up README media and license`
 - `4743fe5` - `feat: refine bar launcher and default config`
-

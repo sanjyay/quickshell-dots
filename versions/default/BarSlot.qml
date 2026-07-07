@@ -58,6 +58,13 @@ PanelWindow {
 
     readonly property color accent: barSlot.root.seal
 
+    // Magnetic hover tuning. These values only affect pointer hover visuals on
+    // slot loaders; they do not change slot width, persistence, IPC, or widget data.
+    readonly property real magneticScale: 1.03
+    readonly property real magneticNeighborPull: 3
+    readonly property real magneticSecondNeighborPull: 1
+    readonly property int magneticAnimationDuration: 170
+
     // ── dim backdrop while unlocked (edit mode); click empty → lock ──
     Rectangle {
         anchors.fill: parent
@@ -454,12 +461,27 @@ PanelWindow {
 
     // ───────────────────── reusable region row of slots ─────────────────────
     component SlotRow: Row {
+        id: slotRow
         property var rmodel
         property var splitsArr          // per-gap split flags (split AFTER slot i)
         property var toggleGap          // function(i): toggle the split after slot i
         property alias rep: repeater
+        property int hoveredIndex: -1
         spacing: 6
         height: 32
+        function magneticOffset(i) {
+            if (hoveredIndex < 0 || barSlot.root.barUnlocked || barSlot.dragging) return 0
+            var d = i - hoveredIndex
+            if (d === -1) return barSlot.magneticNeighborPull
+            if (d === 1) return -barSlot.magneticNeighborPull
+            if (d === -2) return barSlot.magneticSecondNeighborPull
+            if (d === 2) return -barSlot.magneticSecondNeighborPull
+            return 0
+        }
+        function magneticScaleFor(i) {
+            return (!barSlot.root.barUnlocked && !barSlot.dragging && hoveredIndex === i)
+                ? barSlot.magneticScale : 1.0
+        }
         // index of the LAST currently shown slot (skips disabled and auto-hidden
         // narrow-stage widgets) —
         // a split/grow only makes sense BEFORE this (else it opens a gap to nowhere)
@@ -511,11 +533,27 @@ PanelWindow {
                 Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                 Loader {
                     id: ldr
-                    x: slot.pad
+                    x: slot.pad + slotRow.magneticOffset(slot.index)
                     anchors.verticalCenter: parent.verticalCenter
                     sourceComponent: barSlot.registry[slot.gid]
+                    scale: slotRow.magneticScaleFor(slot.index)
+                    transformOrigin: Item.Center
                     // dim the original while its ghost is being dragged
                     opacity: (barSlot.dragItem === ldr && barSlot.dragActive) ? 0.25 : 1.0
+                    Behavior on x { NumberAnimation { duration: barSlot.magneticAnimationDuration; easing.type: Easing.OutCubic } }
+                    Behavior on scale { NumberAnimation { duration: barSlot.magneticAnimationDuration; easing.type: Easing.OutCubic } }
+                }
+                HoverHandler {
+                    id: magneticHover
+                    enabled: slot.visible && slot.hasContent && slot.autoShown
+                        && !barSlot.root.barUnlocked && !barSlot.dragging
+                    onHoveredChanged: {
+                        if (hovered)
+                            slotRow.hoveredIndex = slot.index
+                        else if (slotRow.hoveredIndex === slot.index)
+                            slotRow.hoveredIndex = -1
+                    }
+                    onEnabledChanged: if (!enabled && slotRow.hoveredIndex === slot.index) slotRow.hoveredIndex = -1
                 }
                 // ── drag-catcher: only in unlock mode, overlays the widget ──
                 MouseArea {

@@ -30,7 +30,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 
 | Area | Highlights |
 |---|---|
-| Bar layout | unlock mode, drag/drop widget groups, persistent order, split groups, top/bottom position |
+| Bar layout | unlock mode, drag/drop widget groups, persistent order, split groups, magnetic hover, top/bottom position |
 | Control center | quick actions, widget toggles, workspace modes, bar style, split controls, animation controls |
 | Pickers | theme, wallpaper, screenshot, and video pickers with Tanzaku, Hearthstone, and Carousel styles |
 | Core widgets | workspaces, volume, System info (CPU/GPU/RAM), battery, power profile, network, Bluetooth, weather, MPRIS, tray, notifications |
@@ -59,6 +59,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Control center | quick toggles, power, Bar Functions fly-out |
 | Bar style | border, shadow, frost, pill radius, top/bottom position |
 | Split groups | positional pill splits + Stream, Surge, Bolt, Bolt 2 gap animations |
+| Magnetic hover | subtle pointer-only pill scale and neighbor pull animation without layout reflow |
 | Keybind IPC | `qs -c bar ipc call picker theme\|wallpaper\|screenshots\|videos` |
 | Per-widget panels | click widget to open its popup |
 
