@@ -63,6 +63,37 @@ PanelWindow {
         }
     }
 
+    component ColorTile: Rectangle {
+        required property var colorData
+        property color swatchColor: colorData.color
+        property bool active: root.barColor === colorData.id
+        property bool hovered: colorMa.containsMouse
+        signal activated()
+        height: 25
+        radius: root.tileRadius
+        color: active ? Qt.rgba(swatchColor.r, swatchColor.g, swatchColor.b, root.fillActiveAlpha)
+                      : hovered ? Qt.rgba(swatchColor.r, swatchColor.g, swatchColor.b, root.fillHoverAlpha)
+                                : root.fillIdle
+        border.color: (active || hovered) ? swatchColor : root.sep
+        border.width: 1
+        Behavior on color { ColorAnimation { duration: 120 } }
+        UiText {
+            anchors.centerIn: parent
+            text: colorData.label
+            color: (parent.active || parent.hovered) ? parent.swatchColor : root.ink
+            font.family: root.mono
+            font.pixelSize: 9
+            font.weight: parent.active ? Font.Medium : Font.Normal
+        }
+        MouseArea {
+            id: colorMa
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: parent.activated()
+        }
+    }
+
     MouseArea { anchors.fill: parent; onClicked: root.controlVisible = false }
 
     Rectangle {
@@ -216,31 +247,17 @@ PanelWindow {
                 color: root.sumiHi; font.family: root.mono; font.pixelSize: 10; font.letterSpacing: 1
             }
             Grid {
-                width: parent.width; columns: 2; columnSpacing: 8; rowSpacing: 8
+                width: parent.width
+                columns: 2
+                columnSpacing: 8
+                rowSpacing: 8
                 Repeater {
                     model: root.barColorOptions
-                    delegate: Rectangle {
-                        required property string modelData
-                        readonly property bool on:      root.barColor === modelData
-                        readonly property bool hovered: _cma.containsMouse
-                        width: root.evenW((col.width - 8) / 2); height: 25; radius: root.tileRadius
-                        color: on ? root.fillActive : hovered ? root.fillHover : root.fillIdle
-                        border.color: (on || hovered) ? root.seal : root.sep
-                        border.width: 1
-                        Behavior on color { ColorAnimation { duration: 120 } }
-                        UiText {
-                            anchors.centerIn: parent
-                            text: root.barColorLabel(modelData)
-                            color: (parent.on || parent.hovered) ? root.seal : root.ink
-                            font.family: root.mono; font.pixelSize: 11
-                            font.weight: parent.on ? Font.Medium : Font.Normal
-                        }
-                        MouseArea {
-                            id: _cma
-                            anchors.fill: parent; hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.barColor = modelData
-                        }
+                    ColorTile {
+                        required property var modelData
+                        width: root.evenW((col.width - 8) / 2)
+                        colorData: modelData
+                        onActivated: root.barColor = modelData.id
                     }
                 }
             }

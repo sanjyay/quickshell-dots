@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # QS-Shell update check (writes a state file the bar watches; no apply here).
 #
-# Topology of THIS setup: the live bar dir is a *copy* of versions/<V>/ from the
+# Topology of THIS setup: the live bar dir is a *copy* of versions/default/ from the
 # deploy clone at ~/.local/share/quickshell-dots by default (override with
 # QS_SHELL_REPO). We never run git in the live dir — we compare the deploy
-# repo's tracking branch against origin, scoped to the installed version.
+# repo's tracking branch against origin, scoped to the installed config.
 #
 # State contract: ~/.cache/qs-shell/update-available.json ALWAYS exists.
-#   "up to date" = {"behind": 0}.  Pending   = {"behind": N, "version", "summary", "checked"}.
+#   "up to date" = {"behind": 0}.  Pending   = {"behind": N, "config", "summary", "checked"}.
 # The bar's FileView only ever reads a complete file via atomic replace and never
 # depends on delete-detection.
 set -euo pipefail
@@ -37,10 +37,10 @@ write_state() {                       # $1 = complete JSON; atomic replace
 }
 clear_state() { write_state "$(jq -nc --arg c "$(date -Is)" '{behind: 0, checked: $c}')"; }
 
-# Installed version (.qsrise marker; this install predates it → fall back to V1).
-ver="V1"
-[ -f "$DEST/.qsrise" ] && ver="$(tr -d '[:space:]' < "$DEST/.qsrise")"
-[ -n "$ver" ] || ver="V1"
+# Installed config marker. Older markers are normalized to the single config.
+cfg="default"
+[ -f "$DEST/.qsrise" ] && cfg="$(tr -d '[:space:]' < "$DEST/.qsrise")"
+[ "$cfg" = "default" ] || cfg="default"
 
 # No repo ⇒ an update is impossible ⇒ clear any stale badge. (Unlike the offline
 # case below, where keeping the last known state is correct.)
@@ -55,9 +55,9 @@ upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"
   || { clear_state; exit 0; }
 
 # Commits the upstream is ahead by that change the deployable payload: THIS
-# version's directory, or the companion pieces the post-update hook ships
+# config directory, or the companion pieces the post-update hook ships
 # (helper scripts / systemd units). Docs-only commits stay badge-free.
-payload=("versions/$ver/" "scripts/" "systemd/")
+payload=("versions/$cfg/" "scripts/" "systemd/")
 behind="$(git rev-list --count "HEAD..$upstream" -- "${payload[@]}" 2>/dev/null || echo 0)"
 if [ "${behind:-0}" -eq 0 ]; then
   clear_state
@@ -70,7 +70,7 @@ summary="$(git log --max-count=8 --format='%s' "HEAD..$upstream" -- "${payload[@
 
 write_state "$(jq -nc \
   --argjson behind  "$behind" \
-  --arg     version "$ver" \
+  --arg     config "$cfg" \
   --argjson summary "$summary" \
   --arg     checked "$(date -Is)" \
-  '{behind: $behind, version: $version, summary: $summary, checked: $checked}')"
+  '{behind: $behind, config: $config, summary: $summary, checked: $checked}')"

@@ -651,6 +651,13 @@ PanelWindow {
         property int narrowStage: 0            // 0 normal · 1 compact · 2 portrait · 3 emergency
         property real g8FloorWidth: 80         // published by G8: its clock-only minimal width
         function groupVisibleAtStage(gid, stage) {
+            // Hide lower-priority side widgets as horizontal pressure rises. The
+            // center clock/status floor and core controls stay visible; verbose
+            // widgets drop first so text never piles up around the center. Keep
+            // AI usage (G7) and now playing (G9) visible when their toggles are on.
+            if (stage >= 1 && (gid === "G10" || gid === "G14")) return false
+            if (stage >= 2 && gid === "G3") return false
+            if (stage >= 3 && gid === "G11") return false
             return true
         }
         function sideNaturalWidth(row, stage) {
@@ -671,15 +678,17 @@ PanelWindow {
         function updateNarrowStage() {
             var s = narrowStage, W = island.width
             if (W < 1) return                              // no layout yet
-            // downshift while the CURRENT stage no longer fits (24px slack)…
-            if (s === 0 && narrowCandidateWidth(0) + 24 > W) s = 1
-            if (s === 1 && narrowCandidateWidth(1) + 24 > W) s = 2
-            if (s === 2 && narrowCandidateWidth(2) + 24 > W) s = 3
+            // downshift while the CURRENT stage no longer fits with readable slack.
+            // The slack intentionally exceeds the hard overlap boundary so text-heavy
+            // widgets disappear before the center area becomes noisy.
+            if (s === 0 && narrowCandidateWidth(0) + 120 > W) s = 1
+            if (s === 1 && narrowCandidateWidth(1) + 96 > W) s = 2
+            if (s === 2 && narrowCandidateWidth(2) + 72 > W) s = 3
             // …upshift only when the NEXT-LARGER stage fits with 48px slack,
             // measured against that stage's own candidate width.
-            if (s === 3 && narrowCandidateWidth(2) + 48 <= W) s = 2
-            if (s === 2 && narrowCandidateWidth(1) + 48 <= W) s = 1
-            if (s === 1 && narrowCandidateWidth(0) + 48 <= W) s = 0
+            if (s === 3 && narrowCandidateWidth(2) + 120 <= W) s = 2
+            if (s === 2 && narrowCandidateWidth(1) + 144 <= W) s = 1
+            if (s === 1 && narrowCandidateWidth(0) + 168 <= W) s = 0
             if (s !== narrowStage) narrowStage = s
         }
         function scheduleNarrowUpdate() { narrowTimer.restart() }

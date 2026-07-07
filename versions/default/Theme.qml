@@ -21,25 +21,32 @@ Item {
     property color color03: "#c8b36a"   // colors.toml color3
     property color sealRaw:    "#c4746e"
     property color accentHint: sealRaw    // filled by palette; default = same as red
-    property string barColor: "red"        // "red", "accent", "color02", "color03"
-    readonly property bool barColorIsAccent: barColor === "accent"
+    property string barColor: "red"
+    readonly property bool barColorIsAccent: false
     // Compatibility alias for older local code/reviews that still use the
     // previous boolean name.
     readonly property bool useThemeAccent: barColorIsAccent
 
-    readonly property color seal: barColorIsAccent ? accentHint
-                                : barColor === "color02" ? color02
-                                : barColor === "color03" ? color03
-                                : sealRaw
-    readonly property var barColorOptions: ["red", "accent", "color02", "color03"]
+    readonly property color seal: barColorValue(barColor)
+    readonly property var barColorOptions: [
+        { id: "red",    label: "Red",    color: sealRaw },
+        { id: "mauve",  label: "Mauve",  color: "#cba6f7" },
+        { id: "purple", label: "Purple", color: "#9d7cd8" },
+        { id: "blue",   label: "Blue",   color: "#7aa2f7" }
+    ]
+    function barColorValue(id) {
+        for (var i = 0; i < barColorOptions.length; i++)
+            if (barColorOptions[i].id === id) return barColorOptions[i].color
+        return sealRaw
+    }
     function barColorValid(id) {
-        return id === "red" || id === "accent" || id === "color02" || id === "color03"
+        for (var i = 0; i < barColorOptions.length; i++)
+            if (barColorOptions[i].id === id) return true
+        return false
     }
     function barColorLabel(id) {
-        if (id === "red") return "Red"
-        if (id === "accent") return "Accent"
-        if (id === "color02") return "Color 02"
-        if (id === "color03") return "Color 03"
+        for (var i = 0; i < barColorOptions.length; i++)
+            if (barColorOptions[i].id === id) return barColorOptions[i].label
         return "Red"
     }
 
@@ -88,12 +95,12 @@ Item {
     property var barLayoutControllers: ({})
     property bool _barLayoutSyncing: false
 
-    readonly property bool anyPopupVisible: calendarVisible || cpuVisible || aiUsageVisible
+    readonly property bool anyPopupVisible: appLauncherVisible || calendarVisible || cpuVisible || aiUsageVisible
         || memVisible || volVisible || controlVisible || networkVisible || bluetoothVisible
         || batteryVisible || mprisVisible || weatherVisible
         || workspaceVisible || imagePickerVisible || mediaBrowserVisible || notifVisible
         || powerProfileVisible || archVisible || shellUpdateVisible || trayVisible || trayMenuVisible
-    readonly property bool keyboardPopupVisible: imagePickerVisible || mediaBrowserVisible
+    readonly property bool keyboardPopupVisible: appLauncherVisible || imagePickerVisible || mediaBrowserVisible
 
     function registerBarLayoutController(screenName, controller) {
         if (!screenName || !controller) return
@@ -305,6 +312,7 @@ Item {
 
     function closePopups(except) {
         _closingPopups = true
+        if (except !== "appLauncherVisible") appLauncherVisible = false
         if (except !== "calendarVisible") calendarVisible = false
         if (except !== "cpuVisible") cpuVisible = false
         if (except !== "aiUsageVisible") aiUsageVisible = false
@@ -345,6 +353,11 @@ Item {
         imagePickerVisible = false
         mediaBrowserMode = mode
         mediaBrowserVisible = true
+    }
+
+    function openAppLauncher() {
+        activateFocusedPopupScreen()
+        appLauncherVisible = true
     }
 
     // ── pill/card border (default, non-borderless mode) ──
@@ -431,6 +444,10 @@ Item {
             }
         }
     }
+
+    // ── Calendar state ──
+    property bool appLauncherVisible: false
+    onAppLauncherVisibleChanged: popupOpened("appLauncherVisible")
 
     // ── Calendar state ──
     property bool calendarVisible: false
@@ -748,10 +765,15 @@ Item {
                     var ba = parseInt(parts[4]); theme.barAnim = (ba >= 0 && ba <= 8) ? ba : 0
                     if (parts.length >= 6) {
                         var bc = parts[5]
-                        if (bc === "1") theme.barColor = "accent"
+                        if (bc === "1") theme.barColor = "red"
                         else if (bc === "0") theme.barColor = "red"
-                        else if (bc === "green" || bc === "color2") theme.barColor = "color02"
-                        else if (bc === "yellow" || bc === "color3") theme.barColor = "color03"
+                        else if (bc === "green" || bc === "color2") theme.barColor = "red"
+                        else if (bc === "yellow" || bc === "color3") theme.barColor = "red"
+                        else if (bc === "accent" || bc === "color02" || bc === "color03") theme.barColor = "red"
+                        else if (bc === "cat_mauve") theme.barColor = "mauve"
+                        else if (bc === "cat_pink") theme.barColor = "purple"
+                        else if (bc === "cat_blue" || bc === "tokyo_blue") theme.barColor = "blue"
+                        else if (bc.indexOf("cat_") === 0 || bc.indexOf("tokyo_") === 0) theme.barColor = "red"
                         else if (theme.barColorValid(bc)) theme.barColor = bc
                     }
                 }
@@ -1431,5 +1453,11 @@ Item {
         function wallpaper(): void   { openImagePicker("wallpaper") }
         function screenshots(): void { openMediaBrowser("screenshots") }
         function videos(): void      { openMediaBrowser("videos") }
+    }
+
+    // Terminal entry point: `qs -c bar ipc call launcher open`
+    IpcHandler {
+        target: "launcher"
+        function open(): void { openAppLauncher() }
     }
 }

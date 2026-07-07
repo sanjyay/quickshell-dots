@@ -1,6 +1,6 @@
 //@ pragma UseQApplication
 //
-// V1 bar lifecycle fix: bind one bar to each real Wayland output, skip
+// Bar lifecycle fix: bind one bar to each real Wayland output, skip
 // transient nameless/0x0 placeholder screens, and recreate a BarSlot when that
 // output disappears and returns. If a screen remains valid but the layer window
 // loses resources or closes, recreate only that window instead of reloading the
@@ -220,6 +220,7 @@ ShellRoot {
     }
 
     TooltipOverlay { root: theme }
+    AppLauncherPanel { root: theme }
     CalendarPopup { root: theme }
     ArchUpdaterPanel { root: theme }
     ShellUpdatePanel { root: theme }

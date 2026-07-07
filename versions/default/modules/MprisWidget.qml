@@ -12,6 +12,7 @@ Item {
     readonly property var  player:  sel.player
     readonly property bool active:  sel.active
     readonly property bool playing: sel.playing
+    readonly property int titleWidth: 68
 
     onActiveChanged: root.mprisActive = active
     Component.onCompleted: root.mprisActive = active
@@ -154,7 +155,7 @@ Item {
         // item so the layer.effect can resolve the id; visible:false → no Row layout.
         Item {
             id: marqueeFadeMask
-            width: 88; height: 28
+            width: rootMod.titleWidth; height: 28
             visible: false
             layer.enabled: true
             Rectangle {
@@ -171,8 +172,8 @@ Item {
         // ── marquee title ──
         Item {
             id: marqueeClip
-            implicitWidth: 88
-            width: 88
+            implicitWidth: rootMod.titleWidth
+            width: rootMod.titleWidth
             height: 28
             anchors.verticalCenter: parent.verticalCenter
             // alpha-mask fade of the right edge: the scrolling title dissolves into

@@ -2,25 +2,24 @@
 # Quickshell Rise — one-command installer
 # Usage:
 #   bash <(curl -fsSL https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/install.sh)
-#   bash <(curl -fsSL .../install.sh) V1          # install a specific version non-interactively
-#   bash <(curl -fsSL .../install.sh) V1 --autostart
+#   bash <(curl -fsSL .../install.sh) --autostart
 # Autostart via Omarchy post-boot hook (opt-in).
 set -euo pipefail
 
 REPO_URL="https://github.com/sanjyay/quickshell-dots.git"
 DEST="$HOME/.config/quickshell/bar"
+CONFIG_DIR="default"
 
-# args: optional version name + flags
-WANT_VERSION=""
+# args: optional flags
 WANT_AUTOSTART="" # "" = leave unchanged and print hint, "yes" = install hook, "no" = remove hook
-WANT_CLAUDE=""   # "" = ask interactively, "yes"/"no" = non-interactive
+WANT_CLAUDE="yes" # AI usage backend installs by default; pass --no-ai-backend to skip
 for a in "$@"; do
   case "$a" in
     --autostart)          WANT_AUTOSTART="yes" ;;
     --no-autostart)       WANT_AUTOSTART="no"  ;;
     --claude-backend|--ai-backend)       WANT_CLAUDE="yes" ;;
     --no-claude-backend|--no-ai-backend) WANT_CLAUDE="no"  ;;
-    *) WANT_VERSION="$a" ;;
+    *) warn "Ignoring unknown argument: $a" ;;
   esac
 done
 
@@ -189,7 +188,7 @@ fonts="$(fc-list)"
 if ((${#fontmiss[@]})); then
   warn "Missing fonts: ${fontmiss[*]}"
   warn "The bar needs these to display icons correctly."
-  if [[ -z "$WANT_VERSION" ]]; then
+  if [[ -t 0 ]]; then
     read -p "Install missing fonts? [Y/n] " ans </dev/tty || ans=""   # no tty → empty, not unset (set -u)
     case "${ans,,}" in n|no) err "Fonts required — aborting."; exit 1 ;; esac
   fi
@@ -230,16 +229,7 @@ else
   src_repo="$tmp/repo"
 fi
 
-mapfile -t versions < <(cd "$src_repo/versions" && ls -d */ | sed 's#/##')
-((${#versions[@]})) || { err "No versions found in repo"; exit 1; }
-
-# ── 3. choose version ───────────────────────────────────────────
-choice="$WANT_VERSION"
-if [[ -z "$choice" ]]; then
-  echo "${c_b}Available versions:${c_0}"
-  select v in "${versions[@]}"; do [[ -n "$v" ]] && { choice="$v"; break; }; done
-fi
-printf '%s\n' "${versions[@]}" | grep -qx "$choice" || { err "Unknown version: $choice"; exit 1; }
+[[ -d "$src_repo/versions/$CONFIG_DIR" ]] || { err "Missing config: versions/$CONFIG_DIR"; exit 1; }
 
 # ── 4. install ──────────────────────────────────────────────────
 # back up only a FOREIGN config (no .qsrise marker). Re-installing our own bar
@@ -249,8 +239,8 @@ mkdir -p "$(dirname "$DEST")"
 rm -rf "$(dirname "$DEST")"/.qs-install-stage.* 2>/dev/null || true
 ts="$(date +%Y%m%d-%H%M%S)"
 stage="$(mktemp -d -p "$(dirname "$DEST")" .qs-install-stage.XXXXXX)"
-cp -r "$src_repo/versions/$choice/." "$stage/"
-echo "$choice" > "$stage/.qsrise"
+cp -r "$src_repo/versions/$CONFIG_DIR/." "$stage/"
+echo "$CONFIG_DIR" > "$stage/.qsrise"
 
 if [[ -d "$DEST" ]]; then
   if [[ -e "$DEST/.qsrise" ]]; then
@@ -273,9 +263,9 @@ if [[ -n "$restore_src" && "$restore_src" == "$DEST.old."* ]]; then
   rm -rf "$restore_src"
 fi
 restore_src=""
-info "Installed '${c_b}$choice${c_0}' → $DEST"
+info "Installed Quickshell bar → $DEST"
 
-# ── 4b. ArchUpdater security gate (pre-install package verdicts) ─
+# ── 4a. ArchUpdater security gate (pre-install package verdicts) ─
 # Pure bash, no extra deps. The weekly fetch timer keeps the known-infected
 # list current; without any list the updater panel fail-closes to
 # "protection limited" instead of claiming packages are clean.
@@ -342,16 +332,8 @@ case "$WANT_AUTOSTART" in
     ;;
 esac
 
-# ── 8. AI usage backends (opt-in; never block the bar install) ──
+# ── 8. AI usage backends (enabled by default; never block the bar install) ──
 do_claude="$WANT_CLAUDE"
-if [[ -z "$do_claude" ]]; then
-  if [[ -t 0 ]]; then
-    read -p "Install the AI usage backend for the quota widget (Claude + Codex + OpenCode, 0 tokens)? [y/N] " ans || ans=""
-    case "${ans,,}" in y|yes) do_claude="yes" ;; *) do_claude="no" ;; esac
-  else
-    do_claude="no"
-  fi
-fi
 if [[ "$do_claude" == "yes" ]]; then
   install_claude_backend "$src_repo" || warn "Claude backend setup incomplete — the bar is installed and fine; re-run with --ai-backend to retry."
   # Codex side of the same AI usage widget — installed alongside when present.
@@ -367,7 +349,7 @@ else
   [[ -x "$HOME/.local/bin/codex-usage" ]] && { install_codex_backend "$src_repo" || warn "Codex backend refresh incomplete."; refreshed_ai=1; }
   [[ -x "$HOME/.local/bin/opencode-usage" ]] && { install_opencode_backend "$src_repo" || warn "OpenCode backend refresh incomplete."; refreshed_ai=1; }
   if [[ "$refreshed_ai" -eq 0 ]]; then
-    info "Skipped AI usage backend (install with --ai-backend to enable it)."
+    info "Skipped AI usage backend (--no-ai-backend was requested)."
   else
     info "Refreshed already-installed AI usage backend scripts."
   fi

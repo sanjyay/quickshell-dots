@@ -47,13 +47,12 @@ Item {
             onVisibleChanged: if (!rootMod.recording) opacity = 1.0
         }
 
-        // timer
         UiText {
             anchors.verticalCenter: parent.verticalCenter
             text: rootMod.elapsedStr
-            color: root.seal
+            color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.82)
             font.family: root.mono
-            font.pixelSize: 11
+            font.pixelSize: 12
         }
     }
 

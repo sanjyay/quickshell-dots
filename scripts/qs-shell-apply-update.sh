@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # QS-Shell apply update.
 #
-# Topology: the live bar dir is a *copy* of versions/<V>/ from the deploy clone
+# Topology: the live bar dir is a *copy* of versions/default/ from the deploy clone
 # at ~/.local/share/quickshell-dots by default (override with QS_SHELL_REPO).
-# Updating = pull that repo, redeploy the installed version, restart the bar.
+# Updating = pull that repo, redeploy the installed config, restart the bar.
 #
 # MUST be launched DETACHED from the bar (the QML button uses `setsid`), because
 # this script restarts the bar.
@@ -117,9 +117,9 @@ stop_bar_instances() {
   return "$rc"
 }
 
-ver="V1"
-[ -f "$DEST/.qsrise" ] && ver="$(tr -d '[:space:]' < "$DEST/.qsrise")"
-[ -n "$ver" ] || ver="V1"
+cfg="default"
+[ -f "$DEST/.qsrise" ] && cfg="$(tr -d '[:space:]' < "$DEST/.qsrise")"
+[ "$cfg" = "default" ] || cfg="default"
 
 [ -d "$REPO/.git" ] || fail "Repo not found at $REPO"
 cd "$REPO"
@@ -159,7 +159,7 @@ else
   fail "Local branch has unmerged commits — resolve manually (git status in $REPO)."
 fi
 
-[ -d "$REPO/versions/$ver" ] || fail "Version '$ver' missing in repo after pull."
+[ -d "$REPO/versions/$cfg" ] || fail "Config '$cfg' missing in repo after pull."
 
 # 3. Always back up the live dir before overwriting (protects un-synced edits).
 mkdir -p "$BACKUP_ROOT"
@@ -176,11 +176,11 @@ ls -1dt "$BACKUP_ROOT"/bar.* 2>/dev/null | tail -n +4 | xargs -r rm -rf
 #    dir is ignored. Clean the stage on any exit.
 stage="$(mktemp -d -p "$(dirname "$DEST")" .qs-stage.XXXXXX)"
 trap 'rm -rf "$stage" 2>/dev/null || true' EXIT
-cp -r "$REPO/versions/$ver/." "$stage/"
+cp -r "$REPO/versions/$cfg/." "$stage/"
 if [ -f "$backup/quotes.txt" ]; then
   cp -p "$backup/quotes.txt" "$stage/quotes.txt"
 fi
-printf '%s\n' "$ver" > "$stage/.qsrise"
+printf '%s\n' "$cfg" > "$stage/.qsrise"
 
 # Stop the bar before swapping, and WAIT for it to actually exit (don't trust a
 # fixed sleep). Prefer Quickshell's registered config path over command-line
@@ -201,7 +201,7 @@ rollback() {
     else
       cp -a "$backup" "$DEST" 2>/dev/null || true
     fi
-    msg="Deploy failed — previous version restored."
+    msg="Deploy failed — previous config restored."
   else                                 # $DEST never changed (the aside-move itself failed)
     msg="Update aborted before any change — bar restarted unchanged."
   fi

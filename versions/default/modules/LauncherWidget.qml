@@ -9,7 +9,7 @@ Item {
     implicitWidth: logoContentWidth + logoPadding
     implicitHeight: 28
 
-    readonly property string tooltipText: "Control center"
+    readonly property string tooltipText: "Apps  •  Right click controls"
     readonly property bool logoIconMode: root.launcherLogoMode === "icon"
     readonly property bool hyprlandLogo: !logoIconMode && root.launcherLogoText === "hyprland"
     readonly property bool archTextLogo: !logoIconMode && root.launcherLogoText === "arch"
@@ -39,7 +39,7 @@ Item {
         duration: 2600; loops: Animation.Infinite
         // gate: only animate while hovered or control panel open — otherwise the
         // Canvas repainted 24/7 via onPhaseChanged even when nobody looks
-        running: ma.containsMouse || root.controlVisible
+        running: ma.containsMouse || root.controlVisible || root.appLauncherVisible
     }
 
     // shadow as a SIBLING of the pill (the pill itself clips, for the wave —
@@ -72,7 +72,7 @@ Item {
             anchors.fill: parent
             // only present while active (hovered or control panel open); fully
             // gone when idle. Fades so it appears/disappears smoothly.
-            opacity: (ma.containsMouse || root.controlVisible) ? 0.55 : 0
+            opacity: (ma.containsMouse || root.controlVisible || root.appLauncherVisible) ? 0.55 : 0
             visible: opacity > 0.001
             Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
@@ -231,12 +231,16 @@ Item {
         id: ma
         anchors.fill: parent
         hoverEnabled: true
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: Qt.PointingHandCursor
         onEntered: tip.show()
         onExited:  { tip.hide() }
-        onClicked: {
+        onClicked: function(mouse) {
             tip.hide()
-            root.controlVisible = !root.controlVisible
+            if (mouse.button === Qt.RightButton)
+                root.controlVisible = !root.controlVisible
+            else
+                root.openAppLauncher()
         }
     }
 }
