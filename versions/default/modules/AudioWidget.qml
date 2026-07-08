@@ -104,6 +104,27 @@ Item {
     Process { id: muteRunner;    command: ["bash", "-c", "pamixer -t"];          onExited: (code) => rootMod.notifyAudioError("Mute", code) }
     Process { id: volUpRunner;   command: ["bash", "-c", "pamixer --increase 5"]; onExited: (code) => rootMod.notifyAudioError("Volume up", code) }
     Process { id: volDownRunner; command: ["bash", "-c", "pamixer --decrease 5"]; onExited: (code) => rootMod.notifyAudioError("Volume down", code) }
+    Process {
+        id: volSetRunner
+        property int targetVolume: rootMod.volume
+        command: ["bash", "-c", "pamixer --set-volume " + targetVolume + " --unmute"]
+        onExited: (code) => {
+            rootMod.notifyAudioError("Set volume", code)
+            audio.refresh()
+        }
+    }
+
+    property bool volumeDragged: false
+    property real pressX: 0
+    property real pressY: 0
+    function setVolumeFromPointer(mouseX, mouseY) {
+        var p = mapToItem(slider, mouseX, mouseY)
+        var ratio = Math.max(0, Math.min(1, p.x / slider.width))
+        var nextVolume = Math.round(ratio * 100)
+        volSetRunner.targetVolume = nextVolume
+        volSetRunner.running = false
+        volSetRunner.running = true
+    }
 
     MouseArea {
         anchors.fill: parent
@@ -117,7 +138,25 @@ Item {
             else                    { volDownRunner.running = false; volDownRunner.running = true }
             audio.refresh()
         }
+        onPressed: (e) => {
+            rootMod.pressX = e.x
+            rootMod.pressY = e.y
+            rootMod.volumeDragged = false
+        }
+        onPositionChanged: (e) => {
+            if (!(pressedButtons & Qt.LeftButton)) return
+            if (Math.abs(e.x - rootMod.pressX) < 3 && Math.abs(e.y - rootMod.pressY) < 3) return
+            rootMod.volumeDragged = true
+            rootMod.setVolumeFromPointer(e.x, e.y)
+        }
+        onReleased: (e) => {
+            if (rootMod.volumeDragged && e.button === Qt.LeftButton) {
+                rootMod.setVolumeFromPointer(e.x, e.y)
+                tip.hide()
+            }
+        }
         onClicked: (e) => {
+            if (rootMod.volumeDragged) return
             tip.hide()
             if (e.button === Qt.RightButton) { muteRunner.running = false; muteRunner.running = true }
             else                             { root.volVisible = !root.volVisible }

@@ -8,6 +8,11 @@ import "Palette.js" as Palette
 Item {
     id: theme
 
+    property var cameraSwitch: null
+
+    Component.onCompleted: console.log("Theme.qml completed cameraSwitch=" + (cameraSwitch ? cameraSwitch.monitorVersion : "null"))
+    onCameraSwitchChanged: console.log("Theme.qml cameraSwitch changed cameraSwitch=" + (cameraSwitch ? cameraSwitch.monitorVersion : "null"))
+
     readonly property string colorsPath: Quickshell.env("HOME") + "/.config/omarchy/current/theme/colors.toml"
 
     property color paper:   "#181616"
@@ -544,6 +549,7 @@ Item {
     property int    aiOcToday: 0
     property var    aiOcModels: []
     property int    aiClockTick: 0
+    property real   aiLastBackendKick: 0
 
     // F15: clamp an external 0..1 utilization to a 0–100 int (a negative/over-range value would
     // otherwise produce wrong text and negative/overwide usage bars)
@@ -659,7 +665,41 @@ Item {
         }
     }
 
-    function refreshAiUsage(selectedOnly) {
+    Process {
+        id: aiRunBackends
+        onExited: aiReadAfterBackend.restart()
+    }
+
+    Timer {
+        id: aiReadAfterBackend
+        interval: 600
+        repeat: false
+        onTriggered: theme.refreshAiUsage(true, true)
+    }
+
+    function kickAiBackends(selectedOnly) {
+        var now = Date.now()
+        var minGap = aiUsageVisible ? 15000 : 60000
+        if (aiRunBackends.running || now - aiLastBackendKick < minGap) return
+        aiLastBackendKick = now
+
+        var names = selectedOnly === true ? [aiTool] : ["claude", "codex", "opencode"]
+        var cmds = []
+        for (var i = 0; i < names.length; i++) {
+            if (names[i] === "claude")
+                cmds.push("[ -x \"$HOME/.local/bin/claude-usage\" ] && \"$HOME/.local/bin/claude-usage\" >/dev/null 2>&1 || true")
+            else if (names[i] === "codex")
+                cmds.push("[ -x \"$HOME/.local/bin/codex-usage\" ] && \"$HOME/.local/bin/codex-usage\" >/dev/null 2>&1 || true")
+            else if (names[i] === "opencode")
+                cmds.push("[ -x \"$HOME/.local/bin/opencode-usage\" ] && \"$HOME/.local/bin/opencode-usage\" >/dev/null 2>&1 || true")
+        }
+        if (cmds.length === 0) return
+        aiRunBackends.command = ["bash", "-lc", cmds.join("; ")]
+        aiRunBackends.running = false
+        aiRunBackends.running = true
+    }
+
+    function refreshAiUsage(selectedOnly, skipBackendKick) {
         aiClockTick++
         var only = selectedOnly === true
         if (!only || aiTool === "claude") {
@@ -671,11 +711,13 @@ Item {
         if (!only || aiTool === "opencode") {
             aiReadOpenCode.running = false; aiReadOpenCode.running = true
         }
+        if (skipBackendKick !== true) kickAiBackends(only)
     }
 
     Timer {
-        // 30s normally; 5s while the AI panel is open (responsive when looked at)
-        interval: theme.aiUsageVisible ? 5000 : 30000
+        // Keep the UI responsive while bounding backend calls; kickAiBackends()
+        // enforces its own slower rate limit.
+        interval: theme.aiUsageVisible ? 5000 : 15000
         running: true; repeat: true; triggeredOnStart: true
         onTriggered: theme.refreshAiUsage(theme.aiUsageVisible)
     }
@@ -820,6 +862,8 @@ Item {
     property bool modMpris:      true    // G9 now-playing / mpris pill
     property bool modClaude:     true    // default on (toggle in ControlPanel)
     property bool modPrivacy:    true    // microphone/camera privacy pills
+    property bool modPrivacyMic: true
+    property bool modPrivacyCamera: true
     property bool modBattery:    true    // battery pill, shown only when hardware exists
 
     // ── workspace display mode ──
@@ -855,6 +899,8 @@ Item {
     onModVolumeChanged:     if (_widgetsLoaded) saveWidgets()
     onModMprisChanged:      if (_widgetsLoaded) saveWidgets()
     onModPrivacyChanged:    if (_widgetsLoaded) saveWidgets()
+    onModPrivacyMicChanged: if (_widgetsLoaded) saveWidgets()
+    onModPrivacyCameraChanged: if (_widgetsLoaded) saveWidgets()
     onModBatteryChanged:    if (_widgetsLoaded) saveWidgets()
     onAiToolChanged:        if (_widgetsLoaded) saveWidgets()
     onWorkspaceModeChanged: if (_widgetsLoaded) saveWidgets()
@@ -943,7 +989,9 @@ Item {
                  + archUpdateDay + " "                    // +23 package updater weekday
                  + (archUpdateScheduleActive ? "1" : "0") + " " // +24 scheduled updater is active until no packages remain
                  + (modPrivacy ? "1" : "0") + " "         // +25 microphone/camera privacy pills
-                 + (modBattery ? "1" : "0")               // +26 battery pill
+                 + (modBattery ? "1" : "0") + " "         // +26 battery pill
+                 + (modPrivacyMic ? "1" : "0") + " "      // +27 microphone privacy pill
+                 + (modPrivacyCamera ? "1" : "0")         // +28 camera privacy pill
         widgetSaveProc.command = ["bash", "-c",
             "echo '" + line + "' > '" + widgetsCachePath + "'"]
         widgetSaveProc.running = false
@@ -1143,6 +1191,10 @@ Item {
                     if (parts.length > wsField + 24) theme.archUpdateScheduleActive = parts[wsField + 24] === "1"
                     if (parts.length > wsField + 25) theme.modPrivacy = parts[wsField + 25] !== "0"
                     if (parts.length > wsField + 26) theme.modBattery = parts[wsField + 26] !== "0"
+                    if (parts.length > wsField + 27) theme.modPrivacyMic = parts[wsField + 27] !== "0"
+                    else theme.modPrivacyMic = theme.modPrivacy
+                    if (parts.length > wsField + 28) theme.modPrivacyCamera = parts[wsField + 28] !== "0"
+                    else theme.modPrivacyCamera = theme.modPrivacy
                 }
                 theme._widgetsLoaded = true
             }

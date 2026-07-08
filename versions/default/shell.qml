@@ -11,11 +11,20 @@ import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 import "panels"
+import "modules"
 
 ShellRoot {
     id: root
 
-    Theme { id: theme }
+    CameraSwitchMonitor {
+        id: cameraSwitchMonitor
+        Component.onCompleted: console.log("shell.qml CameraSwitchMonitor created version=" + cameraSwitchMonitor.monitorVersion)
+    }
+
+    Theme {
+        id: theme
+        cameraSwitch: cameraSwitchMonitor
+    }
 
     // IPC handlers must live outside the per-monitor BarSlot delegate. Otherwise
     // multi-monitor setups register the same target once per bar.
@@ -69,7 +78,10 @@ ShellRoot {
     }
 
     onBarScreensChanged: ensureActivePopupScreen()
-    Component.onCompleted: ensureActivePopupScreen()
+    Component.onCompleted: {
+        console.log("shell.qml startup configPath=" + Qt.resolvedUrl("shell.qml"))
+        ensureActivePopupScreen()
+    }
 
     // Secondary guard for failures that do not replace the ShellScreen object.
     // resourcesLost is followed by closed, so one pending flag handles the pair

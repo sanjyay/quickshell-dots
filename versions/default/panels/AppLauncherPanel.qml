@@ -30,7 +30,10 @@ PanelWindow {
     property string query: ""
     property int selectedIndex: 0
     property var apps: []
+    property bool cacheLoaded: false
+    property bool scanningApps: false
     property real reveal: root.appLauncherVisible ? 1 : 0
+    readonly property string cachePath: Quickshell.env("HOME") + "/.cache/quickshell/app-launcher/apps.json"
     readonly property color launcherAccent: root.seal
     readonly property color launcherAccentText: Qt.lighter(root.seal, 1.18)
     readonly property color launcherSelectedText: Qt.lighter(root.indigo, 1.35)
@@ -48,29 +51,57 @@ PanelWindow {
     }
 
     readonly property string scanCommand:
-        "resolve_icon() { " +
-        "case \"$1\" in " +
-        "/*) [ -f \"$1\" ] && printf '%s' \"$1\"; return ;; " +
-        "\"\") return ;; " +
-        "esac; " +
-        "for base in \"$HOME/.local/share/icons\" \"$HOME/.icons\" /usr/local/share/icons /usr/share/icons /usr/share/pixmaps; do " +
-        "[ -d \"$base\" ] || continue; " +
-        "found=$(find \"$base\" -type f \\( -iname \"$1.png\" -o -iname \"$1.svg\" -o -iname \"$1.xpm\" -o -iname \"$1.svgz\" \\) 2>/dev/null | sort -Vr | head -n1); " +
-        "[ -n \"$found\" ] && printf '%s' \"$found\" && return; " +
-        "done; " +
-        "printf '%s' \"$1\"; " +
-        "}; " +
-        "for d in /usr/share/applications /usr/local/share/applications \"$HOME/.local/share/applications\"; do " +
-        "[ -d \"$d\" ] || continue; find \"$d\" -maxdepth 1 -type f -name '*.desktop'; done | " +
-        "while IFS= read -r f; do " +
-        "grep -Eq '^(NoDisplay|Hidden)=true' \"$f\" && continue; " +
-        "name=$(grep -m1 '^Name=' \"$f\" | cut -d= -f2-); " +
-        "exec=$(grep -m1 '^Exec=' \"$f\" | cut -d= -f2-); " +
-        "icon=$(grep -m1 '^Icon=' \"$f\" | cut -d= -f2-); " +
-        "icon=$(resolve_icon \"$icon\"); " +
-        "[ -n \"$name\" ] && [ -n \"$exec\" ] || continue; " +
-        "printf '%s\\t%s\\t%s\\t%s\\n' \"$name\" \"$exec\" \"$icon\" \"$f\"; " +
-        "done | sort -fu"
+        "python3 -c " + shellQuote(
+            "import configparser, json, os, sys, tempfile\n" +
+            "cache = os.path.expanduser('~/.cache/quickshell/app-launcher/apps.json')\n" +
+            "print('APP_LAUNCHER rescan started cache=' + cache, file=sys.stderr)\n" +
+            "dirs = [os.path.expanduser('~/.local/share/applications'), '/usr/local/share/applications', '/usr/share/applications']\n" +
+            "icon_bases = [os.path.expanduser('~/.local/share/icons'), os.path.expanduser('~/.icons'), '/usr/local/share/icons', '/usr/share/icons', '/usr/share/pixmaps']\n" +
+            "def resolve_icon(icon):\n" +
+            "    if not icon: return ''\n" +
+            "    if icon.startswith('/'): return icon if os.path.isfile(icon) else icon\n" +
+            "    names = [icon] if os.path.splitext(icon)[1] else [icon + ext for ext in ('.png', '.svg', '.xpm', '.svgz')]\n" +
+            "    for base in icon_bases:\n" +
+            "        if not os.path.isdir(base): continue\n" +
+            "        for root, _, files in os.walk(base):\n" +
+            "            fs = set(files)\n" +
+            "            for name in names:\n" +
+            "                if name in fs: return os.path.join(root, name)\n" +
+            "    return icon\n" +
+            "def field(cp, key):\n" +
+            "    return cp.get('Desktop Entry', key, fallback='').strip()\n" +
+            "apps, seen = [], set()\n" +
+            "for d in dirs:\n" +
+            "    if not os.path.isdir(d): continue\n" +
+            "    for fn in sorted(os.listdir(d)):\n" +
+            "        if not fn.endswith('.desktop'): continue\n" +
+            "        path = os.path.join(d, fn)\n" +
+            "        cp = configparser.ConfigParser(interpolation=None, strict=False)\n" +
+            "        cp.optionxform = str\n" +
+            "        try: cp.read(path, encoding='utf-8')\n" +
+            "        except Exception: continue\n" +
+            "        if not cp.has_section('Desktop Entry'): continue\n" +
+            "        if field(cp, 'NoDisplay').lower() == 'true' or field(cp, 'Hidden').lower() == 'true': continue\n" +
+            "        name, exec_cmd = field(cp, 'Name'), field(cp, 'Exec')\n" +
+            "        if not name or not exec_cmd: continue\n" +
+            "        key = (name + ' ' + exec_cmd + ' ' + path).lower()\n" +
+            "        if any(x in key for x in ('avahi', 'btop', 'fcitx')): continue\n" +
+            "        if name in seen: continue\n" +
+            "        seen.add(name)\n" +
+            "        apps.append({'name': name, 'exec': exec_cmd, 'icon': resolve_icon(field(cp, 'Icon')), 'file': path, 'categories': field(cp, 'Categories'), 'keywords': field(cp, 'Keywords'), 'mtime': int(os.path.getmtime(path)) if os.path.exists(path) else 0})\n" +
+            "apps.sort(key=lambda a: a['name'].lower())\n" +
+            "payload = {'version': 1, 'generatedAt': int(__import__('time').time()), 'apps': apps}\n" +
+            "try:\n" +
+            "    os.makedirs(os.path.dirname(cache), exist_ok=True)\n" +
+            "    fd, tmp = tempfile.mkstemp(prefix='apps.', suffix='.json.tmp', dir=os.path.dirname(cache), text=True)\n" +
+            "    with os.fdopen(fd, 'w', encoding='utf-8') as f: json.dump(payload, f, ensure_ascii=False, separators=(',', ':'))\n" +
+            "    os.replace(tmp, cache)\n" +
+            "    print('APP_LAUNCHER cache write success count=%d path=%s' % (len(apps), cache), file=sys.stderr)\n" +
+            "except Exception as e:\n" +
+            "    print('APP_LAUNCHER cache write failure path=%s error=%s' % (cache, e), file=sys.stderr)\n" +
+            "print(json.dumps(payload, ensure_ascii=False))\n" +
+            "print('APP_LAUNCHER rescan finished count=%d' % len(apps), file=sys.stderr)\n"
+        )
 
     Behavior on reveal {
         NumberAnimation {
@@ -84,16 +115,29 @@ PanelWindow {
         if (visible) {
             query = ""
             resetListPosition()
-            if (apps.length === 0) scanApps()
+            if (!cacheLoaded) loadCachedApps()
+            if (!scanningApps) scanApps()
             focusTimer.restart()
             Qt.callLater(resetListPosition)
         }
     }
     onFilteredAppsChanged: selectedIndex = Math.max(0, Math.min(selectedIndex, filteredApps.length - 1))
+    Component.onCompleted: {
+        console.log("AppLauncher cache path " + cachePath)
+        loadCachedApps()
+    }
 
     function scanApps() {
+        scanningApps = true
+        console.log("AppLauncher rescan started")
         scanProc.running = false
         scanProc.running = true
+    }
+
+    function loadCachedApps() {
+        console.log("AppLauncher cache load started path=" + cachePath)
+        cacheProc.running = false
+        cacheProc.running = true
     }
 
     function iconSource(icon) {
@@ -106,6 +150,30 @@ PanelWindow {
         return key.indexOf("avahi") >= 0
             || key.indexOf("btop") >= 0
             || key.indexOf("fcitx") >= 0
+    }
+
+    function parseCachedApps(text) {
+        var payload = JSON.parse(String(text || "{}"))
+        var list = payload.apps || []
+        var next = []
+        var seen = {}
+        for (var i = 0; i < list.length; i++) {
+            var app = list[i]
+            if (!app || !app.name || !app.exec) continue
+            if (hiddenApp(app.name, app.exec, app.file || "")) continue
+            if (seen[app.name]) continue
+            seen[app.name] = true
+            next.push({
+                name: app.name,
+                exec: app.exec,
+                icon: app.icon || "",
+                file: app.file || "",
+                categories: app.categories || "",
+                keywords: app.keywords || "",
+                mtime: app.mtime || 0
+            })
+        }
+        return next
     }
 
     function resetListPosition() {
@@ -147,26 +215,48 @@ PanelWindow {
     }
 
     Process {
+        id: cacheProc
+        command: ["bash", "-lc",
+            "p=" + appPanel.shellQuote(appPanel.cachePath) + "; " +
+            "printf 'APP_LAUNCHER cache path %s\\n' \"$p\" >&2; " +
+            "if [ -s \"$p\" ]; then cat \"$p\"; else printf 'APP_LAUNCHER cache load failure path=%s reason=missing-or-empty\\n' \"$p\" >&2; fi"
+        ]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    if (String(this.text || "").trim() === "") throw "missing-or-empty"
+                    var next = appPanel.parseCachedApps(this.text)
+                    if (next.length > 0) appPanel.apps = next
+                    appPanel.cacheLoaded = true
+                    console.log("AppLauncher cache load success count=" + next.length + " path=" + appPanel.cachePath)
+                } catch (e) {
+                    appPanel.cacheLoaded = true
+                    console.warn("AppLauncher cache load failure path=" + appPanel.cachePath + " error=" + e)
+                }
+                if (!appPanel.scanningApps) appPanel.scanApps()
+            }
+        }
+    }
+
+    Process {
         id: scanProc
         command: ["bash", "-lc", appPanel.scanCommand]
         stdout: StdioCollector {
             onStreamFinished: {
-                var lines = this.text.trim().split("\n")
-                var next = []
-                var seen = {}
-                for (var i = 0; i < lines.length; i++) {
-                    var line = lines[i]
-                    if (!line) continue
-                    var parts = line.split("\t")
-                    if (parts.length < 2) continue
-                    var name = parts[0]
-                    if (appPanel.hiddenApp(name, parts[1], parts[3] || "")) continue
-                    if (seen[name]) continue
-                    seen[name] = true
-                    next.push({ name: name, exec: parts[1], icon: parts[2] || "", file: parts[3] || "" })
+                try {
+                    var next = appPanel.parseCachedApps(this.text)
+                    appPanel.apps = next
+                    console.log("AppLauncher rescan finished count=" + next.length)
+                    console.log("AppLauncher cache write success path=" + appPanel.cachePath)
+                } catch (e) {
+                    console.warn("AppLauncher rescan parse failure error=" + e)
                 }
-                appPanel.apps = next
+                appPanel.scanningApps = false
             }
+        }
+        onExited: {
+            appPanel.scanningApps = false
+            console.log("AppLauncher rescan process exited code=" + code)
         }
     }
 

@@ -9,8 +9,12 @@ Item {
 
     property bool muted: false
     property int activeApps: 0
+    readonly property color disabledColor: "#d65d5d"
     readonly property bool live: activeApps > 0
-    readonly property bool shown: root.modPrivacy
+    readonly property bool shown: root.modPrivacy && root.modPrivacyMic
+    readonly property color contentColor: muted
+        ? root.seal
+        : disabledColor
 
     visible: shown
     implicitWidth: shown ? row.implicitWidth + 12 : 0
@@ -43,9 +47,7 @@ Item {
         IconText {
             anchors.verticalCenter: parent.verticalCenter
             text: IconMap.icon(rootMod.muted ? "mic_off" : "mic")
-            color: rootMod.live && !rootMod.muted
-                ? root.seal
-                : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, rootMod.muted ? 0.3 : 0.7)
+            color: rootMod.contentColor
             font.pixelSize: 13
             Behavior on color { ColorAnimation { duration: 160 } }
         }

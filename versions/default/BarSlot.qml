@@ -60,10 +60,11 @@ PanelWindow {
 
     // Magnetic hover tuning. These values only affect pointer hover visuals on
     // slot loaders; they do not change slot width, persistence, IPC, or widget data.
-    readonly property real magneticScale: 1.03
-    readonly property real magneticNeighborPull: 3
-    readonly property real magneticSecondNeighborPull: 1
-    readonly property int magneticAnimationDuration: 170
+    readonly property real magneticScale: 1.07
+    readonly property real magneticLift: -3
+    readonly property real magneticNeighborPull: 6
+    readonly property real magneticSecondNeighborPull: 2.5
+    readonly property int magneticAnimationDuration: 190
 
     // ── dim backdrop while unlocked (edit mode); click empty → lock ──
     Rectangle {
@@ -444,7 +445,7 @@ PanelWindow {
                 NetworkWidget       { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
                 BluetoothWidget     { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
                 PrivacyMicWidget    { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
-                PrivacyCameraWidget { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                PrivacyCameraWidget { root: barSlot.root; cameraSwitch: barSlot.root.cameraSwitch; anchors.verticalCenter: parent.verticalCenter }
             }
         }
     }
@@ -481,6 +482,10 @@ PanelWindow {
         function magneticScaleFor(i) {
             return (!barSlot.root.barUnlocked && !barSlot.dragging && hoveredIndex === i)
                 ? barSlot.magneticScale : 1.0
+        }
+        function magneticLiftFor(i) {
+            return (!barSlot.root.barUnlocked && !barSlot.dragging && hoveredIndex === i)
+                ? barSlot.magneticLift : 0
         }
         // index of the LAST currently shown slot (skips disabled and auto-hidden
         // narrow-stage widgets) —
@@ -538,10 +543,20 @@ PanelWindow {
                     sourceComponent: barSlot.registry[slot.gid]
                     scale: slotRow.magneticScaleFor(slot.index)
                     transformOrigin: Item.Center
+                    transform: Translate {
+                        y: slotRow.magneticLiftFor(slot.index)
+                        Behavior on y {
+                            NumberAnimation {
+                                duration: barSlot.magneticAnimationDuration
+                                easing.type: Easing.OutBack
+                                easing.overshoot: 1.25
+                            }
+                        }
+                    }
                     // dim the original while its ghost is being dragged
                     opacity: (barSlot.dragItem === ldr && barSlot.dragActive) ? 0.25 : 1.0
-                    Behavior on x { NumberAnimation { duration: barSlot.magneticAnimationDuration; easing.type: Easing.OutCubic } }
-                    Behavior on scale { NumberAnimation { duration: barSlot.magneticAnimationDuration; easing.type: Easing.OutCubic } }
+                    Behavior on x { NumberAnimation { duration: barSlot.magneticAnimationDuration; easing.type: Easing.OutBack; easing.overshoot: 1.35 } }
+                    Behavior on scale { NumberAnimation { duration: barSlot.magneticAnimationDuration; easing.type: Easing.OutBack; easing.overshoot: 1.18 } }
                 }
                 HoverHandler {
                     id: magneticHover

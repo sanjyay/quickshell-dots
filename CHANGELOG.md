@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-09
+
+### Privacy And Media Widgets
+
+- Added Lenovo LOQ camera kill-switch monitoring through the Ideapad extra buttons input device.
+- Updated camera and microphone privacy colors so inactive states use the bar color and active privacy-risk states use red.
+- Removed the camera hover tooltip text while keeping the camera status indicator behavior.
+- Made the volume widget interactive with mouse wheel adjustment and left-drag volume setting.
+
+### App Launcher
+
+- Added persistent application caching at `~/.cache/quickshell/app-launcher/apps.json`.
+- Loaded cached applications immediately on startup and refreshed desktop entries silently in the background.
+- Kept the existing no-cache scanning fallback for first run or missing cache.
+
 ## 2026-07-07
 
 ### System Info Widget

@@ -34,7 +34,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Control center | quick actions, widget toggles, workspace modes, bar style, split controls, animation controls |
 | Pickers | theme, wallpaper, screenshot, and video pickers with Tanzaku, Hearthstone, and Carousel styles |
 | Core widgets | workspaces, volume, System info (CPU/GPU/RAM), battery, power profile, network, Bluetooth, weather, MPRIS, tray, notifications |
-| Privacy tools | microphone mute indicator/toggle and camera status/block toggle |
+| Privacy tools | microphone mute indicator/toggle and Lenovo LOQ camera kill-switch status |
 | Updates | shell update badge, weekly scheduled package update badge, Arch/AUR counter, known-infected AUR safety check |
 | AI usage | Claude, Codex, and OpenCode usage pill with provider switcher and detail panel |
 
@@ -54,7 +54,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | MPRIS | media controls |
 | Notifications | mako history, unread count, clear |
 | System monitors | compact System info widget with CPU/GPU temperatures, CPU/GPU usage, VRAM, and RAM usage |
-| Privacy tools | microphone mute state, active microphone clients, camera status, active camera processes |
+| Privacy tools | microphone mute state, active microphone clients, Lenovo LOQ camera hardware switch status |
 | Speed test | manual Cloudflare speed test in the network panel |
 | Control center | quick toggles, power, Bar Functions fly-out |
 | Bar style | border, shadow, frost, pill radius, top/bottom position |
@@ -88,7 +88,7 @@ Notes:
 
 - `pamixer`, `pactl`, or `wpctl` support the audio and microphone controls. Most PipeWire setups already provide `wpctl`.
 - `bluez-utils` provides `bluetoothctl`, which the Bluetooth widget currently uses.
-- `psmisc` provides `fuser`, used by the camera privacy indicator.
+- Lenovo LOQ camera switch monitoring reads the Ideapad extra buttons input device; if it cannot open the device, add your user to the input group or create a udev rule for that input device.
 - `power-profiles-daemon` is needed for the power-profile widget.
 - `iwd` and `impala` are used by the Wi-Fi panel on classic Omarchy setups. If NetworkManager is active, the panel opens `nmtui` instead.
 - `gpu-screen-recorder` enables the screen-recording widget.
@@ -122,6 +122,7 @@ Common actions:
 - Use the self-update badge when it appears to update this shell from inside the bar.
 - Use the System info widget for quick CPU/GPU temperatures; click it for CPU, GPU, VRAM, and RAM details.
 - Use the network cluster for network, Bluetooth, microphone, and camera privacy controls.
+- The app launcher displays cached applications immediately from `~/.cache/quickshell/app-launcher/apps.json` and silently refreshes the cache in the background.
 - The AI pill shows remaining 5h Codex allowance in the bar. Click it to open the usage panel, which shows the weekly Codex window and other AI providers.
 
 <details>
@@ -129,14 +130,14 @@ Common actions:
 
 | Widget | Left | Middle | Right | Scroll |
 |---|---|---|---|---|
-| Audio | panel | - | mute toggle | volume |
+| Audio | panel / drag to set volume | - | mute toggle | volume |
 | Clock | calendar | - | timezone picker | toggle 24h / 12h |
 | System info | CPU/GPU/RAM panel | - | - | - |
 | Power Profile | panel | - | cycle profile | - |
 | Network | panel | - | open system manager | - |
 | Bluetooth | panel with up to 3 paired devices | - | open Bluetooth manager | - |
 | Microphone | mute toggle | - | - | - |
-| Camera | block / unblock in terminal | - | - | - |
+| Camera | - | - | - | - |
 | AI usage | open quota panel | - | switch provider | - |
 | Weather | panel | - | force refresh | - |
 | Voxtype | cycle model | - | config | - |

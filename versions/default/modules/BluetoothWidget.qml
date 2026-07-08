@@ -18,6 +18,9 @@ Item {
     readonly property string tooltipText: connected
         ? "Bluetooth · " + numConnected + " connected"
         : (btOn ? "Bluetooth on" : "Bluetooth off")
+    readonly property color contentColor: connected
+        ? root.seal
+        : (btOn ? root.seal : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.3))
 
     readonly property bool shown: true
     visible: implicitWidth > 0.5
@@ -46,9 +49,7 @@ Item {
         IconText {
             anchors.verticalCenter: parent.verticalCenter
             text: IconMap.icon(rootMod.iconN)
-            color: rootMod.connected
-                ? root.seal
-                : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, rootMod.btOn ? 0.7 : 0.3)
+            color: rootMod.contentColor
             font.pixelSize: 14
             Behavior on color { ColorAnimation { duration: 200 } }
         }
@@ -57,7 +58,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             visible: rootMod.connected
             text: String(rootMod.numConnected)
-            color: root.seal
+            color: rootMod.contentColor
             font.family: root.mono
             font.pixelSize: 12
         }
