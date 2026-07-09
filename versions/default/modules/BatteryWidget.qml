@@ -53,6 +53,8 @@ Item {
 
     implicitWidth:  shown ? (row.implicitWidth + 18) : 0
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
     visible: implicitWidth > 0.5
     opacity: shown ? 1 : 0
 

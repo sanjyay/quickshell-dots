@@ -68,6 +68,8 @@ Item {
     visible: implicitWidth > 0.5
     implicitWidth: root.modMpris ? (active ? (row.implicitWidth + 18) : (idleNote.implicitWidth + 16)) : 0
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
     opacity: root.modMpris ? 1 : 0
 
     Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }

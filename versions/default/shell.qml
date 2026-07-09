@@ -199,8 +199,8 @@ ShellRoot {
             && !root.isActivePopupScreenName(targetScreen.name)
     }
 
-    component DynamicIslandOverlay: PanelWindow {
-        id: islandWindow
+    component PulseOverlay: PanelWindow {
+        id: pulseWindow
 
         required property var root
         required property var targetScreen
@@ -213,16 +213,16 @@ ShellRoot {
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.focusable: false
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-        WlrLayershell.namespace: "quickshell-dynamic-island"
-        mask: Region { item: island }
+        WlrLayershell.namespace: "quickshell-pulse"
+        mask: Region { item: pulse }
 
-        DynamicIsland {
-            id: island
+        Pulse {
+            id: pulse
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             anchors.topMargin: 7
-            root: islandWindow.root
-            cameraSwitch: islandWindow.root.cameraSwitch
+            root: pulseWindow.root
+            cameraSwitch: pulseWindow.root.cameraSwitch
         }
     }
 
@@ -262,7 +262,7 @@ ShellRoot {
         model: root.barScreens
 
         delegate: Component {
-            DynamicIslandOverlay {
+            PulseOverlay {
                 required property var modelData
 
                 root: theme

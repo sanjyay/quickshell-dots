@@ -63,6 +63,8 @@ Item {
     // mirror the connection type for status text; it must not gate the toggle.
     Binding { target: rootMod.root; property: "networkMode"; value: rootMod.mode }
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
 
     Rectangle {
         x: 0; anchors.verticalCenter: parent.verticalCenter

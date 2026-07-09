@@ -34,6 +34,8 @@ Item {
     visible: rootMod.showToday || implicitWidth > 0.5
     implicitWidth: rootMod.showToday ? 26 : 0
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
     opacity: rootMod.showToday ? 1 : 0
     Behavior on implicitWidth { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
     Behavior on opacity { NumberAnimation { duration: 120 } }

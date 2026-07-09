@@ -9,7 +9,7 @@ Item {
 
     width: pill.width
     height: 44
-    visible: root.enableDynamicIsland && reveal > 0.01
+    visible: root.enablePulse && reveal > 0.01
     opacity: reveal
     scale: 0.94 + reveal * 0.06
     z: 80
@@ -17,20 +17,18 @@ Item {
     property real reveal: 0
     property string title: ""
     property string detail: ""
-    property int lastVolume: -1
     property string lastTrack: ""
     property bool lastMicLive: false
     property bool lastCameraBlocked: false
     property int lastBrightness: -1
 
-    AudioData { id: audio; poll: true }
     MprisSelect { id: mpris }
 
     Behavior on reveal { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
     Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
     function flash(t, d) {
-        if (!root.enableDynamicIsland) return
+        if (!root.enablePulse) return
         title = t
         detail = d
         reveal = 1
@@ -45,18 +43,6 @@ Item {
     }
 
     Connections {
-        target: audio
-        function onVolumeChanged() {
-            if (island.lastVolume >= 0 && Math.abs(audio.volume - island.lastVolume) > 0)
-                island.flash(audio.muted ? "Volume muted" : "Volume", audio.volume + "%")
-            island.lastVolume = audio.volume
-        }
-        function onMutedChanged() {
-            island.flash(audio.muted ? "Volume muted" : "Volume", audio.volume + "%")
-        }
-    }
-
-    Connections {
         target: mpris
         function onPlayerChanged() { island.checkTrack() }
         function onActiveChanged() { island.checkTrack() }
@@ -64,7 +50,7 @@ Item {
 
     Timer {
         interval: 1200
-        running: root.enableDynamicIsland
+        running: root.enablePulse
         repeat: true
         triggeredOnStart: true
         onTriggered: island.checkTrack()
@@ -117,7 +103,7 @@ Item {
 
     Timer {
         interval: 2000
-        running: root.enableDynamicIsland
+        running: root.enablePulse
         repeat: true
         triggeredOnStart: true
         onTriggered: {

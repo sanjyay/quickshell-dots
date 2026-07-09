@@ -13,6 +13,8 @@ Item {
     visible: updateAvailable && !checking
     implicitWidth: visible ? 20 : 0
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
 
 
     readonly property string tooltipText: "Omarchy update available"

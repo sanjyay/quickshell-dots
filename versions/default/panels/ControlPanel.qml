@@ -524,7 +524,7 @@ PanelWindow {
                 }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Battery";     visible: root.hasBattery; active: root.modBattery; onActivated: root.modBattery = !root.modBattery }
             }
-            Tile { width: parent.width; label: "Dynamic island"; active: root.enableDynamicIsland; onActivated: root.enableDynamicIsland = !root.enableDynamicIsland }
+            Tile { width: parent.width; label: "Pulse"; active: root.enablePulse; onActivated: root.enablePulse = !root.enablePulse }
             Grid {
                 width: parent.width
                 columns: 2

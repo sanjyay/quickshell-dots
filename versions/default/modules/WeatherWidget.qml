@@ -28,6 +28,8 @@ Item {
 
     implicitWidth: root.modWeather ? ico.implicitWidth : 0
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
 
     function refresh(force) {
         if (weatherProc.running) {

@@ -12,6 +12,8 @@ Item {
     visible: silenced
     implicitWidth: silenced ? 20 : 0
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
 
 
     readonly property string tooltipText: "Notifications silenced"

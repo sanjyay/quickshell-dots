@@ -20,6 +20,8 @@ Item {
     visible: displayIcon !== ""
     implicitWidth: visible ? 20 : 0
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
 
 
     readonly property string tooltipText: hint !== "" ? hint : (state === "recording" ? "Voxtype recording" : "Voxtype transcribing")

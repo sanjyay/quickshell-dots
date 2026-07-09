@@ -9,6 +9,8 @@ Item {
     visible: implicitWidth > 0.5
     implicitWidth: root.modMemory ? row.implicitWidth + 18 : 0
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
     opacity: root.modMemory ? 1 : 0
 
     Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }

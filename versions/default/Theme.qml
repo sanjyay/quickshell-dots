@@ -26,7 +26,7 @@ Item {
     property color color03: "#c8b36a"   // colors.toml color3
     property color sealRaw:    "#c4746e"
     property color accentHint: sealRaw    // filled by palette; default = same as red
-    property bool enableDynamicIsland: true
+    property bool enablePulse: true
     property string barColor: "red"
 
     readonly property color baseSeal: barColorValue(barColor)
@@ -923,7 +923,7 @@ Item {
     }
     onArchUpdateScheduleActiveChanged: if (_widgetsLoaded) saveWidgets()
     onArchUpdateCompletedDateChanged: if (_widgetsLoaded) saveWidgets()
-    onEnableDynamicIslandChanged: if (_widgetsLoaded) saveWidgets()
+    onEnablePulseChanged: if (_widgetsLoaded) saveWidgets()
 
     readonly property var archUpdateDayOptions: [
         { id: "monday",    label: "Mon", index: 1 },
@@ -1008,7 +1008,7 @@ Item {
                  + (modPrivacyCamera ? "1" : "0") + " "   // +28 camera privacy pill
                  + "0 "                                    // +29 reserved cache field
                  + "0 "                                    // +30 reserved cache field
-                 + (enableDynamicIsland ? "1" : "0") + " " // +31 dynamic island
+                 + (enablePulse ? "1" : "0") + " "         // +31 pulse
                  + archUpdateCompletedDate                 // +32 scheduled updater completed date
         widgetSaveProc.command = ["bash", "-c",
             "echo '" + line + "' > '" + widgetsCachePath + "'"]
@@ -1213,7 +1213,7 @@ Item {
                     else theme.modPrivacyMic = theme.modPrivacy
                     if (parts.length > wsField + 28) theme.modPrivacyCamera = parts[wsField + 28] !== "0"
                     else theme.modPrivacyCamera = theme.modPrivacy
-                    if (parts.length > wsField + 31) theme.enableDynamicIsland = parts[wsField + 31] !== "0"
+                    if (parts.length > wsField + 31) theme.enablePulse = parts[wsField + 31] !== "0"
                     if (parts.length > wsField + 32) theme.archUpdateCompletedDate = parts[wsField + 32]
                 }
                 theme._widgetsLoaded = true

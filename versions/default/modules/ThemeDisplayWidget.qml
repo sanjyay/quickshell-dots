@@ -8,6 +8,8 @@ Item {
 
     implicitWidth: 22
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
 
     UiText {
         anchors.centerIn: parent

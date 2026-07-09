@@ -37,7 +37,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Privacy tools | microphone mute indicator/toggle and Lenovo LOQ camera kill-switch status |
 | Updates | shell update badge, weekly scheduled package update badge, Arch/AUR counter, known-infected AUR safety check |
 | AI usage | Claude, Codex, and OpenCode usage pill with provider switcher and detail panel |
-| Dynamic Island | top-center overlay for volume, brightness, media, microphone, and camera changes, visible even when the bar is hidden by fullscreen |
+| Pulse | top-center overlay for brightness, media, microphone, and camera changes, visible even when the bar is hidden by fullscreen |
 
 <details>
 <summary>Full feature list</summary>
@@ -61,7 +61,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Bar style | border, shadow, frost, pill radius, top/bottom position |
 | Split groups | positional pill splits + Stream, Surge, Bolt, Bolt 2 gap animations |
 | Magnetic hover | subtle pointer-only pill scale and neighbor pull animation without layout reflow |
-| Dynamic Island | independent top overlay for short-lived system events, visible during fullscreen because it is not inside the bar window |
+| Pulse | independent top overlay for short-lived system events, visible during fullscreen because it is not inside the bar window |
 | Keybind IPC | `qs -c bar ipc call picker theme\|wallpaper\|screenshots\|videos` |
 | Per-widget panels | click widget to open its popup |
 

@@ -8,6 +8,8 @@ Item {
 
     implicitWidth: logoContentWidth + logoPadding
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
 
     readonly property bool logoIconMode: root.launcherLogoMode === "icon"
     readonly property bool hyprlandLogo: !logoIconMode && root.launcherLogoText === "hyprland"

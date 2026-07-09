@@ -8,6 +8,8 @@ Item {
 
     implicitWidth: trayRow.implicitWidth
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
     visible: trayRow.implicitWidth > 0
 
     function toggleHide(item) {
@@ -28,6 +30,8 @@ Item {
 
                 implicitWidth: 24
                 implicitHeight: 28
+                width: implicitWidth
+                height: implicitHeight
                 visible: root.trayPinned.indexOf(modelData.id) >= 0
 
                 Image {
@@ -68,6 +72,8 @@ Item {
             id: toggleBtn
             implicitWidth: 22
             implicitHeight: 28
+            width: implicitWidth
+            height: implicitHeight
             visible: hiddenCount > 0
 
             // count CURRENTLY-EXISTING tray items that are not pinned (= hidden behind this

@@ -36,6 +36,8 @@ Item {
     visible: shown
     implicitWidth: shown ? row.implicitWidth + 12 : 0
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
     opacity: shown ? 1 : 0
 
     Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }

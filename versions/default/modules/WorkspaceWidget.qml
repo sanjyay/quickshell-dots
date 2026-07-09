@@ -7,6 +7,8 @@ Item {
 
     implicitWidth: wsRow.implicitWidth
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
 
     // The focused workspace's id ONLY when it's a real (positive) workspace beyond
     // the persist range — else 0. An int signals on value change only, so switching
@@ -87,6 +89,8 @@ Item {
                              : root.workspaceStyle === "magic"   ? (isFocused ? 20 : 18)
                              : (isFocused ? 32 : 16)
                 implicitHeight: 28
+                width: implicitWidth
+                height: implicitHeight
 
                 Behavior on implicitWidth {
                     NumberAnimation { duration: 200; easing.type: Easing.OutCubic }

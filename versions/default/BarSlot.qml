@@ -301,7 +301,6 @@ PanelWindow {
             // own needed width, else minimal⇄compact oscillates.
             property int stage: 0                        // 0 normal · 1 compact · 2 minimal
             readonly property bool showWeather: stage <= 1
-            readonly property bool showDate:    stage === 0
             readonly property bool showIcons:   iconsRow.hasActive
             // needed widths per stage: reactive bindings over the UNCOLLAPSED content
             // (the stage-gated wrapper widths shrink and would mislead the upshift
@@ -311,7 +310,6 @@ PanelWindow {
             readonly property real needCompact: needMinimal
                 + (weather.implicitWidth > 0.5 ? 8 + weather.implicitWidth : 0)
             readonly property real needNormal: needCompact
-                + (dateLabel.implicitWidth > 0.5 ? 8 + dateLabel.implicitWidth : 0)
             function updateStage() {
                 // compact only while G8 actually occupies the center slot: after a
                 // drag swap G8 can sit in a SIDE row — its own width then feeds the
@@ -364,39 +362,7 @@ PanelWindow {
                         root: barSlot.root
                     }
                 }
-                ClockWidget   { id: clock;   root: barSlot.root }
-                Item {                                   // date (stage-gated)
-                    visible: width > 0.5
-                    width: g8.showDate ? dateLabel.implicitWidth : 0
-                    height: 28
-                    clip: true
-                    opacity: g8.showDate ? 1 : 0
-                    Behavior on width   { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-                    Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-                    UiText {
-                        id: dateLabel
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: {
-                            clock.now;
-                            var days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-                            var d = new Date();
-                            return days[d.getDay()] + " " + d.getDate();
-                        }
-                        color: Qt.rgba(barSlot.root.ink.r, barSlot.root.ink.g, barSlot.root.ink.b, 0.5)
-                        font.family: barSlot.root.mono
-                        font.pixelSize: 10
-                        font.letterSpacing: 0.5
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            barSlot.root.activatePopupScreen(barSlot.screen)
-                            barSlot.root.calendarTick++;
-                            barSlot.root.calendarVisible = !barSlot.root.calendarVisible
-                        }
-                    }
-                }
+                ClockWidget   { id: clock; root: barSlot.root; barScreen: barSlot.screen }
                 Item {                                   // indicator icons wrapper (stage-gated)
                     visible: g8.showIcons || width > 0.5
                     width: g8.showIcons ? iconsRow.implicitWidth : 0

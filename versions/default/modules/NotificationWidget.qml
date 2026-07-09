@@ -11,6 +11,8 @@ Item {
 
     implicitWidth: 26
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
 
     IconText {
         id: bellIcon

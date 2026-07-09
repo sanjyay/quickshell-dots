@@ -5,6 +5,7 @@ import Quickshell.Io
 Item {
     id: rootMod
     required property var root
+    property var barScreen: null
 
     property date now: new Date()
 
@@ -23,9 +24,12 @@ Item {
     readonly property var days: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
 
     readonly property string tooltipText: days[now.getDay()] + ", " + now.getDate() + " " + months[now.getMonth()] + " " + now.getFullYear()
+    readonly property string dateStr: days[now.getDay()] + " " + now.getDate()
 
-    implicitWidth: label.implicitWidth
+    implicitWidth: clockRow.implicitWidth
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
 
     Timer {
         interval: 1000
@@ -34,14 +38,28 @@ Item {
         onTriggered: rootMod.now = new Date()
     }
 
-    UiText {
-        id: label
+    Row {
+        id: clockRow
         anchors.centerIn: parent
-        text: rootMod.timeStr
-        color: root.ink
-        font.family: root.mono
-        font.pixelSize: 12
-        font.letterSpacing: 1
+        spacing: 8
+
+        UiText {
+            anchors.verticalCenter: parent.verticalCenter
+            text: rootMod.timeStr
+            color: root.ink
+            font.family: root.mono
+            font.pixelSize: 12
+            font.letterSpacing: 1
+        }
+
+        UiText {
+            anchors.verticalCenter: parent.verticalCenter
+            text: rootMod.dateStr
+            color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.5)
+            font.family: root.mono
+            font.pixelSize: 10
+            font.letterSpacing: 0.5
+        }
     }
 
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
@@ -51,26 +69,53 @@ Item {
         command: ["bash", "-c", "omarchy-launch-floating-terminal-with-presentation omarchy-tz-select 2>/dev/null"]
     }
 
+    function openCalendarPanel() {
+        tip.hide()
+        if (rootMod.barScreen) root.activatePopupScreen(rootMod.barScreen)
+        root.openCalendar()
+    }
+
+    function toggleClockMode() {
+        root.clock12h = !root.clock12h
+    }
+
+    HoverHandler {
+        id: hover
+        cursorShape: Qt.PointingHandCursor
+        onHoveredChanged: hovered ? tip.show() : tip.hide()
+    }
+
+    TapHandler {
+        acceptedButtons: Qt.LeftButton
+        gesturePolicy: TapHandler.WithinBounds
+        grabPermissions: PointerHandler.CanTakeOverFromAnything
+        onTapped: rootMod.openCalendarPanel()
+    }
+
+    TapHandler {
+        acceptedButtons: Qt.RightButton
+        gesturePolicy: TapHandler.WithinBounds
+        grabPermissions: PointerHandler.CanTakeOverFromAnything
+        onTapped: {
+            tip.hide()
+            tzRunner.running = false
+            tzRunner.running = true
+        }
+    }
+
+    WheelHandler {
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        grabPermissions: PointerHandler.CanTakeOverFromAnything
+        onWheel: function(event) {
+            rootMod.toggleClockMode()
+            event.accepted = true
+        }
+    }
+
     MouseArea {
-        id: mouse
         anchors.fill: parent
-        hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onEntered: { tip.show(); }
-        onExited: { tip.hide(); }
-        onClicked: (e) => {
-            if (e.button === Qt.LeftButton) {
-                tip.hide();
-                root.openCalendar();
-            } else if (e.button === Qt.RightButton) {
-                tip.hide();
-                tzRunner.running = false;                // timezone picker (unchanged)
-                tzRunner.running = true;
-            }
-        }
-        onWheel: (wheel) => {
-            root.clock12h = !root.clock12h;              // scroll toggles 24h / 12h
-            wheel.accepted = true;
-        }
+        acceptedButtons: Qt.NoButton
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
     }
 }

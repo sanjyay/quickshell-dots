@@ -12,6 +12,8 @@ Item {
     visible: awake
     implicitWidth: awake ? 20 : 0
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
 
 
     readonly property string tooltipText: "Idle lock disabled"

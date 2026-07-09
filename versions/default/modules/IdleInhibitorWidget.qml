@@ -10,6 +10,8 @@ Item {
 
     implicitWidth: 22
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
 
     readonly property bool on: root.idleInhibited
     readonly property string tooltipText: on ? "Idle inhibited: ON" : "Idle inhibited: OFF"

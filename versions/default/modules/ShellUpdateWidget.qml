@@ -19,6 +19,8 @@ Item {
     visible: updateAvailable
     implicitWidth: updateAvailable ? 20 : 0
     implicitHeight: 28
+    width: implicitWidth
+    height: implicitHeight
 
 
     readonly property string tooltipText: {
