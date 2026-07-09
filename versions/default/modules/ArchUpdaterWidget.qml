@@ -29,7 +29,7 @@ Item {
     readonly property int badgeCount: rootMod.packageBadgeCount + rootMod.themeBadgeCount
     readonly property bool hasBadge: rootMod.badgeCount > 0
     readonly property bool hasNotice: rootMod.hasUpdates || rootMod.hasThemeUpdates || root.themeUpdLocalEdits > 0
-    readonly property bool showToday: rootMod.hasNotice || rootMod.refreshing || root.archVisible
+    readonly property bool showToday: rootMod.hasNotice || root.archVisible
 
     visible: rootMod.showToday || implicitWidth > 0.5
     implicitWidth: rootMod.showToday ? 26 : 0
@@ -86,6 +86,10 @@ Item {
     }
 
     function doRefresh() {
+        rootMod.systemCount = 0
+        rootMod.aurCount = 0
+        rootMod.updateCount = 0
+        root.archUpdates = []
         var cmd = [
             "bash", "-c",
             // checkupdates (temp-synced DB, no root, no partial-upgrade risk) sees
@@ -120,6 +124,11 @@ Item {
         rootMod.updateCount = sysCount + aCount
         root.archUpdates = updates
         root.archUpdateScheduleActive = updates.length > 0
+        if (updates.length > 0) {
+            root.archUpdateCompletedDate = ""
+        } else if (root.currentWeekday === root.archUpdateDayIndex(root.archUpdateDay)) {
+            root.archUpdateCompletedDate = root.currentDateKey
+        }
         if (updates.length > 0 || !root.archUpdateDue) {
             rootMod.retryCount = 0
             retryTimer.stop()

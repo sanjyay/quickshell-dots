@@ -491,6 +491,7 @@ Item {
     }
 
     function openCalendar() {
+        activateFocusedPopupScreen();
         calendarMonthOffset = 0;
         calendarTick++;
         selectedDay = (new Date()).getDate();
@@ -880,6 +881,7 @@ Item {
     property bool   clock12h:        false   // false = 24h, true = 12h (AM/PM)
     property string archUpdateDay:   "friday" // weekday when the package update pill is shown
     property bool   archUpdateScheduleActive: false // keep the pill visible after scheduled updates are found
+    property string archUpdateCompletedDate: ""
 
     // ── widget/workspace state persistence ──
     readonly property string widgetsCachePath: Quickshell.env("HOME") + "/.cache/quickshell_widgets"
@@ -915,8 +917,12 @@ Item {
     onStyleRadiusSmallChanged: if (_widgetsLoaded) saveWidgets()
     onWorkspaceStyleChanged:   if (_widgetsLoaded) saveWidgets()
     onBarPositionChanged:      if (_widgetsLoaded) saveWidgets()
-    onArchUpdateDayChanged:    if (_widgetsLoaded) saveWidgets()
+    onArchUpdateDayChanged: {
+        archUpdateCompletedDate = ""
+        if (_widgetsLoaded) saveWidgets()
+    }
     onArchUpdateScheduleActiveChanged: if (_widgetsLoaded) saveWidgets()
+    onArchUpdateCompletedDateChanged: if (_widgetsLoaded) saveWidgets()
     onEnableDynamicIslandChanged: if (_widgetsLoaded) saveWidgets()
 
     readonly property var archUpdateDayOptions: [
@@ -929,16 +935,26 @@ Item {
         { id: "sunday",    label: "Sun", index: 0 }
     ]
     property int currentWeekday: new Date().getDay()
+    property string currentDateKey: dateKey(new Date())
     readonly property bool archUpdateDue: currentWeekday === archUpdateDayIndex(archUpdateDay)
+        && archUpdateCompletedDate !== currentDateKey
 
     Timer {
         interval: 3600000
         running: true
         repeat: true
         triggeredOnStart: true
-        onTriggered: theme.currentWeekday = new Date().getDay()
+        onTriggered: {
+            var now = new Date()
+            theme.currentWeekday = now.getDay()
+            theme.currentDateKey = theme.dateKey(now)
+        }
     }
 
+    function dateKey(d) {
+        function pad2(n) { return n < 10 ? "0" + n : String(n) }
+        return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate())
+    }
     function archUpdateDayIndex(id) {
         for (var i = 0; i < archUpdateDayOptions.length; i++)
             if (archUpdateDayOptions[i].id === id) return archUpdateDayOptions[i].index
@@ -992,7 +1008,8 @@ Item {
                  + (modPrivacyCamera ? "1" : "0") + " "   // +28 camera privacy pill
                  + "0 "                                    // +29 reserved cache field
                  + "0 "                                    // +30 reserved cache field
-                 + (enableDynamicIsland ? "1" : "0")      // +31 dynamic island
+                 + (enableDynamicIsland ? "1" : "0") + " " // +31 dynamic island
+                 + archUpdateCompletedDate                 // +32 scheduled updater completed date
         widgetSaveProc.command = ["bash", "-c",
             "echo '" + line + "' > '" + widgetsCachePath + "'"]
         widgetSaveProc.running = false
@@ -1197,6 +1214,7 @@ Item {
                     if (parts.length > wsField + 28) theme.modPrivacyCamera = parts[wsField + 28] !== "0"
                     else theme.modPrivacyCamera = theme.modPrivacy
                     if (parts.length > wsField + 31) theme.enableDynamicIsland = parts[wsField + 31] !== "0"
+                    if (parts.length > wsField + 32) theme.archUpdateCompletedDate = parts[wsField + 32]
                 }
                 theme._widgetsLoaded = true
             }
