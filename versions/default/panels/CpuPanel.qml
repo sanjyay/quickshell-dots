@@ -30,6 +30,8 @@ PanelWindow {
     property int gpuTemp: 0
     property int gpuMemUsed: 0
     property int gpuMemTotal: 0
+    property bool gpuMemAvailable: false
+    property string gpuSource: ""
     property var gpuHistory: []
     readonly property bool hasGpu: gpuDriver !== "" && gpuDriver !== "none"
     property int ramPct: 0
@@ -52,7 +54,12 @@ PanelWindow {
     }
 
     function vramPct() {
-        return gpuMemTotal > 0 ? Math.max(0, Math.min(100, Math.round(gpuMemUsed * 100 / gpuMemTotal))) : 0
+        return gpuMemAvailable && gpuMemTotal > 0 ? Math.max(0, Math.min(100, Math.round(gpuMemUsed * 100 / gpuMemTotal))) : 0
+    }
+    function gpuProbeCommand(debug) {
+        return "p=\"$HOME/.config/quickshell/bar/modules/qs-gpu-probe.sh\"; " +
+               "[ -x \"$p\" ] || p=\"versions/default/modules/qs-gpu-probe.sh\"; " +
+               "\"$p\"" + (debug ? " --debug" : "")
     }
 
     property real reveal: root.cpuVisible ? 1 : 0
@@ -164,9 +171,9 @@ PanelWindow {
                     secondary: cpuPanel.hasGpu ? cpuPanel.gpuUtil + "%" : "offline"
                     history: cpuPanel.gpuHistory
                     bottomLabel: "VRAM"
-                    bottomText: cpuPanel.gpuMemTotal > 0
+                    bottomText: cpuPanel.gpuMemAvailable && cpuPanel.gpuMemTotal > 0
                                 ? cpuPanel.mibToGib(cpuPanel.gpuMemUsed) + " / " + cpuPanel.mibToGib(cpuPanel.gpuMemTotal) + " GiB"
-                                : "0.0 / 0.0 GiB"
+                                : "--"
                     bottomPercent: cpuPanel.vramPct()
                 }
 
@@ -457,21 +464,14 @@ PanelWindow {
             "  [ \"$v\" -gt \"$best\" ] 2>/dev/null && best=$v; " +
             "done; echo \"$best\"; }; echo CPU_TEMP $(cpu_temp); " +
             "awk '/MemTotal:/ {t=$2} /MemAvailable:/ {a=$2} END{u=t-a; printf \"RAM %.0f %.0f %.0f\\n\", u, t, (t>0?u*100/t:0)}' /proc/meminfo; " +
-            "if command -v nvidia-smi >/dev/null 2>&1; then " +
-            "  nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null | " +
-            "  awk -F', ' '{printf \"GPU %s %s %s %s\\n\", $1, $2, $3, $4}'; " +
-            "elif [ -f /sys/class/drm/card0/device/gpu_busy_percent ]; then " +
-            "  read p < /sys/class/drm/card0/device/gpu_busy_percent; " +
-            "  t=$(cat /sys/class/drm/card0/device/hwmon/hwmon*/temp1_input 2>/dev/null | head -1); " +
-            "  [ -n \"$t\" ] && [ \"$t\" -gt 1000 ] 2>/dev/null && t=$((t/1000)); echo \"GPU $p ${t:-0} 0 0\"; " +
-            "elif [ -f /sys/class/hwmon/hwmon2/device/gpu_busy_percent ]; then " +
-            "  read p < /sys/class/hwmon/hwmon2/device/gpu_busy_percent; echo \"GPU $p 0 0 0\"; " +
-            "fi"
+            cpuPanel.gpuProbeCommand(false)
         ]
         stdout: StdioCollector {
             onStreamFinished: {
                 var lines = this.text.trim().split("\n")
                 cpuPanel.gpuDriver = ""
+                cpuPanel.gpuSource = ""
+                cpuPanel.gpuMemAvailable = false
                 for (var i = 0; i < lines.length; i++) {
                     var parts = lines[i].trim().split(/\s+/)
                     if (parts[0] === "CPU_PCT" && parts.length >= 2) {
@@ -485,12 +485,13 @@ PanelWindow {
                         cpuPanel.ramUsedGiB = usedKB / (1024 * 1024)
                         cpuPanel.ramTotalGiB = totalKB / (1024 * 1024)
                         cpuPanel.ramPct = Math.max(0, Math.min(100, Math.round(parseFloat(parts[3]) || 0)))
-                    } else if (parts[0] === "GPU" && parts.length >= 2) {
-                        cpuPanel.gpuDriver = "detected"
-                        cpuPanel.gpuUtil = parseInt(parts[1]) || 0
-                        cpuPanel.gpuTemp = parseInt(parts[2]) || 0
-                        cpuPanel.gpuMemUsed = parseInt(parts[3]) || 0
-                        cpuPanel.gpuMemTotal = parseInt(parts[4]) || 0
+                    } else if (parts[0] === "GPU" && parts.length >= 6) {
+                        cpuPanel.gpuDriver = parts[1]
+                        cpuPanel.gpuUtil = parts[2] === "--" ? 0 : (parseInt(parts[2]) || 0)
+                        cpuPanel.gpuTemp = parts[3] === "--" ? 0 : (parseInt(parts[3]) || 0)
+                        cpuPanel.gpuMemAvailable = parts[4] !== "--" && parts[5] !== "--"
+                        cpuPanel.gpuMemUsed = cpuPanel.gpuMemAvailable ? (parseInt(parts[4]) || 0) : 0
+                        cpuPanel.gpuMemTotal = cpuPanel.gpuMemAvailable ? (parseInt(parts[5]) || 0) : 0
                         cpuPanel.gpuHistory = cpuPanel.pushSample(cpuPanel.gpuHistory, cpuPanel.gpuUtil)
                     }
                 }

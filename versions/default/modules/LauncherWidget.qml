@@ -9,7 +9,6 @@ Item {
     implicitWidth: logoContentWidth + logoPadding
     implicitHeight: 28
 
-    readonly property string tooltipText: "Apps  •  Right click controls"
     readonly property bool logoIconMode: root.launcherLogoMode === "icon"
     readonly property bool hyprlandLogo: !logoIconMode && root.launcherLogoText === "hyprland"
     readonly property bool archTextLogo: !logoIconMode && root.launcherLogoText === "arch"
@@ -30,7 +29,7 @@ Item {
     readonly property real logoImageWidth: archTextLogo ? archWordmarkWidth : Math.round(logoHeight * logoAspect)
     readonly property real logoIconSlotWidth: 16
     readonly property real logoContentWidth: logoIconMode ? logoIconSlotWidth : logoImageWidth
-    readonly property color archBrandTextColor: root.barColorIsAccent ? root.sealRaw : root.accentHint
+    readonly property color archBrandTextColor: root.accentHint
 
     // animated wave phase
     property real phase: 0
@@ -225,22 +224,14 @@ Item {
         }
     }
 
-    TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
-
     MouseArea {
         id: ma
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        acceptedButtons: Qt.LeftButton
         cursorShape: Qt.PointingHandCursor
-        onEntered: tip.show()
-        onExited:  { tip.hide() }
         onClicked: function(mouse) {
-            tip.hide()
-            if (mouse.button === Qt.RightButton)
-                root.controlVisible = !root.controlVisible
-            else
-                root.openAppLauncher()
+            root.controlVisible = !root.controlVisible
         }
     }
 }

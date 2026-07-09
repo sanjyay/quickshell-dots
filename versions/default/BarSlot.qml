@@ -194,7 +194,7 @@ PanelWindow {
     }
     // reset the 3 region models back to the default group order
     function resetOrder() {
-        var dL = ["G1","G2","G3","G4","G5","G6","G7"]
+        var dL = ["G1","G2","G13","G3","G4","G5","G6","G7"]
         var dR = ["G9","G10","G11","G14","G12"]
         for (var i = 0; i < dL.length; i++) leftModel.setProperty(i, "gid", dL[i])
         centerModel.setProperty(0, "gid", "G8")
@@ -204,12 +204,12 @@ PanelWindow {
 
     property var layoutController: ({
         splitAll: function () {
-            island.leftSplits     = [true, true, true, true, true, true]
+            island.leftSplits     = [true, true, true, true, true, true, true]
             island.rightSplits    = [true, true, true, true]
             island.boundarySplits = [true, true]
         },
         mergeAll: function () {
-            island.leftSplits     = [false, false, false, false, false, false]
+            island.leftSplits     = [false, false, false, false, false, false, false]
             island.rightSplits    = [false, false, false, false]
             island.boundarySplits = [false, false]
             barSlot.root.barAnim  = 0
@@ -255,8 +255,9 @@ PanelWindow {
     // ─────────────────────────── group registry ───────────────────────────
     Component { id: compLauncher;  LauncherWidget  { root: barSlot.root } }
     Component { id: compWorkspace; WorkspaceWidget { root: barSlot.root } }
+    Component { id: compArch;      ArchUpdaterWidget { root: barSlot.root } }
     Component {
-        id: compStatus                                   // G3: arch · tray · notif
+        id: compStatus                                   // G3: tray · notif
         Item {
             visible: implicitWidth > 0.5
             implicitWidth: barSlot.root.modStatus ? Math.round(statusRow.implicitWidth) + 10 : 0
@@ -275,7 +276,6 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 x: Math.round((parent.width - width) / 2)
                 spacing: 6
-                ArchUpdaterWidget  { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
                 TrayWidget         { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
                 NotificationWidget { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
             }
@@ -453,7 +453,7 @@ PanelWindow {
     Component { id: compBattery;    BatteryWidget      { root: barSlot.root } }
 
     readonly property var registry: ({
-        "G1": compLauncher, "G2": compWorkspace, "G3": compStatus,
+        "G1": compLauncher, "G2": compWorkspace, "G13": compArch, "G3": compStatus,
         "G4": compMem, "G5": compCpu, "G6": compVol, "G7": compClaude,
         "G8": compCenter,
         "G9": compMpris, "G10": compQuick, "G11": compNetwork,
@@ -671,7 +671,7 @@ PanelWindow {
         }
 
         // ── split state (positional, per within-region gap) ──
-        property var leftSplits:  [false, false, false, false, false, false]   // gaps in leftModel
+        property var leftSplits:  [false, false, false, false, false, false, false]   // gaps in leftModel
         property var rightSplits: [false, false, false, false]   // gaps in rightModel
         property var boundarySplits: [false, false]   // [left↔center, center↔right]
 
@@ -710,7 +710,6 @@ PanelWindow {
             // AI usage (G7) and now playing (G9) visible when their toggles are on.
             if (stage >= 1 && (gid === "G10" || gid === "G14")) return false
             if (stage >= 2 && gid === "G3") return false
-            if (stage >= 3 && gid === "G11") return false
             return true
         }
         function sideNaturalWidth(row, stage) {
@@ -881,9 +880,9 @@ PanelWindow {
         // ── region models (physical L→R order) ──
         ListModel {
             id: leftModel
-            ListElement { gid: "G1" } ListElement { gid: "G2" } ListElement { gid: "G3" }
-            ListElement { gid: "G4" } ListElement { gid: "G5" } ListElement { gid: "G6" }
-            ListElement { gid: "G7" }
+            ListElement { gid: "G1" } ListElement { gid: "G2" } ListElement { gid: "G13" }
+            ListElement { gid: "G3" } ListElement { gid: "G4" } ListElement { gid: "G5" }
+            ListElement { gid: "G6" } ListElement { gid: "G7" }
         }
         ListModel { id: centerModel; ListElement { gid: "G8" } }
         ListModel {
@@ -950,7 +949,7 @@ PanelWindow {
                 cpu:          island.groupX("G5",  0.5),
                 ai:           island.groupX("G7",  0.5),
                 workspace:    island.groupX("G2",  0.5),
-                arch:         island.groupX("G3",  0.5),
+                arch:         island.groupX("G13", 0.5),
                 bluetooth:    island.groupX("G11", 0.5),
                 power:        island.groupX("G14", 0.5),
                 mpris:        island.groupX("G9",  0.5),

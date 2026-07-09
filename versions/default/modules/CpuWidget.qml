@@ -24,6 +24,11 @@ Item {
     function tempText(v, withC) {
         return v > 0 ? (v + "\u00B0" + (withC ? "C" : "")) : "--\u00B0"
     }
+    function gpuProbeCommand() {
+        return "p=\"$HOME/.config/quickshell/bar/modules/qs-gpu-probe.sh\"; " +
+               "[ -x \"$p\" ] || p=\"versions/default/modules/qs-gpu-probe.sh\"; " +
+               "\"$p\""
+    }
 
     Rectangle {
         x: 0; anchors.verticalCenter: parent.verticalCenter
@@ -102,20 +107,19 @@ Item {
             "  echo \"$label $name\" | grep -Eiq 'cpu|package|tctl|tdie|core 0' && { echo \"$v\"; return; }; " +
             "  [ \"$v\" -gt \"$best\" ] 2>/dev/null && best=$v; " +
             "done; echo \"$best\"; }; " +
-            "gpu_temp(){ if command -v nvidia-smi >/dev/null 2>&1; then " +
-            "  nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits 2>/dev/null | head -1; return; fi; " +
-            "for f in /sys/class/drm/card*/device/hwmon/hwmon*/temp*_input /sys/class/hwmon/hwmon*/temp*_input; do " +
-            "  [ -r \"$f\" ] || continue; dir=${f%/*}; name=$(cat \"$dir/name\" 2>/dev/null); " +
-            "  echo \"$name\" | grep -Eiq 'amdgpu|nvidia|nouveau' || continue; " +
-            "  v=$(cat \"$f\" 2>/dev/null); [ \"$v\" -gt 1000 ] 2>/dev/null && v=$((v/1000)); echo \"$v\"; return; " +
-            "done; echo 0; }; " +
-            "echo CPU_TEMP $(cpu_temp); echo GPU_TEMP $(gpu_temp)"
+            "echo CPU_TEMP $(cpu_temp); " +
+            rootMod.gpuProbeCommand()
         ]
         stdout: StdioCollector {
             onStreamFinished: {
                 var lines = this.text.trim().split("\n")
                 for (var i = 0; i < lines.length; i++) {
                     var parts = lines[i].trim().split(/\s+/)
+                    if (parts[0] === "GPU" && parts.length >= 4) {
+                        rootMod.hasGpu = parts[1] !== "none"
+                        rootMod.gpuTemp = parts[3] === "--" ? 0 : Math.max(0, parseInt(parts[3]) || 0)
+                        continue
+                    }
                     var v = parseInt(parts[1])
                     if (isNaN(v)) continue
                     if (parts[0] === "CPU_PCT") {
@@ -126,9 +130,6 @@ Item {
                         rootMod.history = h
                     } else if (parts[0] === "CPU_TEMP") {
                         rootMod.cpuTemp = Math.max(0, v)
-                    } else if (parts[0] === "GPU_TEMP") {
-                        rootMod.gpuTemp = Math.max(0, v)
-                        rootMod.hasGpu = rootMod.gpuTemp > 0
                     }
                 }
             }

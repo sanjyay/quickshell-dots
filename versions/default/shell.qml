@@ -199,6 +199,33 @@ ShellRoot {
             && !root.isActivePopupScreenName(targetScreen.name)
     }
 
+    component DynamicIslandOverlay: PanelWindow {
+        id: islandWindow
+
+        required property var root
+        required property var targetScreen
+
+        screen: targetScreen
+        color: "transparent"
+        anchors { top: true; left: true; right: true }
+        implicitHeight: 58
+        exclusionMode: ExclusionMode.Ignore
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.focusable: false
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        WlrLayershell.namespace: "quickshell-dynamic-island"
+        mask: Region { item: island }
+
+        DynamicIsland {
+            id: island
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: 7
+            root: islandWindow.root
+            cameraSwitch: islandWindow.root.cameraSwitch
+        }
+    }
+
     Variants {
         model: root.barScreens
 
@@ -223,6 +250,19 @@ ShellRoot {
 
         delegate: Component {
             PopupDismissLayer {
+                required property var modelData
+
+                root: theme
+                targetScreen: modelData
+            }
+        }
+    }
+
+    Variants {
+        model: root.barScreens
+
+        delegate: Component {
+            DynamicIslandOverlay {
                 required property var modelData
 
                 root: theme

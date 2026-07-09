@@ -16,9 +16,12 @@ Item {
         return Math.round(p <= 1.0 ? p * 100 : p)
     }
     readonly property int devState: dev ? dev.state : UPowerDeviceState.Unknown
+    property int lowBatteryThreshold: 20
+    property int chargingAnimationSpeed: 1400
     readonly property bool charging: devState === UPowerDeviceState.Charging
-    readonly property bool full:     devState === UPowerDeviceState.FullyCharged
-    readonly property bool low:      hasBattery && !charging && !full && percent <= 20
+    readonly property bool full:     hasBattery && (devState === UPowerDeviceState.FullyCharged || percent >= 100)
+    readonly property int displayPercent: full ? 100 : percent
+    readonly property bool low:      hasBattery && !charging && !full && percent <= lowBatteryThreshold
 
     // live time estimates from UPower (seconds); 0 when unknown / not applicable
     readonly property real timeToEmpty: dev ? dev.timeToEmpty : 0
@@ -36,7 +39,7 @@ Item {
         : charging ? "Charging"
         : devState === UPowerDeviceState.Discharging ? "Discharging"
         : "On battery"
-    readonly property string tooltipText: statusText + " · " + percent + "%"
+    readonly property string tooltipText: statusText + " · " + displayPercent
                                           + (timeText ? " · " + timeText : "")
 
     // colour shared by the drawn battery body, fill and nub
@@ -75,32 +78,49 @@ Item {
         // drawn landscape battery — body + stepless fill + terminal nub
         Item {
             id: batt
-            width: 36
-            height: 14
+            width: 41
+            height: 16
             anchors.verticalCenter: parent.verticalCenter
 
-            readonly property real ratio: Math.max(0, Math.min(1, rootMod.percent / 100))
+            readonly property real ratio: Math.max(0, Math.min(1, rootMod.displayPercent / 100))
 
-            // low-battery warning: the icon slowly pulses below 20% (not while charging)
+            // State animations stay on the icon only: lightweight and easy to tune.
             property real pulse: 1.0
+            property real chargeGlow: 0.0
+            property real fullGlow: 0.0
             opacity: rootMod.low ? pulse : 1.0
             SequentialAnimation {
                 running: rootMod.shown && rootMod.low   // defensive: never animate while hidden / batteryless
                 loops: Animation.Infinite
-                NumberAnimation { target: batt; property: "pulse"; from: 1.0; to: 0.3; duration: 1100; easing.type: Easing.InOutSine }
-                NumberAnimation { target: batt; property: "pulse"; from: 0.3; to: 1.0; duration: 1100; easing.type: Easing.InOutSine }
+                NumberAnimation { target: batt; property: "pulse"; from: 1.0; to: 0.45; duration: 950; easing.type: Easing.InOutSine }
+                NumberAnimation { target: batt; property: "pulse"; from: 0.45; to: 1.0; duration: 950; easing.type: Easing.InOutSine }
+            }
+            SequentialAnimation {
+                running: rootMod.shown && rootMod.charging && !rootMod.full
+                loops: Animation.Infinite
+                NumberAnimation { target: batt; property: "chargeGlow"; from: 0.18; to: 0.42; duration: rootMod.chargingAnimationSpeed; easing.type: Easing.InOutSine }
+                NumberAnimation { target: batt; property: "chargeGlow"; from: 0.42; to: 0.18; duration: rootMod.chargingAnimationSpeed; easing.type: Easing.InOutSine }
+            }
+            SequentialAnimation {
+                running: rootMod.shown && rootMod.full
+                loops: Animation.Infinite
+                NumberAnimation { target: batt; property: "fullGlow"; from: 0.12; to: 0.26; duration: 1800; easing.type: Easing.InOutSine }
+                NumberAnimation { target: batt; property: "fullGlow"; from: 0.26; to: 0.12; duration: 1800; easing.type: Easing.InOutSine }
             }
 
             Rectangle {
                 id: body
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                width: 32
-                height: 13
-                radius: 2.5
-                color: "transparent"
+                width: 36
+                height: 15
+                radius: 3
+                color: rootMod.full
+                    ? Qt.rgba(root.seal.r, root.seal.g, root.seal.b, batt.fullGlow)
+                    : (rootMod.charging ? Qt.rgba(root.indigo.r, root.indigo.g, root.indigo.b, batt.chargeGlow) : "transparent")
                 border.width: 1.2
                 border.color: rootMod.battColor
+                Behavior on color { ColorAnimation { duration: 180 } }
                 Behavior on border.color { ColorAnimation { duration: 200 } }
 
                 // faint indigo wash so a charging cell reads "active" at any level
@@ -138,20 +158,20 @@ Item {
                         SequentialAnimation on pos {
                             running: rootMod.charging && !rootMod.full
                             loops: Animation.Infinite
-                            NumberAnimation { from: 0; to: 1; duration: 1100; easing.type: Easing.InOutSine }
-                            PauseAnimation { duration: 500 }
+                            NumberAnimation { from: 0; to: 1; duration: rootMod.chargingAnimationSpeed; easing.type: Easing.InOutSine }
+                            PauseAnimation { duration: Math.round(rootMod.chargingAnimationSpeed * 0.35) }
                         }
                     }
                 }
 
                 UiText {
                     anchors.centerIn: parent
-                    text: rootMod.percent + "%"
-                    color: rootMod.percent >= 45
+                    text: rootMod.displayPercent
+                    color: rootMod.displayPercent >= 45
                         ? root.paper
                         : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.9)
                     font.family: root.mono
-                    font.pixelSize: 8
+                    font.pixelSize: 9
                     font.bold: true
                     Behavior on color { ColorAnimation { duration: 200 } }
                 }
@@ -162,8 +182,8 @@ Item {
                 anchors.left: body.right
                 anchors.leftMargin: -0.5
                 anchors.verticalCenter: parent.verticalCenter
-                width: 3
-                height: 6
+                width: 4
+                height: 7
                 radius: 1.2
                 color: rootMod.battColor
                 Behavior on color { ColorAnimation { duration: 200 } }

@@ -26,6 +26,8 @@ PanelWindow {
     property string sizeText: ""        // total energy capacity in Wh (from sysfs)
     property int    cycles:   0          // charge cycles (from sysfs)
     readonly property bool charging: status === "Charging"
+    readonly property bool full: status === "Full" || status === "Fully charged" || percent >= 100
+    readonly property int displayPercent: full ? 100 : percent
 
     // live time estimates from UPower (seconds); 0 when unknown / not applicable
     readonly property var  dev:         UPower.displayDevice
@@ -105,7 +107,7 @@ PanelWindow {
                 UiText {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.top: parent.top
-                    text: batPanel.percent + "%"
+                    text: batPanel.displayPercent
                     color: batPanel.charging ? root.indigo : root.seal
                     font.family: root.mono; font.pixelSize: 11; font.weight: Font.Medium
                 }
@@ -114,7 +116,7 @@ PanelWindow {
                     width: parent.width; height: 8; radius: 4
                     color: root.fillActive
                     Rectangle {
-                        width: parent.width * batPanel.percent / 100
+                        width: parent.width * batPanel.displayPercent / 100
                         height: parent.height; radius: 4
                         color: batPanel.charging ? root.indigo : root.seal
                         Behavior on width { NumberAnimation { duration: 300 } }

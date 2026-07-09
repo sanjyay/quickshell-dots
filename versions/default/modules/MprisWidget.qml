@@ -293,9 +293,17 @@ Item {
     MouseArea {
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.RightButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         onEntered: { if (rootMod.tooltipText) tip.show() }
         onExited:  { tip.hide() }
-        onClicked: { tip.hide(); root.mprisVisible = !root.mprisVisible }
+        onClicked: function(mouse) {
+            tip.hide()
+            if (mouse.button === Qt.LeftButton) {
+                if (rootMod.player) rootMod.player.togglePlaying()
+                else root.mprisVisible = !root.mprisVisible
+            } else {
+                root.mprisVisible = !root.mprisVisible
+            }
+        }
     }
 }

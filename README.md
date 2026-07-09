@@ -31,12 +31,13 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Area | Highlights |
 |---|---|
 | Bar layout | unlock mode, drag/drop widget groups, persistent order, split groups, magnetic hover, top/bottom position |
-| Control center | quick actions, widget toggles, workspace modes, bar style, split controls, animation controls |
+| Control center | quick actions, widget toggles, workspace modes, bar style, and split controls |
 | Pickers | theme, wallpaper, screenshot, and video pickers with Tanzaku, Hearthstone, and Carousel styles |
 | Core widgets | workspaces, volume, System info (CPU/GPU/RAM), battery, power profile, network, Bluetooth, weather, MPRIS, tray, notifications |
 | Privacy tools | microphone mute indicator/toggle and Lenovo LOQ camera kill-switch status |
 | Updates | shell update badge, weekly scheduled package update badge, Arch/AUR counter, known-infected AUR safety check |
 | AI usage | Claude, Codex, and OpenCode usage pill with provider switcher and detail panel |
+| Dynamic Island | top-center overlay for volume, brightness, media, microphone, and camera changes, visible even when the bar is hidden by fullscreen |
 
 <details>
 <summary>Full feature list</summary>
@@ -45,8 +46,8 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 |---|---|
 | Unlock &amp; reorder | unlock the bar, drag widget-groups to swap positions, persistent |
 | Image pickers | theme, wallpaper, screenshots, videos, 3 selectable styles, cached thumbnails |
-| Self-update | in-bar badge when a new version ships, one-click update and restart |
-| Package updates | system + AUR counter, scheduled weekday display, pre-install security check |
+| Self-update | in-bar badge only after a newer shell version is confirmed, one-click update and restart |
+| Package updates | system + AUR counter shown after confirmed updates, scheduled weekday display, pre-install security check |
 | AI usage | combined Claude, Codex, and OpenCode usage pill |
 | Workspaces | switch, overview, 10 / 5 / active-only modes, dots / numbers / magic styles |
 | Weather | current conditions, metric / imperial toggle |
@@ -60,6 +61,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Bar style | border, shadow, frost, pill radius, top/bottom position |
 | Split groups | positional pill splits + Stream, Surge, Bolt, Bolt 2 gap animations |
 | Magnetic hover | subtle pointer-only pill scale and neighbor pull animation without layout reflow |
+| Dynamic Island | independent top overlay for short-lived system events, visible during fullscreen because it is not inside the bar window |
 | Keybind IPC | `qs -c bar ipc call picker theme\|wallpaper\|screenshots\|videos` |
 | Per-widget panels | click widget to open its popup |
 
@@ -117,10 +119,10 @@ Common actions:
 
 - Double-click an empty bar area to unlock drag/drop mode.
 - Press `Esc` or click the dimmed backdrop to lock again.
-- Open the launcher/control widget to change bar style, widgets, privacy module visibility, workspaces, logo, splits, and animations.
+- Open the launcher/control widget to change bar style, widgets, privacy module visibility, workspaces, logo, and splits.
 - Use `Control > Actions > Schedule Update` to choose the weekday for the package-update badge. Friday is the default.
 - Use the self-update badge when it appears to update this shell from inside the bar.
-- Use the System info widget for quick CPU/GPU temperatures; click it for CPU, GPU, VRAM, and RAM details.
+- Use the System info widget for quick CPU/GPU temperatures; click it for CPU, GPU, VRAM, and RAM details. The GPU probe supports NVIDIA and DRM/sysfs GPU data for temperature, utilization, and VRAM where the driver exposes it.
 - Use the network cluster for network, Bluetooth, microphone, and camera privacy controls.
 - The app launcher displays cached applications immediately from `~/.cache/quickshell/app-launcher/apps.json` and silently refreshes the cache in the background.
 - The AI pill shows remaining 5h Codex allowance in the bar. Click it to open the usage panel, which shows the weekly Codex window and other AI providers.
@@ -204,7 +206,7 @@ rm -f ~/.config/omarchy/hooks/post-boot.d/quickshell-rise
 
 ## Updates
 
-The bar checks for shell updates and shows an update badge when this repo has a newer version.
+The bar checks for shell updates and shows an update badge only after this repo is confirmed to have a newer version. Refreshes clear stale update state first, so the badge stays hidden while checks are running and when no update is available.
 
 <details>
 <summary>Shell updates and Arch/AUR safety checks</summary>

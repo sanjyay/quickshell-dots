@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import "../modules"
 
@@ -23,6 +24,7 @@ PanelWindow {
     property bool powerOpen: false
     property bool scheduleOpen: false
     property bool wsOpen: false   // Workspaces collapsible inside the WW fly-out
+    property bool privacyOpen: false
 
     property real reveal: root.controlVisible ? 1 : 0
     Behavior on reveal {
@@ -32,8 +34,18 @@ PanelWindow {
         }
     }
     visible: reveal > 0.001
-    onRevealChanged: if (reveal < 0.01) { powerOpen = false; scheduleOpen = false; wsOpen = false; root.splitsSubVisible = false; root.wwSubVisible = false }  // reset when closed
+    onRevealChanged: if (reveal < 0.01) { powerOpen = false; scheduleOpen = false; wsOpen = false; privacyOpen = false; root.splitsSubVisible = false; root.wwSubVisible = false }  // reset when closed
     WlrLayershell.keyboardFocus: root.controlVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+
+    Process {
+        id: refreshProc
+        command: ["bash", "-lc",
+            "h=\"$HOME/.config/quickshell/bin/qs-shell-refresh-local.sh\"; " +
+            "if [ -x \"$h\" ]; then setsid -f \"$h\" >/dev/null 2>&1; else exit 127; fi"]
+        onExited: function(code) {
+            if (code !== 0) Quickshell.reload(false)
+        }
+    }
 
     // ── reusable tile: neutral by default, highlights only on hover ──
     component Tile: Rectangle {
@@ -150,8 +162,12 @@ PanelWindow {
             }
             Tile {
                 width: parent.width
-                label: "Reload QS-Config"
-                onActivated: { root.controlVisible = false; Quickshell.reload(false) }
+                label: "Refresh QS-Config"
+                onActivated: {
+                    root.controlVisible = false
+                    refreshProc.running = false
+                    refreshProc.running = true
+                }
             }
             Tile {
                 width: parent.width
@@ -495,12 +511,44 @@ PanelWindow {
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "System info"; active: root.modCpu;       onActivated: root.modCpu = !root.modCpu }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "AI usage";    active: root.modClaude;    onActivated: root.modClaude = !root.modClaude }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Power Prof."; active: root.modPower;     onActivated: root.modPower = !root.modPower }
-                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Network";     active: root.modNetwork; enabled: root.networkMode !== "wifi"; onActivated: root.modNetwork = !root.modNetwork }
+                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Network";     active: root.modNetwork; onActivated: root.modNetwork = !root.modNetwork }
+                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Bluetooth";   active: root.modBluetooth; onActivated: root.modBluetooth = !root.modBluetooth }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Status";      active: root.modStatus;  onActivated: root.modStatus = !root.modStatus }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Volume";      active: root.modVolume;  onActivated: root.modVolume = !root.modVolume }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Now playing"; active: root.modMpris;   onActivated: root.modMpris = !root.modMpris }
-                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Privacy";     active: root.modPrivacy; onActivated: root.modPrivacy = !root.modPrivacy }
+                Tile {
+                    width: root.evenW((wwCol.width - 8) / 2)
+                    label: ctrlPanel.privacyOpen ? "Privacy ▾" : "Privacy ▸"
+                    active: root.modPrivacy && (root.modPrivacyMic || root.modPrivacyCamera)
+                    onActivated: ctrlPanel.privacyOpen = !ctrlPanel.privacyOpen
+                }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Battery";     visible: root.hasBattery; active: root.modBattery; onActivated: root.modBattery = !root.modBattery }
+            }
+            Tile { width: parent.width; label: "Dynamic island"; active: root.enableDynamicIsland; onActivated: root.enableDynamicIsland = !root.enableDynamicIsland }
+            Grid {
+                width: parent.width
+                columns: 2
+                columnSpacing: 8
+                rowSpacing: 8
+                visible: ctrlPanel.privacyOpen
+                Tile {
+                    width: root.evenW((wwCol.width - 8) / 2)
+                    label: "Microphone"
+                    active: root.modPrivacy && root.modPrivacyMic
+                    onActivated: {
+                        root.modPrivacyMic = !root.modPrivacyMic
+                        root.modPrivacy = root.modPrivacyMic || root.modPrivacyCamera
+                    }
+                }
+                Tile {
+                    width: root.evenW((wwCol.width - 8) / 2)
+                    label: "Camera"
+                    active: root.modPrivacy && root.modPrivacyCamera
+                    onActivated: {
+                        root.modPrivacyCamera = !root.modPrivacyCamera
+                        root.modPrivacy = root.modPrivacyMic || root.modPrivacyCamera
+                    }
+                }
             }
 
             // ── WORKSPACES (collapsible, like the old widgets group) ──

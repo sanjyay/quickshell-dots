@@ -22,7 +22,7 @@ Item {
         ? root.seal
         : (btOn ? root.seal : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.3))
 
-    readonly property bool shown: true
+    readonly property bool shown: root.modBluetooth
     visible: implicitWidth > 0.5
     implicitWidth: shown ? row.implicitWidth + 14 : 0
     implicitHeight: 28

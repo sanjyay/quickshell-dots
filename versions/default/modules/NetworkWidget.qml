@@ -55,9 +55,12 @@ Item {
         return "Offline"
     }
 
-    // hideable via modNetwork — but only on ethernet/none; on WiFi always shown
-    implicitWidth: (root.modNetwork || mode === "wifi") ? (row.implicitWidth + 18) : 0
-    // mirror the connection type so the ControlPanel can gate the Network toggle
+    readonly property bool shown: root.modNetwork
+    implicitWidth: shown ? (row.implicitWidth + 18) : 0
+    visible: implicitWidth > 0.5
+    opacity: shown ? 1 : 0
+    Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+    // mirror the connection type for status text; it must not gate the toggle.
     Binding { target: rootMod.root; property: "networkMode"; value: rootMod.mode }
     implicitHeight: 28
 

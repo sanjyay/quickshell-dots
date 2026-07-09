@@ -7,10 +7,11 @@ Item {
     required property var root
 
     property bool updateAvailable: false
+    property bool checking: false
     onUpdateAvailableChanged: root.omarchyUpdateAvail = updateAvailable   // mirror for the swarm reactor
 
-    visible: updateAvailable
-    implicitWidth: updateAvailable ? 20 : 0
+    visible: updateAvailable && !checking
+    implicitWidth: visible ? 20 : 0
     implicitHeight: 28
 
 
@@ -27,9 +28,17 @@ Item {
         id: updateProc
         command: ["bash", "-c", "omarchy-update-available >/dev/null 2>&1 && echo YES || echo NO"]
         running: false
-        stdout: StdioCollector {
-            onStreamFinished: { rootMod.updateAvailable = this.text.trim() === "YES" }
+        onRunningChanged: if (running) {
+            rootMod.checking = true
+            rootMod.updateAvailable = false
         }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                rootMod.updateAvailable = this.text.trim() === "YES"
+                rootMod.checking = false
+            }
+        }
+        onExited: rootMod.checking = false
     }
 
     Timer {

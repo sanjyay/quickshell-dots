@@ -11,6 +11,7 @@ Item {
     property int systemCount: 0
     property int aurCount: 0
     property bool refreshing: false
+    property int retryCount: 0
 
     readonly property bool hasUpdates: rootMod.updateCount > 0
     readonly property bool badgePrefsLoaded: root._widgetsLoaded
@@ -28,7 +29,7 @@ Item {
     readonly property int badgeCount: rootMod.packageBadgeCount + rootMod.themeBadgeCount
     readonly property bool hasBadge: rootMod.badgeCount > 0
     readonly property bool hasNotice: rootMod.hasUpdates || rootMod.hasThemeUpdates || root.themeUpdLocalEdits > 0
-    readonly property bool showToday: root.archUpdateDue || root.archUpdateScheduleActive || root.archVisible
+    readonly property bool showToday: rootMod.hasNotice || rootMod.refreshing || root.archVisible
 
     visible: rootMod.showToday || implicitWidth > 0.5
     implicitWidth: rootMod.showToday ? 26 : 0
@@ -48,7 +49,10 @@ Item {
             }
         }
         onExited: (exitCode) => {
-            if (exitCode !== 0) rootMod.refreshing = false
+            if (exitCode !== 0) {
+                rootMod.refreshing = false
+                rootMod.scheduleRetry()
+            }
             refreshWatchdog.stop()
         }
     }
@@ -60,7 +64,15 @@ Item {
     // so the state is unambiguous if it ever hangs.
     Timer {
         id: refreshWatchdog; interval: 70000
-        onTriggered: { rootMod.refreshing = false; checkProc.running = false }
+        onTriggered: { rootMod.refreshing = false; checkProc.running = false; rootMod.scheduleRetry() }
+    }
+
+    Timer {
+        id: retryTimer; interval: 120000
+        onTriggered: {
+            if (!rootMod.refreshing && (root.archUpdateDue || root.archUpdateScheduleActive || root.archVisible))
+                rootMod.doRefresh()
+        }
     }
 
     Timer {
@@ -108,6 +120,19 @@ Item {
         rootMod.updateCount = sysCount + aCount
         root.archUpdates = updates
         root.archUpdateScheduleActive = updates.length > 0
+        if (updates.length > 0 || !root.archUpdateDue) {
+            rootMod.retryCount = 0
+            retryTimer.stop()
+        } else {
+            rootMod.scheduleRetry()
+        }
+    }
+
+    function scheduleRetry() {
+        if (!(root.archUpdateDue || root.archUpdateScheduleActive || root.archVisible)) return
+        if (rootMod.retryCount >= 5) return
+        rootMod.retryCount++
+        retryTimer.restart()
     }
 
     Item {

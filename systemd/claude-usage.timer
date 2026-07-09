@@ -1,11 +1,11 @@
 [Unit]
-Description=Claude Code usage refresh (every 5 min)
+Description=Claude Code usage refresh (every 1 min)
 Requires=claude-usage.service
 
 [Timer]
 OnBootSec=30
-OnUnitActiveSec=5min
-AccuracySec=30s
+OnUnitActiveSec=1min
+AccuracySec=10s
 Persistent=false
 
 [Install]

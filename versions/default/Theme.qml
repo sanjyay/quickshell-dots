@@ -26,13 +26,11 @@ Item {
     property color color03: "#c8b36a"   // colors.toml color3
     property color sealRaw:    "#c4746e"
     property color accentHint: sealRaw    // filled by palette; default = same as red
+    property bool enableDynamicIsland: true
     property string barColor: "red"
-    readonly property bool barColorIsAccent: false
-    // Compatibility alias for older local code/reviews that still use the
-    // previous boolean name.
-    readonly property bool useThemeAccent: barColorIsAccent
 
-    readonly property color seal: barColorValue(barColor)
+    readonly property color baseSeal: barColorValue(barColor)
+    readonly property color seal: baseSeal
     readonly property var barColorOptions: [
         { id: "red",    label: "Red",    color: sealRaw },
         { id: "mauve",  label: "Mauve",  color: "#cba6f7" },
@@ -54,7 +52,6 @@ Item {
             if (barColorOptions[i].id === id) return barColorOptions[i].label
         return "Red"
     }
-
     readonly property string mono:  "JetBrainsMono Nerd Font"
 
     // ── transparency knobs (0.0 = fully transparent, 1.0 = opaque) ──
@@ -856,7 +853,7 @@ Item {
     readonly property string launchWifiCmd: "if systemctl is-active --quiet NetworkManager 2>/dev/null; then omarchy-launch-or-focus-tui nmtui; else omarchy-launch-wifi; fi"
     readonly property string launchBtCmd:   "omarchy-launch-bluetooth"
     property bool modPower:      false   // default off (toggle in ControlPanel)
-    property bool modBluetooth:  true    // legacy cache field; Bluetooth is now part of the network/privacy group
+    property bool modBluetooth:  true    // Bluetooth pill inside the network/privacy group
     property bool modMedia:      true
     property bool modQuick:      true    // G10 group pill (idle-inhibitor · media · theme)
     property bool modMpris:      true    // G9 now-playing / mpris pill
@@ -920,6 +917,7 @@ Item {
     onBarPositionChanged:      if (_widgetsLoaded) saveWidgets()
     onArchUpdateDayChanged:    if (_widgetsLoaded) saveWidgets()
     onArchUpdateScheduleActiveChanged: if (_widgetsLoaded) saveWidgets()
+    onEnableDynamicIslandChanged: if (_widgetsLoaded) saveWidgets()
 
     readonly property var archUpdateDayOptions: [
         { id: "monday",    label: "Mon", index: 1 },
@@ -962,7 +960,7 @@ Item {
                  + "0 "                                  // legacy brightness field; module removed
                  + (modClaude    ? "1" : "0") + " "
                  + (modPower     ? "1" : "0") + " "
-                 + "1 "                                  // legacy Bluetooth field; module is always shown in network group
+                 + (modBluetooth ? "1" : "0") + " "
                  + workspaceMode + " "
                  + pickerStyle + " "
                  + (weatherImperial ? "1" : "0") + " "
@@ -991,7 +989,10 @@ Item {
                  + (modPrivacy ? "1" : "0") + " "         // +25 microphone/camera privacy pills
                  + (modBattery ? "1" : "0") + " "         // +26 battery pill
                  + (modPrivacyMic ? "1" : "0") + " "      // +27 microphone privacy pill
-                 + (modPrivacyCamera ? "1" : "0")         // +28 camera privacy pill
+                 + (modPrivacyCamera ? "1" : "0") + " "   // +28 camera privacy pill
+                 + "0 "                                    // +29 reserved cache field
+                 + "0 "                                    // +30 reserved cache field
+                 + (enableDynamicIsland ? "1" : "0")      // +31 dynamic island
         widgetSaveProc.command = ["bash", "-c",
             "echo '" + line + "' > '" + widgetsCachePath + "'"]
         widgetSaveProc.running = false
@@ -1120,7 +1121,7 @@ Item {
                     if (parts[4] === "5" || parts[4] === "active" || parts[4] === "10") {
                         wsField = 4                         // old format: no bluetooth field
                     } else {
-                        theme.modBluetooth = parts[4] !== "0"  // legacy field only
+                        theme.modBluetooth = parts[4] !== "0"
                         wsField = 5
                     }
                 }
@@ -1195,6 +1196,7 @@ Item {
                     else theme.modPrivacyMic = theme.modPrivacy
                     if (parts.length > wsField + 28) theme.modPrivacyCamera = parts[wsField + 28] !== "0"
                     else theme.modPrivacyCamera = theme.modPrivacy
+                    if (parts.length > wsField + 31) theme.enableDynamicIsland = parts[wsField + 31] !== "0"
                 }
                 theme._widgetsLoaded = true
             }

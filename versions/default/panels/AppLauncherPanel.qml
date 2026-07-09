@@ -121,7 +121,7 @@ PanelWindow {
             Qt.callLater(resetListPosition)
         }
     }
-    onFilteredAppsChanged: selectedIndex = Math.max(0, Math.min(selectedIndex, filteredApps.length - 1))
+    onFilteredAppsChanged: setSelectedIndex(selectedIndex)
     Component.onCompleted: {
         console.log("AppLauncher cache path " + cachePath)
         loadCachedApps()
@@ -254,9 +254,9 @@ PanelWindow {
                 appPanel.scanningApps = false
             }
         }
-        onExited: {
+        onExited: function(exitCode) {
             appPanel.scanningApps = false
-            console.log("AppLauncher rescan process exited code=" + code)
+            console.log("AppLauncher rescan process exited code=" + exitCode)
         }
     }
 
@@ -349,7 +349,7 @@ PanelWindow {
                     clip: true
                     onTextChanged: {
                         appPanel.query = text
-                        appPanel.selectedIndex = 0
+                        appPanel.setSelectedIndex(0)
                     }
                     Keys.onPressed: function(event) {
                         if (event.key === Qt.Key_Escape) {
@@ -396,9 +396,9 @@ PanelWindow {
 
                 delegate: Item {
                     id: row
+                    required property int index
                     required property var modelData
-                    property bool hovered: false
-                    readonly property bool active: ListView.isCurrentItem || hovered
+                    readonly property bool active: appPanel.selectedIndex === row.index
                     width: appList.width
                     height: appPanel.rowHeight
 
@@ -433,11 +433,7 @@ PanelWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onEntered: {
-                            row.hovered = true
-                            appPanel.setSelectedIndex(index)
-                        }
-                        onExited: row.hovered = false
+                        onEntered: appPanel.setSelectedIndex(row.index)
                         onClicked: appPanel.launch(row.modelData)
                     }
                 }

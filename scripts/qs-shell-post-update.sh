@@ -59,8 +59,14 @@ fi
 # ── keep the updater itself current (check + apply + this hook) ─
 put "$repo/scripts/qs-shell-check-update.sh" "$qsbin/qs-shell-check-update.sh" 755 || rc=1
 put "$repo/scripts/qs-shell-apply-update.sh" "$qsbin/qs-shell-apply-update.sh" 755 || rc=1
+put "$repo/scripts/qs-shell-refresh-local.sh" "$qsbin/qs-shell-refresh-local.sh" 755 || rc=1
+put "$repo/scripts/ensure-hypr-launcher-binding.sh" "$qsbin/ensure-hypr-launcher-binding.sh" 755 || rc=1
 put "$repo/systemd/qs-shell-update-check.service" "$units/qs-shell-update-check.service" 644 || rc=1
 put "$repo/systemd/qs-shell-update-check.timer"   "$units/qs-shell-update-check.timer"   644 || rc=1
+
+if [ -f "$repo/scripts/ensure-hypr-launcher-binding.sh" ]; then
+  bash "$repo/scripts/ensure-hypr-launcher-binding.sh" || rc=1
+fi
 
 # ── theme-update checker used by ArchUpdaterPanel ───────────────
 if [ -f "$repo/scripts/qs-theme-update-check.sh" ]; then
@@ -78,9 +84,13 @@ systemctl --user try-restart qs-shell-update-check.timer qs-aur-blacklist-fetch.
 # ── opt-in components: refresh only if the user installed them ──
 if [ -x "$bin/claude-usage" ]; then
   put "$repo/scripts/claude-usage" "$bin/claude-usage" 755 || rc=1
+  put "$repo/systemd/claude-usage.service" "$units/claude-usage.service" 644 || rc=1
+  put "$repo/systemd/claude-usage.timer"   "$units/claude-usage.timer"   644 || rc=1
 fi
 if [ -x "$bin/codex-usage" ]; then
   put "$repo/scripts/codex-usage" "$bin/codex-usage" 755 || rc=1
+  put "$repo/systemd/codex-usage.service" "$units/codex-usage.service" 644 || rc=1
+  put "$repo/systemd/codex-usage.timer"   "$units/codex-usage.timer"   644 || rc=1
 fi
 ai_backend_installed=0
 if [ -x "$bin/claude-usage" ] || [ -x "$bin/codex-usage" ] || [ -x "$bin/opencode-usage" ]; then
@@ -94,8 +104,20 @@ if [ -x "$bin/opencode-usage" ] || { [ "$ai_backend_installed" -eq 1 ] && [ "$op
   put "$repo/scripts/opencode-usage" "$bin/opencode-usage" 755 || rc=1
   put "$repo/systemd/opencode-usage.service" "$units/opencode-usage.service" 644 || rc=1
   put "$repo/systemd/opencode-usage.timer"   "$units/opencode-usage.timer"   644 || rc=1
+fi
+
+if [ "$ai_backend_installed" -eq 1 ]; then
+  ai_timers=""
+  [ -f "$units/claude-usage.timer" ] && ai_timers="$ai_timers claude-usage.timer"
+  [ -f "$units/codex-usage.timer" ] && ai_timers="$ai_timers codex-usage.timer"
+  [ -f "$units/opencode-usage.timer" ] && ai_timers="$ai_timers opencode-usage.timer"
   systemctl --user daemon-reload >/dev/null 2>&1 || true
-  systemctl --user enable --now opencode-usage.timer >/dev/null 2>&1 || true
+  if [ -n "$ai_timers" ]; then
+    # shellcheck disable=SC2086
+    systemctl --user enable --now $ai_timers >/dev/null 2>&1 || true
+    # shellcheck disable=SC2086
+    systemctl --user try-restart $ai_timers >/dev/null 2>&1 || true
+  fi
 fi
 
 exit "$rc"

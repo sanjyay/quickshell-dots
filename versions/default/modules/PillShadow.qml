@@ -7,6 +7,7 @@ import QtQuick.Effects
 // parent bounds. RectangularShadow is analytic — no offscreen FBO per pill,
 // which is why it's safe at 144 Hz on this NVIDIA/Wayland setup (see P0).
 RectangularShadow {
+    id: shadow
     required property var theme
     anchors.fill: parent
     radius: parent.radius

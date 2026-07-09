@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-07-10
+
+### Dynamic Island And Cleanup
+
+- Kept Dynamic Island, enlarged it for better readability, and moved it into an independent top overlay so it remains visible when fullscreen hides the bar.
+- Fixed GPU detection, temperature, utilization, and VRAM reporting with the shared GPU probe script.
+- Fixed update-check flicker so update widgets stay hidden while checks run and only appear after updates are confirmed.
+- Removed the accent glow experiment and restored static theme-based widget shadows.
+- Removed window-aware focused-app accent coloring so the bar uses the selected theme color consistently.
+- Cleaned up removed feature flags, controls, event readers, and dead styling code.
+
 ## 2026-07-09
 
 ### Privacy And Media Widgets

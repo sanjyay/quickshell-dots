@@ -133,6 +133,8 @@ install_shell_updater() {
   mkdir -p "$bindst" "$unitdst"
   install -m 755 "$src/scripts/qs-shell-check-update.sh" "$bindst/qs-shell-check-update.sh"
   install -m 755 "$src/scripts/qs-shell-apply-update.sh" "$bindst/qs-shell-apply-update.sh"
+  install -m 755 "$src/scripts/qs-shell-refresh-local.sh" "$bindst/qs-shell-refresh-local.sh"
+  install -m 755 "$src/scripts/ensure-hypr-launcher-binding.sh" "$bindst/ensure-hypr-launcher-binding.sh"
   install -m 644 "$src/systemd/qs-shell-update-check.service" "$unitdst/qs-shell-update-check.service"
   install -m 644 "$src/systemd/qs-shell-update-check.timer"   "$unitdst/qs-shell-update-check.timer"
 
@@ -241,12 +243,18 @@ ts="$(date +%Y%m%d-%H%M%S)"
 stage="$(mktemp -d -p "$(dirname "$DEST")" .qs-install-stage.XXXXXX)"
 cp -r "$src_repo/versions/$CONFIG_DIR/." "$stage/"
 echo "$CONFIG_DIR" > "$stage/.qsrise"
+if [[ -d "$src_repo/.git" ]]; then
+  printf '%s\n' "$src_repo" > "$stage/.qsrise-source"
+fi
 
 if [[ -d "$DEST" ]]; then
   if [[ -e "$DEST/.qsrise" ]]; then
     if [[ -f "$DEST/quotes.txt" ]]; then
       cp -p "$DEST/quotes.txt" "$stage/quotes.txt"
       info "Preserved custom quotes.txt"
+    fi
+    if [[ -f "$DEST/.qsrise-source" && ! -f "$stage/.qsrise-source" ]]; then
+      cp -p "$DEST/.qsrise-source" "$stage/.qsrise-source"
     fi
     restore_src="$DEST.old.$ts"
     mv "$DEST" "$restore_src"
@@ -264,6 +272,11 @@ if [[ -n "$restore_src" && "$restore_src" == "$DEST.old."* ]]; then
 fi
 restore_src=""
 info "Installed Quickshell bar → $DEST"
+
+# ── 4b. Hyprland launcher binding ──────────────────────────────
+if [[ -f "$src_repo/scripts/ensure-hypr-launcher-binding.sh" ]]; then
+  bash "$src_repo/scripts/ensure-hypr-launcher-binding.sh" || warn "Hyprland launcher binding setup incomplete."
+fi
 
 # ── 4a. ArchUpdater security gate (pre-install package verdicts) ─
 # Pure bash, no extra deps. The weekly fetch timer keeps the known-infected

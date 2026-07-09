@@ -181,6 +181,7 @@ if [ -f "$backup/quotes.txt" ]; then
   cp -p "$backup/quotes.txt" "$stage/quotes.txt"
 fi
 printf '%s\n' "$cfg" > "$stage/.qsrise"
+[ -f "$backup/.qsrise-source" ] && cp -p "$backup/.qsrise-source" "$stage/.qsrise-source"
 
 # Stop the bar before swapping, and WAIT for it to actually exit (don't trust a
 # fixed sleep). Prefer Quickshell's registered config path over command-line
@@ -228,7 +229,7 @@ clear_state
 #     pulled repo so a bar update is complete on its own — no manual install.sh
 #     re-run. Best-effort: a hiccup here never blocks the applied update.
 if [ -f "$REPO/scripts/qs-shell-post-update.sh" ]; then
-  bash "$REPO/scripts/qs-shell-post-update.sh" "$REPO" >/dev/null 2>&1 || \
+  bash "$REPO/scripts/qs-shell-post-update.sh" "$REPO" || \
     note "Shell update" "Companion refresh incomplete — re-run install.sh if a widget misses its helper."
 fi
 
@@ -241,4 +242,5 @@ if [ -z "${QS_SHELL_NO_RESTART:-}" ]; then
   setsid qs -n -d -c bar >/dev/null 2>&1 9>&- < /dev/null &
 fi
 
-note "Shell updated" "Now on the latest '$ver'. Backup kept at $backup"
+new_head="$(git rev-parse --short HEAD 2>/dev/null || printf latest)"
+note "Shell updated" "Now on $new_head. Backup kept at $backup"
