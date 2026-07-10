@@ -6,6 +6,7 @@ Item {
     id: island
     required property var root
     property var cameraSwitch: null
+    property alias inputItem: pulseButton
 
     width: pill.width
     height: 44
@@ -14,9 +15,19 @@ Item {
     scale: 0.94 + reveal * 0.06
     z: 80
 
+    Component.onCompleted: if (root.pointerTrace)
+        console.log("POINTER_PULSE visible=" + island.visible + " reveal=" + island.reveal
+            + " scene=" + island.mapToItem(null, 0, 0).x + "," + island.mapToItem(null, 0, 0).y
+            + " size=" + island.width + "x" + island.height + " hint=" + island.hint)
+    onVisibleChanged: if (root.pointerTrace)
+        console.log("POINTER_PULSE visible=" + island.visible + " reveal=" + island.reveal
+            + " scene=" + island.mapToItem(null, 0, 0).x + "," + island.mapToItem(null, 0, 0).y
+            + " size=" + island.width + "x" + island.height + " hint=" + island.hint)
+
     property real reveal: 0
     property string title: ""
     property string detail: ""
+    property string hint: ""
     property string lastTrack: ""
     property bool lastMicLive: false
     property bool lastCameraBlocked: false
@@ -27,11 +38,13 @@ Item {
     Behavior on reveal { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
     Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
-    function flash(t, d) {
+    function flash(t, d, h, durationMs) {
         if (!root.enablePulse) return
         title = t
         detail = d
+        hint = h || ""
         reveal = 1
+        hideTimer.interval = durationMs || 1800
         hideTimer.restart()
     }
 
@@ -40,6 +53,13 @@ Item {
         interval: 1800
         repeat: false
         onTriggered: island.reveal = 0
+    }
+
+    Connections {
+        target: root
+        function onUpdatePulseSerialChanged() {
+            island.flash(root.updatePulseTitle, root.updatePulseDetail, root.updatePulseHint, 7000)
+        }
     }
 
     Connections {
@@ -61,7 +81,7 @@ Item {
         var track = (mpris.player.trackTitle || "") + " - " + (mpris.player.trackArtist || "")
         if (track !== " - " && track !== lastTrack) {
             lastTrack = track
-            flash("Now playing", track)
+            flash("Now playing", track, "", 1800)
         }
     }
 
@@ -74,7 +94,7 @@ Item {
                 var live = (parseInt(this.text.trim()) || 0) > 0
                 if (live !== island.lastMicLive) {
                     island.lastMicLive = live
-                    island.flash("Microphone", live ? "active" : "idle")
+                    island.flash("Microphone", live ? "active" : "idle", "", 1800)
                 }
             }
         }
@@ -95,7 +115,7 @@ Item {
                 var v = parseInt(this.text.trim())
                 if (isNaN(v)) return
                 if (island.lastBrightness >= 0 && Math.abs(v - island.lastBrightness) >= 2)
-                    island.flash("Brightness", v + "%")
+                    island.flash("Brightness", v + "%", "", 1800)
                 island.lastBrightness = v
             }
         }
@@ -114,7 +134,7 @@ Item {
             var blocked = island.cameraSwitch && island.cameraSwitch.stateKnown && !island.cameraSwitch.cameraEnabled
             if (blocked !== island.lastCameraBlocked) {
                 island.lastCameraBlocked = blocked
-                island.flash("Camera", blocked ? "blocked" : "enabled")
+                island.flash("Camera", blocked ? "blocked" : "enabled", "", 1800)
             }
         }
     }
@@ -123,7 +143,7 @@ Item {
         id: pill
         anchors.centerIn: parent
         width: Math.max(190, Math.min(440, textCol.implicitWidth + 48))
-        height: 42
+        height: island.hint ? 56 : 42
         radius: root.pillRadius
         color: root.barBg
         border.color: Qt.rgba(root.seal.r, root.seal.g, root.seal.b, 0.55)
@@ -150,6 +170,29 @@ Item {
                 elide: Text.ElideRight
                 font.family: root.mono
                 font.pixelSize: 11
+            }
+            UiText {
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: island.hint.length > 0
+                text: island.hint
+                color: root.sumi
+                font.family: root.mono
+                font.pixelSize: 10
+            }
+        }
+
+        BarWidgetButton {
+            id: pulseButton
+            anchors.fill: parent
+            theme: root
+            traceName: "pulse-handler"
+            visible: island.visible && island.hint.length > 0
+            enabled: island.hint.length > 0
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+                root.activeUpdateTab = "packages"
+                root.archVisible = true
+                island.reveal = 0
             }
         }
     }

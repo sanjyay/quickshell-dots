@@ -14,11 +14,14 @@ PanelWindow {
     id: barSlot
     required property var root
     readonly property string screenName: barSlot.screen ? barSlot.screen.name : ""
+    readonly property bool debugLayout: Quickshell.env("QS_BAR_LAYOUT_DEBUG") === "1"
 
     color: "transparent"
     // ALWAYS screen-tall → window never resizes → NO compositor resize animation.
     // Reserve 35px via exclusiveZone; the mask limits the INPUT region: only the bar
     // strip when locked (clicks below pass through), full screen when unlocked (drag).
+    // Keep a small extra vertical hit band in locked mode so magnetic hover scaling
+    // remains clickable at the visual edge without forcing the user to chase it.
     // anchored to left+right always; top OR bottom by barPosition (exclusiveZone
     // reserves space on whichever edge is anchored → no extra logic needed)
     anchors {
@@ -32,9 +35,42 @@ PanelWindow {
     mask: Region {
         x: 0
         y: barSlot.root.barUnlocked ? 0
-           : (barSlot.root.barPosition === "bottom" ? barSlot.height - 35 : 0)
+           : (barSlot.root.barPosition === "bottom" ? barSlot.height - 41 : 0)
         width: barSlot.width
-        height: barSlot.root.barUnlocked ? barSlot.height : 35
+        height: barSlot.root.barUnlocked ? barSlot.height : 41
+    }
+
+    Rectangle {
+        id: pointerTraceMarker
+        visible: barSlot.root.pointerTrace && barSlot.root.pointerTraceX >= 0
+        x: barSlot.root.pointerTraceX - 4
+        y: barSlot.root.pointerTraceY - 4
+        width: 8
+        height: 8
+        radius: 4
+        color: "#ff3355"
+        border.color: "white"
+        border.width: 1
+        z: 1000
+    }
+
+    // Temporary trace surface below widget content; it reports only presses
+    // that reached this layer without a widget handler.
+    MouseArea {
+        id: pointerTraceWindowSurface
+        z: -100
+        anchors.fill: parent
+        enabled: barSlot.root.pointerTrace
+        visible: false
+        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+        propagateComposedEvents: true
+        onPressed: function(event) {
+            barSlot.root.tracePointer(pointerTraceWindowSurface, "bar-window-fallback", event, "pressed")
+        }
+        onClicked: function(event) {
+            barSlot.root.tracePointer(pointerTraceWindowSurface, "bar-window-fallback", event, "clicked")
+            event.accepted = false
+        }
     }
     // grab keyboard while unlocked so ESC can exit
     WlrLayershell.keyboardFocus: barSlot.root.barUnlocked ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
@@ -61,7 +97,7 @@ PanelWindow {
     // Magnetic hover tuning. These values only affect pointer hover visuals on
     // slot loaders; they do not change slot width, persistence, IPC, or widget data.
     readonly property real magneticScale: 1.07
-    readonly property real magneticLift: -3
+    readonly property real magneticLift: 0
     readonly property real magneticNeighborPull: 6
     readonly property real magneticSecondNeighborPull: 2.5
     readonly property int magneticAnimationDuration: 190
@@ -107,7 +143,7 @@ PanelWindow {
             var rep = rows[r].rep
             for (var k = 0; k < rep.count; k++) {
                 var it = rep.itemAt(k)
-                if (!it || !it.visible || !it.autoShown) continue
+                if (!it || !it.visible) continue
                 var p = it.mapToItem(null, 0, 0)
                 if (wx >= p.x && wx <= p.x + it.width && wy >= p.y && wy <= p.y + it.height)
                     return { model: rows[r].rmodel, index: k }
@@ -225,6 +261,15 @@ PanelWindow {
     Component.onCompleted: {
         if (!barSlot.root.activePopupScreenName) barSlot.root.activatePopupScreen(barSlot.screen)
         barSlot.root.registerBarLayoutController(barSlot.screenName, barSlot.layoutController)
+        if (barSlot.root.pointerTrace) {
+            console.log("POINTER_WINDOW screen=" + barSlot.screenName
+                + " logical=" + barSlot.width + "x" + barSlot.height
+                + " mask=" + (barSlot.root.barUnlocked ? "0,0," + barSlot.width + "," + barSlot.height
+                    : "0," + (barSlot.root.barPosition === "bottom" ? barSlot.height - 41 : 0)
+                        + "," + barSlot.width + ",41")
+                + " barPosition=" + barSlot.root.barPosition
+                + " scaleHint=" + (barSlot.screen ? barSlot.screen.devicePixelRatio : "n/a"))
+        }
     }
 
     Component.onDestruction: {
@@ -287,88 +332,37 @@ PanelWindow {
     Component { id: compClaude; ClaudeWidget { root: barSlot.root } }
 
     Component {
-        id: compCenter                                   // G8: weather·clock·date·indicators
+        id: compCenter                                   // G8: clock·date·indicators
         Item {
             id: g8
-            implicitWidth: Math.round(centerRow.implicitWidth) + 18
-            implicitHeight: 28
-
-            // ── responsive stage (narrow-monitor overlap fix) ──
-            // Presentation-only inside G8 — never touches root.mod* user toggles.
-            // Mutable state with hysteresis, NOT a computed property: downshift when
-            // the CURRENT stage no longer fits (24px slack), upshift only when the
-            // LARGER stage would fit with 48px slack — measured against that stage's
-            // own needed width, else minimal⇄compact oscillates.
-            property int stage: 0                        // 0 normal · 1 compact · 2 minimal
-            readonly property bool showWeather: stage <= 1
-            readonly property bool showIcons:   iconsRow.hasActive
-            // needed widths per stage: reactive bindings over the UNCOLLAPSED content
-            // (the stage-gated wrapper widths shrink and would mislead the upshift
-            // decision). 18 = pill padding, 8 = row spacing per visible neighbour.
-            readonly property real needMinimal: 18 + clock.implicitWidth
-                + (showIcons && iconsRow.implicitWidth > 0.5 ? 8 + iconsRow.implicitWidth : 0)
-            readonly property real needCompact: needMinimal
-                + (weather.implicitWidth > 0.5 ? 8 + weather.implicitWidth : 0)
-            readonly property real needNormal: needCompact
-            function updateStage() {
-                // compact only while G8 actually occupies the center slot: after a
-                // drag swap G8 can sit in a SIDE row — its own width then feeds the
-                // very side-row width that centerAvail is measured from, and the
-                // stage delta (~weather+date) exceeds the 24/48px hysteresis window
-                // → boundary-width flutter. As a side widget G8 stays at normal.
-                if (centerModel.count < 1 || centerModel.get(0).gid !== "G8") {
-                    if (stage !== 0) stage = 0
-                    return
-                }
-                var avail = island.centerAvail
-                var s = stage
-                if (s === 0 && needNormal  + 24 > avail) s = 1
-                if (s === 1 && needCompact + 24 > avail) s = 2
-                if (s === 2 && needCompact + 48 <= avail) s = 1
-                if (s === 1 && needNormal  + 48 <= avail) s = 0
-                if (s !== stage) stage = s
-            }
-            // publish the clock + status-icon floor width for the side-row budget
-            Binding { target: island; property: "g8FloorWidth"; value: g8.needMinimal }
-            // 80ms one-shot coalesces width flutter (track changes, tray churn)
-            Timer { id: restageTimer; interval: 80; repeat: false; onTriggered: g8.updateStage() }
-            onNeedNormalChanged:  restageTimer.restart()
-            onNeedCompactChanged: restageTimer.restart()
-            Connections { target: island; function onCenterAvailChanged() { restageTimer.restart() } }
-            Component.onCompleted: restageTimer.restart()
+            implicitWidth: Math.round(centerRow.implicitWidth)
+            implicitHeight: 32
+            width: implicitWidth
+            height: implicitHeight
 
             Rectangle {
                 anchors.centerIn: parent
-                width: parent.implicitWidth; height: barSlot.root.pillH; radius: barSlot.root.pillRadius
-                color: barSlot.root.pill; border.color: barSlot.root.pillBorder; border.width: barSlot.root.pillBorderW
+                width: parent.implicitWidth
+                height: barSlot.root.pillH
+                radius: barSlot.root.pillRadius
+                color: barSlot.root.pill
+                border.color: barSlot.root.pillBorder
+                border.width: barSlot.root.pillBorderW
                 PillShadow { theme: barSlot.root }
             }
+
             Row {
                 id: centerRow
                 anchors.verticalCenter: parent.verticalCenter
                 x: Math.round((parent.width - width) / 2)   // integer center → sharp text
                 spacing: 8
-                Item {                                   // weather wrapper (stage-gated)
-                    visible: width > 0.5
-                    width: g8.showWeather ? weather.implicitWidth : 0
-                    height: 28
-                    clip: true
-                    opacity: g8.showWeather ? 1 : 0
-                    Behavior on width   { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-                    Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-                    WeatherWidget {
-                        id: weather
-                        anchors.fill: parent
-                        root: barSlot.root
-                    }
-                }
                 ClockWidget   { id: clock; root: barSlot.root; barScreen: barSlot.screen }
-                Item {                                   // indicator icons wrapper (stage-gated)
-                    visible: g8.showIcons || width > 0.5
-                    width: g8.showIcons ? iconsRow.implicitWidth : 0
+                Item {                               // indicator icons wrapper
+                    visible: iconsRow.hasActive || width > 0.5
+                    width: iconsRow.implicitWidth
                     height: 28
                     clip: true
-                    opacity: g8.showIcons ? 1 : 0
+                    opacity: iconsRow.hasActive ? 1 : 0
                     Behavior on width   { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
                     Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                     Row {
@@ -391,6 +385,27 @@ PanelWindow {
                     }
                 }
             }
+
+            Rectangle {
+                visible: barSlot.root.pointerTrace
+                anchors.fill: parent
+                color: "transparent"
+                border.color: "#ffaa22"
+                border.width: 1
+                z: 90
+            }
+            Rectangle {
+                visible: barSlot.root.pointerTrace
+                x: centerRow.x + clock.x
+                y: centerRow.y + clock.y
+                width: clock.width
+                height: clock.height
+                color: "transparent"
+                border.color: "#ff3344"
+                border.width: 2
+                z: 91
+            }
+
         }
     }
 
@@ -453,15 +468,14 @@ PanelWindow {
             return (!barSlot.root.barUnlocked && !barSlot.dragging && hoveredIndex === i)
                 ? barSlot.magneticLift : 0
         }
-        // index of the LAST currently shown slot (skips disabled and auto-hidden
-        // narrow-stage widgets) —
+        // index of the LAST currently shown slot (skips disabled widgets) —
         // a split/grow only makes sense BEFORE this (else it opens a gap to nowhere)
         readonly property int lastVisibleIndex: {
             void(width)
             var last = -1
             for (var k = 0; k < repeater.count; k++) {
                 var it = repeater.itemAt(k)
-                if (it && it.hasContent && it.autoShown) last = k
+                if (it && it.hasContent) last = k
             }
             return last
         }
@@ -472,6 +486,7 @@ PanelWindow {
                 id: slot
                 required property string gid
                 required property int index
+                property var loaderItem: null
                 // workspace draws a pill 4px wider than its implicitWidth on each
                 // side; pad its slot symmetrically so inter-group gaps stay uniform.
                 readonly property int pad: slot.gid === "G2" ? barSlot.root.wsPillPad : 0
@@ -480,30 +495,20 @@ PanelWindow {
                 // split AFTER this slot → grow it so the group separates (gap opens).
                 // ONLY for widgets with content — a 0-width widget (battery on a
                 // desktop) must NOT grow, else it shows up as an empty pill.
-                readonly property bool splitAfter: autoShown && hasGapAfter && splitsArr[index]
+                readonly property bool splitAfter: hasGapAfter && splitsArr[index]
                 readonly property real grow: (splitAfter && hasContent && index < lastVisibleIndex) ? 16 : 0
                 readonly property real cr: pad + Math.round(ldr.implicitWidth)
-                // display width: follows the stage (grow via splitAfter is
-                // autoShown-aware so hidden slots also drop their split growth)
+                // display width follows the visible slot state.
                 readonly property real naturalSlotWidth: Math.round(ldr.implicitWidth) + 2 * pad + grow
-                // budget width: the ONLY width the narrow-stage decision may read.
-                // MUST stay stage-independent (no autoShown/lastVisibleIndex terms,
-                // which flip with the stage): a stage-dependent budget feeds back
-                // into its own decision and oscillates once ≥2 split-grows (2×16px)
-                // exceed the 24px hysteresis window. Conservative: counts the split
-                // grow even for hidden/trailing slots (≤16px overestimate, fail-safe).
-                readonly property real budgetSlotWidth: Math.round(ldr.implicitWidth) + 2 * pad
-                    + ((hasGapAfter && splitsArr[index] && hasContent) ? 16 : 0)
-                readonly property bool autoShown: island.groupVisibleAtStage(slot.gid, island.narrowStage)
-                onBudgetSlotWidthChanged: island.scheduleNarrowUpdate()
-                width: autoShown ? naturalSlotWidth : 0
+                width: naturalSlotWidth
                 height: 32
-                visible: hasContent && (autoShown || width > 0.5)   // stays visible while collapsing
-                opacity: autoShown ? 1 : 0
+                visible: hasContent
+                opacity: 1
                 Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
                 Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                 Loader {
                     id: ldr
+                    Component.onCompleted: slot.loaderItem = ldr
                     x: slot.pad + slotRow.magneticOffset(slot.index)
                     anchors.verticalCenter: parent.verticalCenter
                     sourceComponent: barSlot.registry[slot.gid]
@@ -526,8 +531,7 @@ PanelWindow {
                 }
                 HoverHandler {
                     id: magneticHover
-                    enabled: slot.visible && slot.hasContent && slot.autoShown
-                        && !barSlot.root.barUnlocked && !barSlot.dragging
+                    enabled: slot.visible && slot.hasContent && !barSlot.root.barUnlocked && !barSlot.dragging
                     onHoveredChanged: {
                         if (hovered)
                             slotRow.hoveredIndex = slot.index
@@ -539,8 +543,8 @@ PanelWindow {
                 // ── drag-catcher: only in unlock mode, overlays the widget ──
                 MouseArea {
                     anchors.fill: parent
-                    enabled: barSlot.root.barUnlocked && slot.autoShown
-                    visible: barSlot.root.barUnlocked && slot.autoShown
+                    enabled: barSlot.root.barUnlocked && slot.hasContent
+                    visible: barSlot.root.barUnlocked && slot.hasContent
                     z: 25
                     preventStealing: true
                     cursorShape: Qt.OpenHandCursor
@@ -570,7 +574,7 @@ PanelWindow {
                 }
                 // ── split toggle for the gap AFTER this slot (child of slot → tracks it) ──
                 Item {
-                    visible: slot.autoShown && slot.hasGapAfter && slot.index < lastVisibleIndex
+                    visible: slot.hasContent && slot.hasGapAfter && slot.index < lastVisibleIndex
                     width: 14
                     height: slot.height
                     x: (slot.cr + slot.pad + slot.width + 6) / 2 - width / 2   // centered in the gap (cr+pad = pill-right, matches gapInterval)
@@ -644,80 +648,20 @@ PanelWindow {
         readonly property real lcBoundaryX: leftRowItem.x + leftRowItem.width + 9    // just right of Claude
         readonly property real crBoundaryX: rightRowItem.x - 9                       // just left of Mpris
 
-        // ── G8 collision handling (narrow-monitor overlap fix) ──
-        // free span between the side rows; the only stage-decision input — reads
-        // ONLY left/right geometry (never the center row), so stage changes that
-        // resize G8 cannot feed back into this value (no binding loop).
-        readonly property int centerGap: 12
+        // ── G8 collision handling ──
+        // free span between the side rows; reads ONLY left/right geometry so the
+        // center can be clamped from measured bounds without feeding back into the
+        // side rows.
+        readonly property int centerGap: 28
         readonly property int rowMargin: 4    // single source for the side-row edge margins + budget math
-        readonly property real centerAvail: rightRowItem.x - (leftRowItem.x + leftRowItem.width) - 2 * centerGap
-        // centered while space allows; clamped between the rows when squeezed.
-        // If even the current G8 width cannot fit (max < min), fall back to the
-        // screen-clamped ideal — the documented extreme case may overlap.
-        readonly property real idealCenterX: Math.round((width - centerRowItem.width) / 2)
-        readonly property real minCenterX: Math.round(leftRowItem.x + leftRowItem.width + centerGap)
-        readonly property real maxCenterX: Math.round(rightRowItem.x - centerGap - centerRowItem.width)
-        readonly property real centerTargetX: maxCenterX < minCenterX
-            ? Math.max(4, Math.min(idealCenterX, width - centerRowItem.width - 4))
-            : Math.max(minCenterX, Math.min(idealCenterX, maxCenterX))
-
-        // ── side-row auto-compact (portrait/narrow) ──
-        // Presentation-only stages that hide low-priority side groups when the bar
-        // would otherwise overflow. Never touches root.mod* toggles, models, order
-        // or split persistence. Budgets are summed from stage-independent budgetSlotWidth
-        // values — never from the collapsed row widths — so hiding a group cannot
-        // feed back into its own decision (same anti-flutter rule as the G8 stage).
-        property int narrowStage: 0            // 0 normal · 1 compact · 2 portrait · 3 emergency
-        property real g8FloorWidth: 80         // published by G8: its clock-only minimal width
-        function groupVisibleAtStage(gid, stage) {
-            // Hide lower-priority side widgets as horizontal pressure rises. The
-            // center clock/status floor and core controls stay visible; verbose
-            // widgets drop first so text never piles up around the center. Keep
-            // AI usage (G7) and now playing (G9) visible when their toggles are on.
-            if (stage >= 1 && (gid === "G10" || gid === "G14")) return false
-            if (stage >= 2 && gid === "G3") return false
-            return true
-        }
-        function sideNaturalWidth(row, stage) {
-            var sum = 0, n = 0
-            for (var k = 0; k < row.rep.count; k++) {
-                var it = row.rep.itemAt(k)
-                if (!it || !it.hasContent) continue
-                if (!groupVisibleAtStage(it.gid, stage)) continue
-                sum += it.budgetSlotWidth; n++
-            }
-            return sum + Math.max(0, n - 1) * row.spacing
-        }
-        function narrowCandidateWidth(stage) {
-            // side rows + G8 floor + row margins + both center gaps
-            return sideNaturalWidth(leftRowItem, stage) + sideNaturalWidth(rightRowItem, stage)
-                 + g8FloorWidth + 2 * centerGap + 2 * rowMargin
-        }
-        function updateNarrowStage() {
-            var s = narrowStage, W = island.width
-            if (W < 1) return                              // no layout yet
-            // downshift while the CURRENT stage no longer fits with readable slack.
-            // The slack intentionally exceeds the hard overlap boundary so text-heavy
-            // widgets disappear before the center area becomes noisy.
-            if (s === 0 && narrowCandidateWidth(0) + 120 > W) s = 1
-            if (s === 1 && narrowCandidateWidth(1) + 96 > W) s = 2
-            if (s === 2 && narrowCandidateWidth(2) + 72 > W) s = 3
-            // …upshift only when the NEXT-LARGER stage fits with 48px slack,
-            // measured against that stage's own candidate width.
-            if (s === 3 && narrowCandidateWidth(2) + 120 <= W) s = 2
-            if (s === 2 && narrowCandidateWidth(1) + 144 <= W) s = 1
-            if (s === 1 && narrowCandidateWidth(0) + 168 <= W) s = 0
-            if (s !== narrowStage) narrowStage = s
-        }
-        function scheduleNarrowUpdate() { narrowTimer.restart() }
-        Timer { id: narrowTimer; interval: 80; repeat: false; onTriggered: island.updateNarrowStage() }
-        onWidthChanged: scheduleNarrowUpdate()
-        onG8FloorWidthChanged: scheduleNarrowUpdate()
-        Connections {
-            target: barSlot.root
-            function onMprisActiveChanged() { island.scheduleNarrowUpdate() }
-            function onModClaudeChanged() { island.scheduleNarrowUpdate() }
-        }
+        readonly property real leftEdgeX: leftRowItem.x + leftRowItem.width
+        readonly property real rightEdgeX: rightRowItem.x
+        readonly property real minCenterX: Math.round(leftEdgeX + centerGap)
+        readonly property real maxCenterX: Math.round(rightEdgeX - centerGap - centerRowItem.width)
+        readonly property real preferredCenterX: Math.round((width - centerRowItem.width) / 2)
+        readonly property real centerTargetX: maxCenterX >= minCenterX
+            ? Math.max(minCenterX, Math.min(preferredCenterX, maxCenterX))
+            : Math.round((leftEdgeX + rightEdgeX - centerRowItem.width) / 2)
 
         // ── split persistence (survives restart) ──
         readonly property string splitCachePath: Quickshell.env("HOME") + "/.cache/quickshell_barsplits"
@@ -761,9 +705,9 @@ PanelWindow {
         // content-right of slot i, 4px before the next VISIBLE slot's content-left.
         function gapInterval(rep, i) {
             var a = rep.itemAt(i)
-            if (!a || !a.hasContent || !a.autoShown) return null
+            if (!a || !a.hasContent) return null
             var b = null                                   // next VISIBLE slot (skip 0-width)
-            for (var k = i + 1; k < rep.count; k++) { var it = rep.itemAt(k); if (it && it.hasContent && it.autoShown) { b = it; break } }
+            for (var k = i + 1; k < rep.count; k++) { var it = rep.itemAt(k); if (it && it.hasContent) { b = it; break } }
             if (!b) return null
             // a.width - a.grow = slot's pill-right edge (handles workspace ±4 overflow);
             // 0 = next slot's pill-left edge. 4px padding on each side.
@@ -860,6 +804,7 @@ PanelWindow {
         SlotRow {
             id: leftRowItem
             anchors { left: parent.left; leftMargin: island.rowMargin; verticalCenter: parent.verticalCenter }
+            z: 30
             rmodel: leftModel
             splitsArr: island.leftSplits
             toggleGap: function (i) { var a = island.leftSplits.slice(); a[i] = !a[i]; island.leftSplits = a }
@@ -869,12 +814,14 @@ PanelWindow {
             // no centerIn: x is clamped between the side rows on narrow monitors
             anchors.verticalCenter: parent.verticalCenter
             x: island.centerTargetX
+            z: 30
             Behavior on x { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
             rmodel: centerModel
         }
         SlotRow {
             id: rightRowItem
             anchors { right: parent.right; rightMargin: island.rowMargin; verticalCenter: parent.verticalCenter }
+            z: 30
             rmodel: rightModel
             splitsArr: island.rightSplits
             toggleGap: function (i) { var a = island.rightSplits.slice(); a[i] = !a[i]; island.rightSplits = a }
@@ -898,6 +845,27 @@ PanelWindow {
             return 0
         }
 
+        function dumpLayout(tag) {
+            if (!barSlot.debugLayout && !barSlot.root.pointerTrace) return
+            console.log("BarSlot[" + tag + "] screen=" + barSlot.screenName
+                + " width=" + island.width
+                + " left=" + leftRowItem.x + ":" + leftRowItem.width
+                + " center=" + centerRowItem.x + ":" + centerRowItem.width
+                + " right=" + rightRowItem.x + ":" + rightRowItem.width
+                + " min=" + island.minCenterX
+                + " max=" + island.maxCenterX
+                + " pref=" + island.preferredCenterX
+                + " target=" + island.centerTargetX)
+            console.log("BarSlot[" + tag + "] anchors=" + JSON.stringify(island.panelAnchors))
+            if (barSlot.root.pointerTrace) {
+                barSlot.root.traceGeometry(leftRowItem, "left-row")
+                barSlot.root.traceGeometry(centerRowItem, "center-row")
+                barSlot.root.traceGeometry(rightRowItem, "right-row")
+                var clockItem = centerRowItem.rep.itemAt(0)
+                if (clockItem && clockItem.loaderItem) barSlot.root.traceGeometry(clockItem.loaderItem, "clock-loader")
+            }
+        }
+
         readonly property string panelScreenName: barSlot.screen ? barSlot.screen.name : ""
         readonly property var panelAnchors: {
             void(island.width)
@@ -919,12 +887,23 @@ PanelWindow {
                 bluetooth:    island.groupX("G11", 0.5),
                 power:        island.groupX("G14", 0.5),
                 mpris:        island.groupX("G9",  0.5),
-                weather:      island.groupX("G8",  0.5),
                 launcher:     island.groupX("G1",  0.5)
             }
         }
         onPanelAnchorsChanged: barSlot.root.publishBarAnchors(panelScreenName, panelAnchors)
         Component.onCompleted: barSlot.root.publishBarAnchors(panelScreenName, panelAnchors)
+        Timer {
+            interval: 500
+            running: barSlot.debugLayout || barSlot.root.pointerTrace
+            repeat: false
+            onTriggered: island.dumpLayout("initial")
+        }
+        Connections {
+            target: island
+            function onWidthChanged() {
+                if ((barSlot.debugLayout || barSlot.root.pointerTrace) && island.width > 0) island.dumpLayout("width")
+            }
+        }
 
         // ── boundary split markers (left↔center, center↔right) ──
         // positioned via real Row geometries (no mapToItem → robust).

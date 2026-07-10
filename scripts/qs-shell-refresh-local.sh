@@ -9,6 +9,10 @@ SRC="${QS_SHELL_SOURCE:-}"
 if [ -z "$SRC" ] && [ -r "$DEST/.qsrise-source" ]; then
   SRC="$(tr -d '\n' < "$DEST/.qsrise-source")"
 fi
+if [ -n "$SRC" ] && [ ! -d "$SRC/versions/default" ]; then
+  printf '%s\n' "QS-Shell: recorded source '$SRC' is unavailable; falling back to the deploy clone" >&2
+  SRC=""
+fi
 if [ -z "$SRC" ] && [ -d "$HOME/.local/share/quickshell-dots/versions/default" ]; then
   SRC="$HOME/.local/share/quickshell-dots"
 fi

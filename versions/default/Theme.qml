@@ -28,6 +28,45 @@ Item {
     property color accentHint: sealRaw    // filled by palette; default = same as red
     property bool enablePulse: true
     property string barColor: "red"
+    readonly property bool pointerTrace: Quickshell.env("QS_POINTER_TRACE") === "1"
+    property real pointerTraceX: -1
+    property real pointerTraceY: -1
+    property string pointerTraceLabel: ""
+
+    function tracePointer(item, label, event, action) {
+        if (!pointerTrace || !item) return
+        var p = item.mapToItem(null, 0, 0)
+        var chain = []
+        var current = item
+        while (current && chain.length < 12) {
+            chain.push((current.objectName || current.toString())
+                + "@" + current.x + "," + current.y + ":" + current.width + "x" + current.height
+                + ":v=" + current.visible + ":e=" + current.enabled + ":o=" + current.opacity
+                + ":z=" + current.z + ":clip=" + current.clip)
+            current = current.parent
+        }
+        pointerTraceX = p.x + (event && event.x !== undefined ? event.x : item.width / 2)
+        pointerTraceY = p.y + (event && event.y !== undefined ? event.y : item.height / 2)
+        pointerTraceLabel = label + (action ? " -> " + action : "")
+        console.log("POINTER_TRACE label=" + label
+            + " action=" + (action || "")
+            + " scene=" + pointerTraceX + "," + pointerTraceY
+            + " local=" + (event && event.x !== undefined ? event.x + "," + event.y : "n/a")
+            + " item=" + p.x + "," + p.y + " " + item.width + "x" + item.height
+            + " visible=" + item.visible + " enabled=" + item.enabled
+            + " opacity=" + item.opacity + " z=" + item.z + " clip=" + item.clip
+            + " accepted=" + (event && event.accepted !== undefined ? event.accepted : "n/a")
+            + " parentChain=" + chain.join(" <- "))
+    }
+
+    function traceGeometry(item, label) {
+        if (!pointerTrace || !item) return
+        var p = item.mapToItem(null, 0, 0)
+        console.log("POINTER_GEOMETRY label=" + label
+            + " scene=" + p.x + "," + p.y + " " + item.width + "x" + item.height
+            + " visible=" + item.visible + " enabled=" + item.enabled
+            + " opacity=" + item.opacity + " z=" + item.z + " clip=" + item.clip)
+    }
 
     readonly property color baseSeal: barColorValue(barColor)
     readonly property color seal: baseSeal
@@ -99,7 +138,7 @@ Item {
 
     readonly property bool anyPopupVisible: appLauncherVisible || calendarVisible || cpuVisible || aiUsageVisible
         || memVisible || volVisible || controlVisible || networkVisible || bluetoothVisible
-        || batteryVisible || mprisVisible || weatherVisible
+        || batteryVisible || mprisVisible
         || workspaceVisible || imagePickerVisible || mediaBrowserVisible || notifVisible
         || powerProfileVisible || archVisible || shellUpdateVisible || trayVisible || trayMenuVisible
     readonly property bool keyboardPopupVisible: appLauncherVisible || imagePickerVisible || mediaBrowserVisible
@@ -271,7 +310,6 @@ Item {
         else if (name === "bluetooth") bluetoothBarX = x
         else if (name === "power") powerBarX = x
         else if (name === "mpris") mprisBarX = x
-        else if (name === "weather") weatherBarX = x
         else if (name === "launcher") launcherBarX = x
         else if (name === "shellUpdate") shellUpdateBarX = x
         else if (name === "trayMenu") trayMenuX = x
@@ -325,7 +363,6 @@ Item {
         if (except !== "bluetoothVisible") bluetoothVisible = false
         if (except !== "batteryVisible") batteryVisible = false
         if (except !== "mprisVisible") mprisVisible = false
-        if (except !== "weatherVisible") weatherVisible = false
         if (except !== "workspaceVisible") workspaceVisible = false
         if (except !== "imagePickerVisible") imagePickerVisible = false
         if (except !== "mediaBrowserVisible") mediaBrowserVisible = false
@@ -829,7 +866,6 @@ Item {
     property bool modMemory:     true
     property bool modCpu:        true
     property bool modVolume:     true
-    property bool modWeather:    true
     property bool modNetwork:    true
     property string networkMode: "none"   // mirrored from NetworkWidget: wifi/ethernet/none
     property bool omarchyUpdateAvail: false   // mirrored from UpdateWidget (6h poll)
@@ -877,11 +913,23 @@ Item {
     property string launcherLogoMode: "text"     // "text" or "icon"
     property string launcherLogoText: "omarchy"  // "omarchy", "hyprland", "arch", or "omacom"
     property string launcherLogoIcon: "omarchy"  // see launcherLogoIconGlyph()
-    property bool   weatherImperial: false   // false = °C / km·h, true = °F / mph
     property bool   clock12h:        false   // false = 24h, true = 12h (AM/PM)
     property string archUpdateDay:   "friday" // weekday when the package update pill is shown
     property bool   archUpdateScheduleActive: false // keep the pill visible after scheduled updates are found
-    property string archUpdateCompletedDate: ""
+    // Update completion is determined by a durable package fingerprint, not the date.
+    property string archUpdateStatus: "unknown"
+    property string archUpdateFingerprint: ""
+    property string archUpdateCompletedFingerprint: ""
+    property string archUpdateSettledScheduleKey: ""
+    property bool archUpdateRebootRequired: false
+    property string archUpdateSnapperStatus: "unavailable"
+    property bool   updatesAvailable: false
+    property int    updateCount: 0
+    property int    previousUpdateCount: 0
+    property int    updatePulseSerial: 0
+    property string updatePulseTitle: ""
+    property string updatePulseDetail: ""
+    property string updatePulseHint: ""
 
     // ── widget/workspace state persistence ──
     readonly property string widgetsCachePath: Quickshell.env("HOME") + "/.cache/quickshell_widgets"
@@ -907,7 +955,6 @@ Item {
     onLauncherLogoModeChanged: if (_widgetsLoaded) saveWidgets()
     onLauncherLogoTextChanged: if (_widgetsLoaded) saveWidgets()
     onLauncherLogoIconChanged: if (_widgetsLoaded) saveWidgets()
-    onWeatherImperialChanged: if (_widgetsLoaded) saveWidgets()
     onClock12hChanged:        if (_widgetsLoaded) saveWidgets()
     onArchBadgePackagesChanged: if (_widgetsLoaded) saveWidgets()
     onArchBadgeThemesChanged:   if (_widgetsLoaded) saveWidgets()
@@ -917,12 +964,8 @@ Item {
     onStyleRadiusSmallChanged: if (_widgetsLoaded) saveWidgets()
     onWorkspaceStyleChanged:   if (_widgetsLoaded) saveWidgets()
     onBarPositionChanged:      if (_widgetsLoaded) saveWidgets()
-    onArchUpdateDayChanged: {
-        archUpdateCompletedDate = ""
-        if (_widgetsLoaded) saveWidgets()
-    }
+    onArchUpdateDayChanged: if (_widgetsLoaded) saveWidgets()
     onArchUpdateScheduleActiveChanged: if (_widgetsLoaded) saveWidgets()
-    onArchUpdateCompletedDateChanged: if (_widgetsLoaded) saveWidgets()
     onEnablePulseChanged: if (_widgetsLoaded) saveWidgets()
 
     readonly property var archUpdateDayOptions: [
@@ -936,8 +979,11 @@ Item {
     ]
     property int currentWeekday: new Date().getDay()
     property string currentDateKey: dateKey(new Date())
-    readonly property bool archUpdateDue: currentWeekday === archUpdateDayIndex(archUpdateDay)
-        && archUpdateCompletedDate !== currentDateKey
+    readonly property bool isArchUpdateScheduleDay: currentWeekday === archUpdateDayIndex(archUpdateDay)
+    // The date is only a scheduling cadence. Suppression is keyed by package state
+    // in qs-package-update-state.sh, so new packages later that day are not hidden.
+    readonly property bool archUpdateDue: isArchUpdateScheduleDay
+        && archUpdateSettledScheduleKey !== currentDateKey
 
     Timer {
         interval: 3600000
@@ -971,6 +1017,30 @@ Item {
         return "Fri"
     }
 
+    function setPackageUpdateCount(count, notificationKey) {
+        var nextCount = Math.max(0, count || 0)
+        if (nextCount === 0) {
+            updatesAvailable = false
+            updateCount = 0
+            previousUpdateCount = 0
+            updatePulseTitle = ""
+            updatePulseDetail = ""
+            updatePulseHint = ""
+            return
+        }
+
+        updatesAvailable = true
+        updateCount = nextCount
+        if (nextCount === previousUpdateCount && !notificationKey) return
+
+        previousUpdateCount = nextCount
+        if (!notificationKey) return
+        updatePulseTitle = "Updates Available"
+        updatePulseDetail = nextCount + (nextCount === 1 ? " package ready" : " packages ready")
+        updatePulseHint = "Click to update"
+        updatePulseSerial++
+    }
+
     function saveWidgets() {
         var line = (modMemory    ? "1" : "0") + " "
                  + "0 "                                  // legacy brightness field; module removed
@@ -979,7 +1049,7 @@ Item {
                  + (modBluetooth ? "1" : "0") + " "
                  + workspaceMode + " "
                  + pickerStyle + " "
-                 + (weatherImperial ? "1" : "0") + " "
+                 + "0 "                                  // legacy weather unit field; weather removed
                  + (clock12h        ? "1" : "0") + " "
                  + (modNetwork      ? "1" : "0") + " "
                  + (styleShadow      ? "1" : "0") + " "   // field +5 (was styleBorderless; value-compatible)
@@ -1008,8 +1078,7 @@ Item {
                  + (modPrivacyCamera ? "1" : "0") + " "   // +28 camera privacy pill
                  + "0 "                                    // +29 reserved cache field
                  + "0 "                                    // +30 reserved cache field
-                 + (enablePulse ? "1" : "0") + " "         // +31 pulse
-                 + archUpdateCompletedDate                 // +32 scheduled updater completed date
+                 + (enablePulse ? "1" : "0")                 // +31 pulse
         widgetSaveProc.command = ["bash", "-c",
             "echo '" + line + "' > '" + widgetsCachePath + "'"]
         widgetSaveProc.running = false
@@ -1151,8 +1220,7 @@ Item {
                         if (ps === "hearthstone" || ps === "carousel" || ps === "tanzaku")
                             theme.pickerStyle = ps
                     }
-                    // weatherImperial / clock12h follow pickerStyle
-                    if (parts.length > wsField + 2) theme.weatherImperial = parts[wsField + 2] === "1"
+                    // wsField+2 is the legacy weather unit field; weather was removed.
                     if (parts.length > wsField + 3) theme.clock12h        = parts[wsField + 3] === "1"
                     if (parts.length > wsField + 4) theme.modNetwork      = parts[wsField + 4] === "1"
                     // style tokens — appended after modNetwork, each guarded
@@ -1214,7 +1282,6 @@ Item {
                     if (parts.length > wsField + 28) theme.modPrivacyCamera = parts[wsField + 28] !== "0"
                     else theme.modPrivacyCamera = theme.modPrivacy
                     if (parts.length > wsField + 31) theme.enablePulse = parts[wsField + 31] !== "0"
-                    if (parts.length > wsField + 32) theme.archUpdateCompletedDate = parts[wsField + 32]
                 }
                 theme._widgetsLoaded = true
             }
@@ -1232,8 +1299,6 @@ Item {
     onBatteryVisibleChanged: popupOpened("batteryVisible")
     property bool mprisVisible:     false
     onMprisVisibleChanged: popupOpened("mprisVisible")
-    property bool weatherVisible:   false
-    onWeatherVisibleChanged: popupOpened("weatherVisible")
     property bool workspaceVisible: false
     onWorkspaceVisibleChanged: popupOpened("workspaceVisible")
 
@@ -1450,7 +1515,6 @@ Item {
     property real bluetoothBarX:  0
     property real powerBarX:      0
     property real mprisBarX:      0
-    property real weatherBarX:    0
     property real launcherBarX:   6   // ControlPanel follows the Launcher/Control group
 
     // ── Tray context-menu state (themed menu, rendered by TrayMenu.qml) ──

@@ -2,9 +2,11 @@
 # QS-Shell update check (writes a state file the bar watches; no apply here).
 #
 # Topology of THIS setup: the live bar dir is a *copy* of versions/default/ from the
-# deploy clone at ~/.local/share/quickshell-dots by default (override with
-# QS_SHELL_REPO). We never run git in the live dir — we compare the deploy
-# repo's tracking branch against origin, scoped to the installed config.
+# installed config directory. Prefer the source recorded there in .qsrise-source;
+# fall back to the persistent deploy clone at ~/.local/share/quickshell-dots only
+# when the recorded source is missing or invalid. We never run git in the live dir —
+# we compare the deploy repo's tracking branch against origin, scoped to the
+# installed config.
 #
 # State contract: ~/.cache/qs-shell/update-available.json ALWAYS exists.
 #   "up to date" = {"behind": 0}.  Pending   = {"behind": N, "config", "summary", "checked"}.
@@ -17,6 +19,16 @@ DEST="${QS_SHELL_DEST:-$HOME/.config/quickshell/bar}"
 STATE_DIR="$HOME/.cache/qs-shell"
 STATE="$STATE_DIR/update-available.json"
 mkdir -p "$STATE_DIR"
+
+SOURCE="${QS_SHELL_SOURCE:-}"
+if [ -z "$SOURCE" ] && [ -r "$DEST/.qsrise-source" ]; then
+  SOURCE="$(tr -d '\n' < "$DEST/.qsrise-source")"
+fi
+if [ -n "$SOURCE" ] && [ -d "$SOURCE/.git" ]; then
+  REPO="$SOURCE"
+elif [ -n "$SOURCE" ]; then
+  printf '%s\n' "QS-Shell: recorded source '$SOURCE' is unavailable; falling back to $REPO" >&2
+fi
 
 # jq is required (and a hard dependency in install.sh). Warn once rather than
 # failing silently under `set -e` after a successful fetch.

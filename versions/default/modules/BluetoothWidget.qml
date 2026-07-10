@@ -102,7 +102,7 @@ Item {
 
     Process { id: clickRunner; command: ["bash", "-c", root.launchBtCmd] }
 
-    MouseArea {
+    BarWidgetButton {
         anchors.fill: parent
         hoverEnabled: true; cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton

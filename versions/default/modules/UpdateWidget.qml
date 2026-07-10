@@ -10,8 +10,8 @@ Item {
     property bool checking: false
     onUpdateAvailableChanged: root.omarchyUpdateAvail = updateAvailable   // mirror for the swarm reactor
 
-    visible: updateAvailable && !checking
-    implicitWidth: visible ? 20 : 0
+    visible: false
+    implicitWidth: 0
     implicitHeight: 28
     width: implicitWidth
     height: implicitHeight
@@ -53,7 +53,7 @@ Item {
 
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
 
-    MouseArea {
+    BarWidgetButton {
         anchors.fill: parent
         hoverEnabled: true; cursorShape: Qt.PointingHandCursor
         onEntered: tip.show()

@@ -119,11 +119,7 @@ PanelWindow {
         return m
     }
 
-    // ── OK-only update policy ──
-    // The main button installs ONLY verified repo/system OK packages, via pacman.
-    // AUR packages are never part of a pacman transaction, so WARN/AUR is skipped
-    // automatically; system packages that are not OK are held back with --ignore
-    // (keeps the upgrade whole — no partial-upgrade risk, unlike a name allowlist).
+    // ── package review state ──
     readonly property int repoOkPackages: {
         var n = 0, r = root.archGateResults || []
         for (var i = 0; i < r.length; i++)
@@ -137,17 +133,6 @@ PanelWindow {
         return n
     }
     readonly property int btnCount: aurReviewPackages > 0 ? 3 : 2
-    // NOT gated on degraded: repo updates are trusted via pacman/GPG independently
-    // of the AUR blacklist, so a degraded AUR feed must not block repo upgrades.
-    readonly property bool canUpdate: repoOkPackages > 0 && root.archGateState !== "scanning"
-    function systemIgnoreList() {
-        var out = [], r = root.archGateResults || []
-        for (var i = 0; i < r.length; i++)
-            if (r[i].repo !== "aur" && r[i].verdict !== "OK"
-                && /^[a-zA-Z0-9@._+-]+$/.test(r[i].pkg))
-                out.push(r[i].pkg)
-        return out
-    }
     function shellQuote(value) {
         return "'" + String(value).replace(/'/g, "'\"'\"'") + "'"
     }
@@ -712,21 +697,18 @@ PanelWindow {
                     }
                 }
 
-                // Update — OK-only repo/system via pacman; AUR is never installed here.
+                // Package installation is intentionally outside this unprivileged bar.
+                // This control keeps the discovered package set visible and fresh.
                 Rectangle {
                     width: (parent.width - 8 * (archPanel.btnCount - 1)) / archPanel.btnCount
                     height: 28; radius: root.tileRadius
-                    opacity: archPanel.canUpdate ? 1.0 : 0.45
-                    color: (updateMa.containsMouse && archPanel.canUpdate) ? root.fillPrimaryHover : root.seal
+                    opacity: 1.0
+                    color: updateMa.containsMouse ? root.fillPrimaryHover : root.seal
                     border.color: "transparent"
                     Behavior on color { ColorAnimation { duration: 120 } }
                     UiText {
                         anchors.centerIn: parent
-                        text: archPanel.repoOkPackages === 0
-                            ? "No pacman updates"
-                            : (archPanel.aurReviewPackages > 0 || root.archGateFail > 0)
-                                ? "Update " + archPanel.repoOkPackages + " OK only"
-                                : "Update " + archPanel.repoOkPackages
+                        text: archPanel.repoOkPackages === 0 ? "No pacman updates" : "Recheck " + archPanel.repoOkPackages
                         color: root.paper
                         font.family: root.mono; font.pixelSize: 11
                     }
@@ -734,30 +716,9 @@ PanelWindow {
                         id: updateMa
                         anchors.fill: parent
                         hoverEnabled: true
-                        enabled: archPanel.canUpdate
-                        cursorShape: archPanel.canUpdate ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            // OK-only: pacman never touches AUR, so WARN/AUR is skipped
-                            // automatically; non-OK SYSTEM packages are held back with
-                            // --ignore (whole upgrade, no partial-upgrade risk). Names
-                            // are regex-validated before interpolation.
-                            var ig = archPanel.systemIgnoreList();
-                            var ign = ig.length ? " --ignore " + ig.join(",") : "";
-                            var prompt = "Update " + archPanel.repoOkPackages + " verified repo packages only?";
-                            if (archPanel.aurReviewPackages > 0)
-                                prompt += " " + archPanel.aurReviewPackages + " AUR review packages will be skipped.";
-                            if (root.archGateDegraded)
-                                prompt += " (security feed degraded)";
-                            var updateCommand = archPanel.themedGumConfirmEnv()
-                                + " gum confirm " + archPanel.shellQuote(prompt)
-                                + " && sudo pacman -Syu" + ign
-                                + "; qs -c bar ipc call omarchy.system-update refresh >/dev/null 2>&1 || true";
-                            panelUpdateRunner.command = ["bash", "-c",
-                                "omarchy-launch-floating-terminal-with-presentation "
-                                    + archPanel.shellQuote(updateCommand)];
-                            root.archVisible = false;
-                            panelUpdateRunner.running = false;
-                            panelUpdateRunner.running = true;
+                            root.archRefreshTick++
                         }
                     }
                 }

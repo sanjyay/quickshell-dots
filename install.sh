@@ -123,6 +123,10 @@ install_shell_updater() {
   local unitdst="$HOME/.config/systemd/user"
   local repodir="$HOME/.local/share/quickshell-dots"
 
+  mkdir -p "$bindst" "$unitdst"
+  # This read-only helper does not depend on the persistent updater clone.
+  install -m 755 "$src/scripts/qs-package-update-state.sh" "$bindst/qs-package-update-state.sh"
+
   if [[ -d "$repodir/.git" ]]; then
     git -C "$repodir" fetch --quiet origin || true
   else
@@ -176,7 +180,7 @@ miss=()
 for b in "${need[@]}"; do command -v "$b" >/dev/null 2>&1 || miss+=("$b"); done
 if ((${#miss[@]})); then
   err "Missing required: ${miss[*]}"
-  warn "On Arch:  sudo pacman -S quickshell git jq curl"
+  warn "Install quickshell, git, jq, and curl through your system's normal package-management workflow."
   exit 1
 fi
 optmiss=()
@@ -189,18 +193,12 @@ fonts="$(fc-list)"
 [[ "$fonts" == *"Material Symbols"*  ]] || fontmiss+=("Material Symbols Rounded")
 if ((${#fontmiss[@]})); then
   warn "Missing fonts: ${fontmiss[*]}"
-  warn "The bar needs these to display icons correctly."
-  if [[ -t 0 ]]; then
-    read -p "Install missing fonts? [Y/n] " ans </dev/tty || ans=""   # no tty → empty, not unset (set -u)
-    case "${ans,,}" in n|no) err "Fonts required — aborting."; exit 1 ;; esac
-  fi
+  warn "The bar needs these to display icons correctly; installation is intentionally left to your administrator workflow."
   if [[ "$fonts" != *"JetBrainsMono Nerd"* ]]; then
-    info "Installing ttf-jetbrains-mono-nerd..."
-    sudo pacman -S --noconfirm ttf-jetbrains-mono-nerd
+    warn "JetBrains Mono Nerd Font is missing; install it through your normal administrator workflow."
   fi
   if [[ "$fonts" != *"Material Symbols"* ]]; then
-    info "Installing ttf-material-symbols-variable..."
-    sudo pacman -S --noconfirm ttf-material-symbols-variable
+    warn "Material Symbols font is missing; install it through your normal administrator workflow."
   fi
 fi
 
@@ -231,6 +229,11 @@ else
   src_repo="$tmp/repo"
 fi
 
+source_ref="$src_repo"
+if [[ "$src_repo" == "$tmp/repo" ]]; then
+  source_ref="$HOME/.local/share/quickshell-dots"
+fi
+
 [[ -d "$src_repo/versions/$CONFIG_DIR" ]] || { err "Missing config: versions/$CONFIG_DIR"; exit 1; }
 
 # ── 4. install ──────────────────────────────────────────────────
@@ -244,7 +247,7 @@ stage="$(mktemp -d -p "$(dirname "$DEST")" .qs-install-stage.XXXXXX)"
 cp -r "$src_repo/versions/$CONFIG_DIR/." "$stage/"
 echo "$CONFIG_DIR" > "$stage/.qsrise"
 if [[ -d "$src_repo/.git" ]]; then
-  printf '%s\n' "$src_repo" > "$stage/.qsrise-source"
+  printf '%s\n' "$source_ref" > "$stage/.qsrise-source"
 fi
 
 if [[ -d "$DEST" ]]; then
@@ -272,6 +275,22 @@ if [[ -n "$restore_src" && "$restore_src" == "$DEST.old."* ]]; then
 fi
 restore_src=""
 info "Installed Quickshell bar → $DEST"
+
+verify_installed_copy() {
+  local rel
+  for rel in BarSlot.qml \
+             modules/ClockWidget.qml \
+             modules/ClaudeWidget.qml \
+             modules/ScreenRecordWidget.qml \
+             shell.qml; do
+    cmp -s "$src_repo/versions/$CONFIG_DIR/$rel" "$DEST/$rel" || {
+      err "Installed $rel does not match $src_repo/versions/$CONFIG_DIR/$rel"
+      exit 1
+    }
+  done
+}
+verify_installed_copy
+info "Verified installed bar matches source tree"
 
 # ── 4b. Hyprland launcher binding ──────────────────────────────
 if [[ -f "$src_repo/scripts/ensure-hypr-launcher-binding.sh" ]]; then

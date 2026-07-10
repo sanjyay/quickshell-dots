@@ -67,7 +67,7 @@ Item {
         }
     }
 
-    MouseArea {
+    BarWidgetButton {
         anchors.fill: parent
         hoverEnabled: true
     }

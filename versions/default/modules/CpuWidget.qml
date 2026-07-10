@@ -145,7 +145,7 @@ Item {
 
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
 
-    MouseArea {
+    BarWidgetButton {
         id: clickArea
         anchors.fill: parent
         hoverEnabled: true

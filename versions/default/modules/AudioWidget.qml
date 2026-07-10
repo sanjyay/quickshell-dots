@@ -4,6 +4,7 @@ import Quickshell.Io
 
 Item {
     id: rootMod
+    objectName: "volume-wrapper"
     required property var root
 
     AudioData { id: audio; poll: true }
@@ -128,8 +129,10 @@ Item {
         volSetRunner.running = true
     }
 
-    MouseArea {
+    BarWidgetButton {
         anchors.fill: parent
+        theme: root
+        traceName: "volume-handler"
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton

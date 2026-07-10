@@ -16,8 +16,8 @@ Item {
     property string version: ""
 
     readonly property bool updateAvailable: behind > 0
-    visible: updateAvailable
-    implicitWidth: updateAvailable ? 20 : 0
+    visible: false
+    implicitWidth: 0
     implicitHeight: 28
     width: implicitWidth
     height: implicitHeight
@@ -72,7 +72,7 @@ Item {
 
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
 
-    MouseArea {
+    BarWidgetButton {
         anchors.fill: parent
         hoverEnabled: true; cursorShape: Qt.PointingHandCursor
         onEntered: tip.show()

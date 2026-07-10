@@ -9,6 +9,7 @@ import Quickshell.Io
 // Gating is unchanged: root.modClaude is the on/off toggle for the whole pill.
 Item {
     id: rootMod
+    objectName: "ai-wrapper"
     required property var root
 
     // ── which tool the bar pill displays ──
@@ -60,6 +61,7 @@ Item {
     readonly property string ocModel:     root.aiOcModel
     readonly property int    ocToday:     root.aiOcToday
     readonly property bool   ocHas:       root.aiOcHas
+    readonly property bool debugLayout: Quickshell.env("QS_BAR_LAYOUT_DEBUG") === "1"
 
     // ── per-tool signal (active OR fresh non-zero usage) ──
     readonly property bool clSignal: clActive || (clPct5h > 0 && clFresh)
@@ -290,12 +292,52 @@ Item {
 
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
 
-    MouseArea {
+    Rectangle {
+        visible: rootMod.debugLayout
         anchors.fill: parent
+        radius: root.pillRadius
+        color: Qt.rgba(0.16, 0.78, 0.43, 0.10)
+        border.color: Qt.rgba(0.16, 0.78, 0.43, 0.75)
+        border.width: 1
+        z: 50
+    }
+
+    Rectangle {
+        visible: rootMod.debugLayout
+        anchors.fill: row
+        radius: root.pillRadius
+        color: Qt.rgba(0.22, 0.62, 0.90, 0.08)
+        border.color: Qt.rgba(0.22, 0.62, 0.90, 0.82)
+        border.width: 1
+        z: 51
+    }
+
+    BarWidgetButton {
+        anchors.fill: parent
+        theme: root
+        traceName: "ai-handler"
         hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-        onEntered: if (shown) { root.refreshAiUsage(); tip.show() }
-        onExited: { tip.hide() }
-        onClicked: {
+        onEntered: {
+            if (shown) {
+                root.refreshAiUsage()
+                tip.show()
+            }
+            if (rootMod.debugLayout) console.log("ClaudeWidget hover entered outer=" + rootMod.width + "x" + rootMod.height)
+        }
+        onExited: {
+            tip.hide()
+            if (rootMod.debugLayout) console.log("ClaudeWidget hover exited outer=" + rootMod.width + "x" + rootMod.height)
+        }
+        onPressed: function(mouse) {
+            if (!rootMod.debugLayout) return
+            var scene = mapToItem(null, mouse.x, mouse.y)
+            console.log("ClaudeWidget press local=" + mouse.x + "," + mouse.y
+                + " scene=" + scene.x + "," + scene.y
+                + " outer=" + rootMod.x + "," + rootMod.y + " " + rootMod.width + "x" + rootMod.height
+                + " visible=" + row.implicitWidth + "x" + row.implicitHeight)
+        }
+        onClicked: function(mouse) {
+            if (rootMod.debugLayout) console.log("ClaudeWidget click local=" + mouse.x + "," + mouse.y)
             tip.hide()
             root.aiTool = "codex"
             root.refreshAiUsage(true)

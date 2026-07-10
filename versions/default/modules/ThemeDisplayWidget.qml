@@ -27,7 +27,7 @@ Item {
         text: "L: Theme  R: Wallpaper"
     }
 
-    MouseArea {
+    BarWidgetButton {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor

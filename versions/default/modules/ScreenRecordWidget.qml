@@ -9,20 +9,27 @@ Item {
     property bool recording: false
     property int  elapsed:   0   // seconds
 
+    function pad(n) { return n < 10 ? "0" + n : String(n) }
+
     visible: implicitWidth > 0.5
     implicitWidth: recording ? row.implicitWidth + 6 : 0
     clip: true
     implicitHeight: 28
     width: implicitWidth
     height: implicitHeight
+    opacity: recording ? 1 : 0
 
 
     readonly property string elapsedStr: {
         var h = Math.floor(elapsed / 3600)
         var m = Math.floor((elapsed % 3600) / 60)
         var s = elapsed % 60
-        function pad(n) { return n < 10 ? "0" + n : String(n) }
         return h > 0 ? (h + ":" + pad(m) + ":" + pad(s)) : (pad(m) + ":" + pad(s))
+    }
+    readonly property string compactElapsedStr: {
+        var totalMinutes = Math.floor(elapsed / 60)
+        var s = elapsed % 60
+        return totalMinutes + ":" + pad(s)
     }
     readonly property string tooltipText: "Recording · " + elapsedStr + "\nClick to stop"
 
@@ -51,7 +58,7 @@ Item {
 
         UiText {
             anchors.verticalCenter: parent.verticalCenter
-            text: rootMod.elapsedStr
+            text: rootMod.compactElapsedStr
             color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.82)
             font.family: root.mono
             font.pixelSize: 12
@@ -91,8 +98,9 @@ Item {
 
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
 
-    MouseArea {
+    BarWidgetButton {
         anchors.fill: parent
+        enabled: rootMod.recording
         hoverEnabled: true; cursorShape: Qt.PointingHandCursor
         onEntered: tip.show()
         onExited:  { tip.hide() }

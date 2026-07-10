@@ -29,7 +29,7 @@ Item {
         text: "L: Screenshots  R: Videos"
     }
 
-    MouseArea {
+    BarWidgetButton {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor

@@ -45,7 +45,7 @@ Item {
                     smooth: true
                 }
 
-                MouseArea {
+                BarWidgetButton {
                     id: ma
                     anchors.fill: parent
                     acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
@@ -123,7 +123,7 @@ Item {
                 }
             }
 
-            MouseArea {
+            BarWidgetButton {
                 id: toggleMa
                 anchors.fill: parent
                 hoverEnabled: true

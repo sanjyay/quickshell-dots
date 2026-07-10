@@ -97,7 +97,7 @@ Item {
         text: ""   // music_note
         font.pixelSize: 15
         color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.45)
-        MouseArea {
+        BarWidgetButton {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
             cursorShape: Qt.PointingHandCursor
@@ -120,7 +120,7 @@ Item {
                 ? Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.7)
                 : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.22)
             Behavior on color { ColorAnimation { duration: 150 } }
-            MouseArea {
+            BarWidgetButton {
                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                 onClicked: if (rootMod.player) rootMod.player.previous()
             }
@@ -132,7 +132,7 @@ Item {
             text: rootMod.playing ? "" : ""
             font.pixelSize: 13
             color: root.seal
-            MouseArea {
+            BarWidgetButton {
                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                 onClicked: if (rootMod.player) rootMod.player.togglePlaying()
             }
@@ -147,7 +147,7 @@ Item {
                 ? Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.7)
                 : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.22)
             Behavior on color { ColorAnimation { duration: 150 } }
-            MouseArea {
+            BarWidgetButton {
                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                 onClicked: if (rootMod.player) rootMod.player.next()
             }
@@ -292,7 +292,7 @@ Item {
 
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
 
-    MouseArea {
+    BarWidgetButton {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton

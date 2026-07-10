@@ -73,18 +73,17 @@ Built for **Omarchy / Hyprland**. It integrates with `omarchy-*` helpers, Omarch
 
 Required packages are checked by the installer:
 
-```bash
-sudo pacman -S quickshell git jq curl ttf-jetbrains-mono-nerd ttf-material-symbols-variable
-```
+Install `quickshell`, `git`, `jq`, `curl`, `ttf-jetbrains-mono-nerd`, and
+`ttf-material-symbols-variable` through your distribution's normal administrator workflow.
 
 <details>
 <summary>Optional widget dependencies</summary>
 
 Optional packages enable specific widgets:
 
-```bash
-sudo pacman -S pamixer power-profiles-daemon bluez-utils iwd impala hypridle gpu-screen-recorder psmisc
-```
+Install `pamixer`, `power-profiles-daemon`, `bluez-utils`, `iwd`, `impala`,
+`hypridle`, `gpu-screen-recorder`, and `psmisc` through your distribution's
+normal administrator workflow.
 
 Notes:
 

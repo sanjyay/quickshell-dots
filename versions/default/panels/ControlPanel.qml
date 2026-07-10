@@ -176,6 +176,69 @@ PanelWindow {
                 accent: root.seal
                 onActivated: ctrlPanel.scheduleOpen = !ctrlPanel.scheduleOpen
             }
+            Rectangle {
+                width: parent.width
+                height: updateInfoCol.implicitHeight + 14
+                visible: root.updatesAvailable
+                radius: root.tileRadius
+                color: root.fillIdle
+                border.color: root.sep
+                border.width: 1
+
+                Column {
+                    id: updateInfoCol
+                    anchors.left: parent.left
+                    anchors.right: updateAction.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 8
+                    spacing: 2
+                    UiText {
+                        text: "Updates"
+                        color: root.ink
+                        font.family: root.mono
+                        font.pixelSize: 11
+                        font.weight: Font.Medium
+                    }
+                    UiText {
+                        width: parent.width
+                        text: root.updateCount + (root.updateCount === 1 ? " package available" : " packages available")
+                        color: root.sumi
+                        font.family: root.mono
+                        font.pixelSize: 10
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Rectangle {
+                    id: updateAction
+                    anchors.right: parent.right
+                    anchors.rightMargin: 7
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 58
+                    height: 24
+                    radius: root.tileRadius
+                    color: updateActionMa.containsMouse ? root.fillPrimaryHover : root.seal
+                    UiText {
+                        anchors.centerIn: parent
+                        text: "Update"
+                        color: root.paper
+                        font.family: root.mono
+                        font.pixelSize: 10
+                    }
+                    MouseArea {
+                        id: updateActionMa
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            root.activeUpdateTab = "packages"
+                            root.controlVisible = false
+                            root.archVisible = true
+                        }
+                    }
+                }
+            }
             Grid {
                 width: parent.width
                 columns: 4

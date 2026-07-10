@@ -226,7 +226,19 @@ Item {
         }
     }
 
-    MouseArea {
+    Rectangle {
+        visible: root.updatesAvailable
+        anchors.right: pill.right
+        anchors.top: pill.top
+        anchors.rightMargin: 4
+        anchors.topMargin: 4
+        width: 6
+        height: 6
+        radius: 3
+        color: root.seal
+    }
+
+    BarWidgetButton {
         id: ma
         anchors.fill: parent
         hoverEnabled: true

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # QS-Shell apply update.
 #
-# Topology: the live bar dir is a *copy* of versions/default/ from the deploy clone
-# at ~/.local/share/quickshell-dots by default (override with QS_SHELL_REPO).
-# Updating = pull that repo, redeploy the installed config, restart the bar.
+# Topology: the live bar dir is a *copy* of versions/default/ from the installed
+# config directory. Prefer the source recorded there in .qsrise-source; fall
+# back to the persistent deploy clone at ~/.local/share/quickshell-dots only
+# when the recorded source is missing or invalid. Updating = pull that repo,
+# redeploy the installed config, restart the bar.
 #
 # MUST be launched DETACHED from the bar (the QML button uses `setsid`), because
 # this script restarts the bar.
@@ -26,6 +28,16 @@ STATE="$STATE_DIR/update-available.json"
 # or wiped by hygiene tools, and the backup is the rollback's last-resort restore.
 BACKUP_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/qs-shell/backups"
 mkdir -p "$STATE_DIR"
+
+SOURCE="${QS_SHELL_SOURCE:-}"
+if [ -z "$SOURCE" ] && [ -r "$DEST/.qsrise-source" ]; then
+  SOURCE="$(tr -d '\n' < "$DEST/.qsrise-source")"
+fi
+if [ -n "$SOURCE" ] && [ -d "$SOURCE/.git" ]; then
+  REPO="$SOURCE"
+elif [ -n "$SOURCE" ]; then
+  printf '%s\n' "QS-Shell: recorded source '$SOURCE' is unavailable; falling back to $REPO" >&2
+fi
 
 note() { notify-send -a "QS-Shell" "$@" 2>/dev/null || true; }
 fail() { note -u critical "Shell update failed" "$1"; exit 1; }

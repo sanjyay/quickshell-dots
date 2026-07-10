@@ -19,13 +19,7 @@ PanelWindow {
     readonly property int gap: 8
 
     property real reveal: root.calendarVisible ? 1 : 0
-    Behavior on reveal {
-        NumberAnimation {
-            duration: root.calendarVisible ? 160 : 120
-            easing.type: root.calendarVisible ? Easing.OutCubic : Easing.InCubic
-        }
-    }
-    visible: reveal > 0.001
+    visible: root.calendarVisible
     WlrLayershell.keyboardFocus: root.calendarVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     MouseArea {
@@ -37,7 +31,7 @@ PanelWindow {
         id: card
         width: 280
         height: col.implicitHeight + 24
-        radius: reveal > 0.001 ? root.pillRadius : 0
+        radius: root.pillRadius
         color: root.bg
         border.color: root.pillBorder
         border.width: root.pillBorderW

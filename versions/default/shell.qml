@@ -189,7 +189,15 @@ ShellRoot {
                 anchors.fill: parent
                 enabled: dismissLayer.visible
                 acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-                onClicked: dismissLayer.root.closePopups()
+                onPressed: function(event) {
+                    if (dismissLayer.root.pointerTrace)
+                        dismissLayer.root.tracePointer(hitArea, "popup-dismiss-layer", event, "pressed")
+                }
+                onClicked: function(event) {
+                    if (dismissLayer.root.pointerTrace)
+                        dismissLayer.root.tracePointer(hitArea, "popup-dismiss-layer", event, "clicked")
+                    dismissLayer.root.closePopups()
+                }
             }
         }
         visible: root.anyPopupVisible
@@ -214,10 +222,14 @@ ShellRoot {
         WlrLayershell.focusable: false
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
         WlrLayershell.namespace: "quickshell-pulse"
-        mask: Region { item: pulse }
+        // The pulse is decorative while hidden. Its item retains a geometry for
+        // animation, so using it directly as the layer mask blocks the bar below.
+        // Restrict input to the actionable control only.
+        mask: Region { item: pulse.inputItem }
 
         Pulse {
             id: pulse
+            objectName: "pulse-overlay"
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             anchors.topMargin: 7
@@ -287,7 +299,6 @@ ShellRoot {
     BluetoothPanel { root: theme }
     BatteryPanel { root: theme }
     MprisPanel { root: theme }
-    WeatherPanel { root: theme }
     WorkspacePanel { root: theme }
     ControlPanel { root: theme }
     TrayMenu { root: theme }

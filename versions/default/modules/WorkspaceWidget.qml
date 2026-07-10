@@ -49,7 +49,7 @@ Item {
     }
 
     // right-click anywhere opens the workspace panel
-    MouseArea {
+    BarWidgetButton {
         anchors.fill: parent
         acceptedButtons: Qt.RightButton
         cursorShape: Qt.PointingHandCursor
@@ -177,7 +177,7 @@ Item {
                     Behavior on color { ColorAnimation { duration: 200 } }
                 }
 
-                MouseArea {
+                BarWidgetButton {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
                     hoverEnabled: true
