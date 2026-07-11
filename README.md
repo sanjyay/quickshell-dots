@@ -31,12 +31,12 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Area | Highlights |
 |---|---|
 | Bar layout | unlock mode, drag/drop widget groups, persistent order, split groups, magnetic hover, top/bottom position |
-| Control center | quick actions, widget toggles, workspace modes, bar style, and split controls |
+| Control center | quick actions, widget toggles, notification visibility, workspace modes, bar style, and split controls |
 | Pickers | theme, wallpaper, screenshot, and video pickers with Tanzaku, Hearthstone, and Carousel styles |
-| Core widgets | workspaces, volume, System info (CPU/GPU/RAM), battery, power profile, network, Bluetooth, weather, MPRIS, tray, notifications |
+| Core widgets | workspaces, playback-aware volume, System info (CPU/GPU/RAM), battery, power profile, network, Bluetooth, weather, MPRIS, tray, notifications |
 | Privacy tools | microphone mute indicator/toggle and Lenovo LOQ camera kill-switch status |
 | Updates | shell update badge, weekly scheduled package update badge, Arch/AUR counter, known-infected AUR safety check |
-| AI usage | Claude, Codex, and OpenCode usage pill with provider switcher and detail panel |
+| AI usage | Claude, Codex, and OpenCode usage pill with provider switcher, detail panel, and automatic Codex activity visibility |
 | Pulse | top-center overlay for brightness, media, microphone, and camera changes, visible even when the bar is hidden by fullscreen |
 
 <details>
@@ -58,6 +58,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Privacy tools | microphone mute state, active microphone clients, Lenovo LOQ camera hardware switch status |
 | Speed test | manual Cloudflare speed test in the network panel |
 | Control center | quick toggles, power, Bar Functions fly-out |
+| Notification visibility | independent notification bell toggle inside the status group |
 | Bar style | border, shadow, frost, pill radius, top/bottom position |
 | Split groups | positional pill splits + Stream, Surge, Bolt, Bolt 2 gap animations |
 | Magnetic hover | subtle pointer-only pill scale and neighbor pull animation without layout reflow |
@@ -119,12 +120,14 @@ Common actions:
 - Double-click an empty bar area to unlock drag/drop mode.
 - Press `Esc` or click the dimmed backdrop to lock again.
 - Open the launcher/control widget to change bar style, widgets, privacy module visibility, workspaces, logo, and splits.
+- Use the widget controls to hide the notification bell independently from the status/tray group.
 - Use `Control > Actions > Schedule Update` to choose the weekday for the package-update badge. Friday is the default.
 - Use the self-update badge when it appears to update this shell from inside the bar.
 - Use the System info widget for quick CPU/GPU temperatures; click it for CPU, GPU, VRAM, and RAM details. The GPU probe supports NVIDIA and DRM/sysfs GPU data for temperature, utilization, and VRAM where the driver exposes it.
 - Use the network cluster for network, Bluetooth, microphone, and camera privacy controls.
 - The app launcher displays cached applications immediately from `~/.cache/quickshell/app-launcher/apps.json` and silently refreshes the cache in the background.
-- The AI pill shows remaining 5h Codex allowance in the bar. Click it to open the usage panel, which shows the weekly Codex window and other AI providers.
+- Media and volume pills stay out of the bar until a real MPRIS player is playing.
+- The AI pill shows remaining 5h Codex allowance in the bar when manually enabled or when Codex is active. Click it to open the usage panel, which shows the weekly Codex window and other AI providers.
 
 <details>
 <summary>Click bindings</summary>

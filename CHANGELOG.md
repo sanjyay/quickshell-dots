@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-07-12
+
+### Widget Visibility
+
+- Made the MPRIS now-playing pill visible only while a real player is playing, removing the idle music-note placeholder.
+- Made the volume pill playback-aware so it appears only when the volume widget is enabled and media is currently playing.
+- Added automatic AI usage visibility when Codex is active while keeping a manual control for users who want the pill pinned on.
+- Added a separate notification bell toggle inside the status group so tray/status visibility and notification visibility can be managed independently.
+- Persisted the new notification, volume, and AI visibility preferences in the widget cache.
+
 ## 2026-07-10
 
 ### Pulse And Cleanup
