@@ -304,10 +304,11 @@ PanelWindow {
     Component {
         id: compStatus                                   // G3: tray · notif
         Item {
+            readonly property bool enabled: barSlot.root.modStatus && barSlot.root.modNotifications
             visible: implicitWidth > 0.5
-            implicitWidth: barSlot.root.modStatus ? Math.round(statusRow.implicitWidth) + 10 : 0
+            implicitWidth: enabled ? Math.round(statusRow.implicitWidth) + 10 : 0
             implicitHeight: 28
-            opacity: barSlot.root.modStatus ? 1 : 0
+            opacity: enabled ? 1 : 0
             Behavior on implicitWidth { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
             Behavior on opacity      { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
             Rectangle {
@@ -322,7 +323,20 @@ PanelWindow {
                 x: Math.round((parent.width - width) / 2)
                 spacing: 6
                 TrayWidget         { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
-                NotificationWidget { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                Item {
+                    visible: width > 0.5
+                    width: barSlot.root.modNotifications ? notifWidget.implicitWidth : 0
+                    height: 28
+                    clip: true
+                    opacity: barSlot.root.modNotifications ? 1 : 0
+                    Behavior on width   { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                    Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                    NotificationWidget {
+                        id: notifWidget
+                        root: barSlot.root
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
             }
         }
     }

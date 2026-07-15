@@ -572,12 +572,14 @@ PanelWindow {
                 columnSpacing: 8
                 rowSpacing: 8
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "System info"; active: root.modCpu;       onActivated: root.modCpu = !root.modCpu }
-                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "AI usage";    active: root.modClaude;    onActivated: root.modClaude = !root.modClaude }
+                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Clock";       active: root.modClock;     onActivated: root.modClock = !root.modClock }
+                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "AI usage";    active: root.aiWidgetVisible; onActivated: root.toggleAiWidget() }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Power Prof."; active: root.modPower;     onActivated: root.modPower = !root.modPower }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Network";     active: root.modNetwork; onActivated: root.modNetwork = !root.modNetwork }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Bluetooth";   active: root.modBluetooth; onActivated: root.modBluetooth = !root.modBluetooth }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Status";      active: root.modStatus;  onActivated: root.modStatus = !root.modStatus }
-                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Volume";      active: root.modVolume;  onActivated: root.modVolume = !root.modVolume }
+                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Notifications"; active: root.modNotifications; onActivated: root.modNotifications = !root.modNotifications }
+                Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Volume";      active: root.modVolume; onActivated: root.toggleVolumeWidget() }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Now playing"; active: root.modMpris;   onActivated: root.modMpris = !root.modMpris }
                 Tile {
                     width: root.evenW((wwCol.width - 8) / 2)

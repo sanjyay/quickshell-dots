@@ -79,7 +79,11 @@ Item {
 
     // The widget toggle controls visibility. Signal still drives the usage fill/tooltip,
     // but an idle AI tool should not make the ControlPanel toggle look broken.
-    readonly property bool shown: root.modClaude
+    readonly property bool shown: root.aiWidgetVisible
+
+    onCxActiveChanged: root.codexActive = cxActive
+    Component.onCompleted: root.codexActive = cxActive
+    Component.onDestruction: if (root) root.codexActive = false
 
     readonly property string tooltipText: {
         var lines = []
@@ -155,7 +159,7 @@ Item {
         stdout: StdioCollector { onStreamFinished: { rootMod.ocActive = (this.text.trim() === "1") } }
     }
     Timer {
-        interval: 5000; running: root.modClaude || root.aiUsageVisible; repeat: true; triggeredOnStart: true
+        interval: 5000; running: true; repeat: true; triggeredOnStart: true
         onTriggered: {
             detectClaude.running = false; detectClaude.running = true
             detectCodex.running = false;  detectCodex.running = true

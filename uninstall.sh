@@ -27,6 +27,38 @@ pkill -f "quickshell -p $DEST" 2>/dev/null && info "Stopped the bar" || true
 # Covers the current OAuth backend and any older split cookie/calc install.
 unitdir="$HOME/.config/systemd/user"
 bindir="$HOME/.local/bin"
+remove_hypr_quickshell_bindings() {
+  local keybindings="${HYPR_BINDINGS_CONF:-${HYPR_KEYBINDINGS_CONF:-$HOME/.config/hypr/bindings.conf}}"
+  [[ -f "$keybindings" ]] || return 0
+
+  local tmp removed=0
+  tmp="$(mktemp)"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    case "$line" in
+      "unbind = SUPER, SPACE"|\
+      "bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open"|\
+      "unbind = SUPER SHIFT, SPACE"|\
+      "bindd = SUPER SHIFT, SPACE, Refresh Quickshell bar, exec, bash -lc 'qs -c bar kill; sleep 0.2; qs -n -d -c bar'"|\
+      "bindd = SUPER SHIFT, SPACE, Toggle-refresh Quickshell bar, exec, bash -lc 'qs -c bar kill >/dev/null 2>&1 || true; sleep 0.35; qs -n -d -c bar'"|\
+      "bindd = SUPER SHIFT, SPACE, Toggle Quickshell bar, exec, bash -lc 'if qs list --all 2>/dev/null | grep -q \"$HOME/.config/quickshell/bar/shell.qml\"; then qs -c bar kill >/dev/null 2>&1 || true; else qs -n -d -c bar; fi'")
+        removed=1
+        ;;
+      *)
+        printf '%s\n' "$line" >> "$tmp"
+        ;;
+    esac
+  done < "$keybindings"
+
+  if [[ "$removed" -eq 1 ]]; then
+    mv "$tmp" "$keybindings"
+    info "Removed Hyprland Quickshell bindings"
+  else
+    rm -f "$tmp"
+  fi
+}
+
+remove_hypr_quickshell_bindings
+
 if compgen -G "$unitdir/claude-usage*" >/dev/null 2>&1 || compgen -G "$bindir/claude-usage*" >/dev/null 2>&1; then
   # stop + disable timers AND services (covers a oneshot run that's mid-flight)
   systemctl --user disable --now \

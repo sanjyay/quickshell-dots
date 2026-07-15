@@ -292,9 +292,9 @@ verify_installed_copy() {
 verify_installed_copy
 info "Verified installed bar matches source tree"
 
-# ── 4b. Hyprland launcher binding ──────────────────────────────
+# ── 4b. Hyprland Quickshell bindings ───────────────────────────
 if [[ -f "$src_repo/scripts/ensure-hypr-launcher-binding.sh" ]]; then
-  bash "$src_repo/scripts/ensure-hypr-launcher-binding.sh" || warn "Hyprland launcher binding setup incomplete."
+  bash "$src_repo/scripts/ensure-hypr-launcher-binding.sh" || warn "Hyprland Quickshell binding setup incomplete."
 fi
 
 # ── 4a. ArchUpdater security gate (pre-install package verdicts) ─

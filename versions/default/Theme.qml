@@ -4,9 +4,15 @@ import Quickshell.Io
 import Quickshell.Hyprland
 import Quickshell.Services.UPower
 import "Palette.js" as Palette
+import "modules"
 
 Item {
     id: theme
+
+    // Keep automatic widget visibility independent of which monitor's bar
+    // happens to instantiate the MPRIS widget. This also avoids a bar being
+    // destroyed briefly clearing the shared playback state.
+    MprisSelect { id: mediaSelection }
 
     property var cameraSwitch: null
 
@@ -870,8 +876,12 @@ Item {
     property string networkMode: "none"   // mirrored from NetworkWidget: wifi/ethernet/none
     property bool omarchyUpdateAvail: false   // mirrored from UpdateWidget (6h poll)
     property bool notifSilenced: false        // mirrored from NotificationSilenceWidget (DND)
+    property bool modNotifications: true      // notification bell inside the status group
     property string voxState: "idle"          // mirrored from VoxtypeWidget: idle/recording/transcribing
     property bool mprisActive: false          // mirrored from MprisWidget; keeps active media visible in compact layouts
+    readonly property bool mprisPlaying: mediaSelection.playing // true only while a real MPRIS player is playing
+    property var mprisPausedPlayer: null     // keep the specific player visible after a bar-widget pause
+    property bool codexActive: false          // mirrored from ClaudeWidget's Codex process probe
     // battery presence (laptop) — drives the Battery indicator tile's visibility.
     // Direct UPower check, event-driven.
     readonly property bool hasBattery: UPower.displayDevice !== null && UPower.displayDevice.isLaptopBattery
@@ -895,10 +905,26 @@ Item {
     property bool modQuick:      true    // G10 group pill (idle-inhibitor · media · theme)
     property bool modMpris:      true    // G9 now-playing / mpris pill
     property bool modClaude:     true    // default on (toggle in ControlPanel)
+    property bool aiUsageManual: false  // user explicitly enabled the AI pill
     property bool modPrivacy:    true    // microphone/camera privacy pills
     property bool modPrivacyMic: true
     property bool modPrivacyCamera: true
     property bool modBattery:    true    // battery pill, shown only when hardware exists
+    property bool modClock:      true    // center clock/date pill
+    property bool volumeManual:  false   // user explicitly enabled the volume pill
+
+    readonly property bool volumeWidgetVisible: modVolume && mprisPlaying
+    readonly property bool aiWidgetVisible:     modClaude && (aiUsageManual || codexActive)
+
+    function toggleVolumeWidget() {
+        // This controls whether the automatic playback-triggered pill is
+        // enabled; playback itself controls whether it is currently visible.
+        modVolume = !modVolume
+    }
+    function toggleAiWidget() {
+        if (aiWidgetVisible) modClaude = false
+        else { modClaude = true; aiUsageManual = true }
+    }
 
     // ── workspace display mode ──
     property string workspaceMode: "10"   // "10", "5", "active"
@@ -941,14 +967,26 @@ Item {
     onModBluetoothChanged:  if (_widgetsLoaded) saveWidgets()
     onModNetworkChanged:    if (_widgetsLoaded) saveWidgets()
     onModStatusChanged:     if (_widgetsLoaded) saveWidgets()
+    onModNotificationsChanged: {
+        if (!modNotifications) notifVisible = false
+        if (!modNotifications) trayVisible = false
+        if (!modNotifications) trayMenuVisible = false
+        if (_widgetsLoaded) saveWidgets()
+    }
     onModQuickChanged:      if (_widgetsLoaded) saveWidgets()
     onModCpuChanged:        if (_widgetsLoaded) saveWidgets()
     onModVolumeChanged:     if (_widgetsLoaded) saveWidgets()
+    onVolumeManualChanged:  if (_widgetsLoaded) saveWidgets()
+    onAiUsageManualChanged: if (_widgetsLoaded) saveWidgets()
     onModMprisChanged:      if (_widgetsLoaded) saveWidgets()
     onModPrivacyChanged:    if (_widgetsLoaded) saveWidgets()
     onModPrivacyMicChanged: if (_widgetsLoaded) saveWidgets()
     onModPrivacyCameraChanged: if (_widgetsLoaded) saveWidgets()
     onModBatteryChanged:    if (_widgetsLoaded) saveWidgets()
+    onModClockChanged: {
+        if (!modClock) calendarVisible = false
+        if (_widgetsLoaded) saveWidgets()
+    }
     onAiToolChanged:        if (_widgetsLoaded) saveWidgets()
     onWorkspaceModeChanged: if (_widgetsLoaded) saveWidgets()
     onPickerStyleChanged:   if (_widgetsLoaded) saveWidgets()
@@ -1076,9 +1114,12 @@ Item {
                  + (modBattery ? "1" : "0") + " "         // +26 battery pill
                  + (modPrivacyMic ? "1" : "0") + " "      // +27 microphone privacy pill
                  + (modPrivacyCamera ? "1" : "0") + " "   // +28 camera privacy pill
-                 + "0 "                                    // +29 reserved cache field
+                 + (modClock ? "1" : "0") + " "            // +29 clock/date pill
                  + "0 "                                    // +30 reserved cache field
-                 + (enablePulse ? "1" : "0")                 // +31 pulse
+                 + (enablePulse ? "1" : "0") + " "         // +31 pulse
+                 + (modNotifications ? "1" : "0") + " "   // +32 notification bell
+                 + (volumeManual ? "1" : "0") + " "       // +33 volume manual override
+                 + (aiUsageManual ? "1" : "0")            // +34 AI manual override
         widgetSaveProc.command = ["bash", "-c",
             "echo '" + line + "' > '" + widgetsCachePath + "'"]
         widgetSaveProc.running = false
@@ -1281,7 +1322,11 @@ Item {
                     else theme.modPrivacyMic = theme.modPrivacy
                     if (parts.length > wsField + 28) theme.modPrivacyCamera = parts[wsField + 28] !== "0"
                     else theme.modPrivacyCamera = theme.modPrivacy
+                    if (parts.length > wsField + 29) theme.modClock = parts[wsField + 29] !== "0"
                     if (parts.length > wsField + 31) theme.enablePulse = parts[wsField + 31] !== "0"
+                    if (parts.length > wsField + 32) theme.modNotifications = parts[wsField + 32] !== "0"
+                    if (parts.length > wsField + 33) theme.volumeManual = parts[wsField + 33] === "1"
+                    if (parts.length > wsField + 34) theme.aiUsageManual = parts[wsField + 34] === "1"
                 }
                 theme._widgetsLoaded = true
             }

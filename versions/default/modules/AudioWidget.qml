@@ -16,11 +16,11 @@ Item {
         : "Audio " + volume + "%"
 
     visible: implicitWidth > 0.5
-    implicitWidth: root.modVolume ? row.implicitWidth + 18 : 0
+    implicitWidth: root.volumeWidgetVisible ? row.implicitWidth + 18 : 0
     implicitHeight: 28
     width: implicitWidth
     height: implicitHeight
-    opacity: root.modVolume ? 1 : 0
+    opacity: root.volumeWidgetVisible ? 1 : 0
     Behavior on opacity      { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
     Rectangle {
@@ -163,7 +163,7 @@ Item {
         onClicked: (e) => {
             if (rootMod.volumeDragged) return
             tip.hide()
-            if (e.button === Qt.RightButton) { muteRunner.running = false; muteRunner.running = true }
+            if (e.button === Qt.LeftButton)  { muteRunner.running = false; muteRunner.running = true }
             else                             { root.volVisible = !root.volVisible }
         }
     }

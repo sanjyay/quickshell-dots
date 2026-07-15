@@ -55,8 +55,8 @@ PanelWindow {
             "import configparser, json, os, sys, tempfile\n" +
             "cache = os.path.expanduser('~/.cache/quickshell/app-launcher/apps.json')\n" +
             "print('APP_LAUNCHER rescan started cache=' + cache, file=sys.stderr)\n" +
-            "dirs = [os.path.expanduser('~/.local/share/applications'), '/usr/local/share/applications', '/usr/share/applications']\n" +
-            "icon_bases = [os.path.expanduser('~/.local/share/icons'), os.path.expanduser('~/.icons'), '/usr/local/share/icons', '/usr/share/icons', '/usr/share/pixmaps']\n" +
+            "dirs = [os.path.expanduser('~/.local/share/applications'), os.path.expanduser('~/.local/share/flatpak/exports/share/applications'), '/var/lib/flatpak/exports/share/applications', '/usr/local/share/applications', '/usr/share/applications']\n" +
+            "icon_bases = [os.path.expanduser('~/.local/share/icons'), os.path.expanduser('~/.icons'), os.path.expanduser('~/.local/share/flatpak/exports/share/icons'), '/var/lib/flatpak/exports/share/icons', '/usr/local/share/icons', '/usr/share/icons', '/usr/share/pixmaps']\n" +
             "def resolve_icon(icon):\n" +
             "    if not icon: return ''\n" +
             "    if icon.startswith('/'): return icon if os.path.isfile(icon) else icon\n" +

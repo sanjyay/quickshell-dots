@@ -8,10 +8,13 @@ Item {
 
     property bool updateAvailable: false
     property bool checking: false
-    onUpdateAvailableChanged: root.omarchyUpdateAvail = updateAvailable   // mirror for the swarm reactor
+    onUpdateAvailableChanged: {
+        root.omarchyUpdateAvail = updateAvailable   // mirror for the swarm reactor
+        if (updateAvailable) updateTimer.restart()
+    }
 
-    visible: false
-    implicitWidth: 0
+    visible: updateAvailable
+    implicitWidth: updateAvailable ? 20 : 0
     implicitHeight: 28
     width: implicitWidth
     height: implicitHeight
@@ -21,6 +24,7 @@ Item {
 
     IconText {
         anchors.centerIn: parent
+        anchors.verticalCenterOffset: 2
         text: "\uE627"   // sync
         color: root.seal
         font.pixelSize: 14
@@ -44,7 +48,8 @@ Item {
     }
 
     Timer {
-        interval: 21600000   // 6h
+        id: updateTimer
+        interval: rootMod.updateAvailable ? 60000 : 21600000   // recheck active badges every minute
         running: true; repeat: true; triggeredOnStart: true
         onTriggered: { updateProc.running = false; updateProc.running = true }
     }

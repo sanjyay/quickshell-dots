@@ -40,6 +40,7 @@ PanelWindow {
     property real curPos: 0
     property real curLen: 0
     property real _lastRead: -1
+    property bool seeking: false
     Timer {
         interval: 500; repeat: true
         running: mprisPanel.visible && mprisPanel.active
@@ -63,6 +64,13 @@ PanelWindow {
         var m = Math.floor(s / 60)
         var sec = Math.floor(s % 60)
         return m + ":" + (sec < 10 ? "0" + sec : "" + sec)
+    }
+    function seekToRatio(ratio) {
+        if (!player || !player.canSeek || curLen <= 0) return
+        var target = Math.max(0, Math.min(curLen, ratio * curLen))
+        curPos = target
+        _lastRead = target
+        player.position = target
     }
 
     // ── visualizer state ────────────────────────────────────────────
@@ -272,6 +280,7 @@ PanelWindow {
                 width: parent.width
                 height: 14
                 visible: mprisPanel.active && mprisPanel.curLen > 0
+                readonly property bool seekable: mprisPanel.player && mprisPanel.player.canSeek
                 Rectangle {
                     id: track
                     anchors.left: parent.left; anchors.right: parent.right
@@ -283,8 +292,28 @@ PanelWindow {
                         color: root.seal
                         width: parent.width * (mprisPanel.curLen > 0
                             ? Math.min(1, mprisPanel.curPos / mprisPanel.curLen) : 0)
-                        Behavior on width { NumberAnimation { duration: 450 } }
+                        Behavior on width {
+                            enabled: !mprisPanel.seeking
+                            NumberAnimation { duration: 450 }
+                        }
                     }
+                }
+                MouseArea {
+                    anchors.left: parent.left; anchors.right: parent.right
+                    anchors.top: parent.top
+                    height: 10
+                    enabled: parent.seekable
+                    hoverEnabled: enabled
+                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onPressed: function(mouse) {
+                        mprisPanel.seeking = true
+                        mprisPanel.seekToRatio(mouse.x / width)
+                    }
+                    onPositionChanged: function(mouse) {
+                        if (pressed) mprisPanel.seekToRatio(mouse.x / width)
+                    }
+                    onReleased: mprisPanel.seeking = false
+                    onCanceled: mprisPanel.seeking = false
                 }
                 UiText {
                     anchors.left: parent.left; anchors.top: track.bottom; anchors.topMargin: 2

@@ -134,7 +134,7 @@ Common actions:
 
 | Widget | Left | Middle | Right | Scroll |
 |---|---|---|---|---|
-| Audio | panel / drag to set volume | - | mute toggle | volume |
+| Audio | mute toggle / drag to set volume | - | volume panel | volume |
 | Clock | calendar | - | timezone picker | toggle 24h / 12h |
 | System info | CPU/GPU/RAM panel | - | - | - |
 | Power Profile | panel | - | cycle profile | - |

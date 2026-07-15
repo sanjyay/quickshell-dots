@@ -14,9 +14,13 @@ Item {
     readonly property bool playing: sel.playing
     readonly property int titleWidth: 68
 
-    onActiveChanged: root.mprisActive = active
+    onActiveChanged: {
+        root.mprisActive = active
+    }
     Component.onCompleted: root.mprisActive = active
-    Component.onDestruction: if (root) root.mprisActive = false
+    Component.onDestruction: if (root) {
+        root.mprisActive = false
+    }
 
     readonly property string trackLabel: {
         if (!player) return ""
@@ -63,14 +67,16 @@ Item {
         NumberAnimation { target: rootMod; property: "barH2"; to: 0.08; duration: 430; easing.type: Easing.OutCubic }
         NumberAnimation { target: rootMod; property: "barH3"; to: 0.08; duration: 480; easing.type: Easing.OutCubic }
     }
-    onPlayingChanged: { if (!playing) dropAnim.restart() }
+    onPlayingChanged: {
+        if (!playing) dropAnim.restart()
+    }
 
     visible: implicitWidth > 0.5
-    implicitWidth: root.modMpris ? (active ? (row.implicitWidth + 18) : (idleNote.implicitWidth + 16)) : 0
+    implicitWidth: root.modMpris && (playing || root.mprisPausedPlayer === player) ? row.implicitWidth + 18 : 0
     implicitHeight: 28
     width: implicitWidth
     height: implicitHeight
-    opacity: root.modMpris ? 1 : 0
+    opacity: root.modMpris && (playing || root.mprisPausedPlayer === player) ? 1 : 0
 
     Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
@@ -80,29 +86,13 @@ Item {
 
     Rectangle {
         x: 0; anchors.verticalCenter: parent.verticalCenter
-        width: rootMod.active ? (Math.round(row.implicitWidth) + 18) : (Math.round(idleNote.implicitWidth) + 16)
+        width: Math.round(row.implicitWidth) + 18
         height: root.pillH
         radius: root.pillRadius
         color: root.pill
         border.color: root.pillBorder
         border.width: root.pillBorderW
         PillShadow { theme: root }
-    }
-
-    // ── idle: a single music-note, clickable to open the no-song panel ──
-    IconText {
-        id: idleNote
-        anchors.centerIn: parent
-        visible: !rootMod.active
-        text: ""   // music_note
-        font.pixelSize: 15
-        color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.45)
-        BarWidgetButton {
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.mprisVisible = !root.mprisVisible
-        }
     }
 
     Row {
@@ -134,7 +124,11 @@ Item {
             color: root.seal
             BarWidgetButton {
                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                onClicked: if (rootMod.player) rootMod.player.togglePlaying()
+                onClicked: {
+                    if (!rootMod.player) return
+                    root.mprisPausedPlayer = rootMod.playing ? rootMod.player : null
+                    rootMod.player.togglePlaying()
+                }
             }
         }
 
@@ -301,8 +295,10 @@ Item {
         onClicked: function(mouse) {
             tip.hide()
             if (mouse.button === Qt.LeftButton) {
-                if (rootMod.player) rootMod.player.togglePlaying()
-                else root.mprisVisible = !root.mprisVisible
+                if (rootMod.player) {
+                    root.mprisPausedPlayer = rootMod.playing ? rootMod.player : null
+                    rootMod.player.togglePlaying()
+                } else root.mprisVisible = !root.mprisVisible
             } else {
                 root.mprisVisible = !root.mprisVisible
             }

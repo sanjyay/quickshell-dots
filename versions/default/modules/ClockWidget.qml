@@ -28,11 +28,13 @@ BarWidgetButton {
     readonly property string dateStr: days[now.getDay()] + " " + now.getDate()
     readonly property bool debugLayout: Quickshell.env("QS_BAR_LAYOUT_DEBUG") === "1"
 
-    implicitWidth: Math.round(clockRow.implicitWidth) + 18
+    visible: root.modClock
+    implicitWidth: root.modClock ? Math.round(clockRow.implicitWidth) + 18 : 0
     // The bar's visible clock slot is 32px high. Keeping the interactive item
     // at that same height avoids a dead lower edge when the pill is compact.
     implicitHeight: Math.max(32, root.pillH)
     width: implicitWidth
+    opacity: root.modClock ? 1 : 0
     height: implicitHeight
     theme: root
     backgroundVisible: false
@@ -40,6 +42,9 @@ BarWidgetButton {
     preventStealing: true
     Accessible.name: "Clock and calendar"
     Accessible.description: tooltipText
+
+    Behavior on implicitWidth { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
     onEntered: tip.show()
     onExited: tip.hide()

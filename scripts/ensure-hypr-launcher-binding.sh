@@ -1,25 +1,54 @@
 #!/usr/bin/env bash
-# Ensure Super+Space opens the Quickshell launcher without rewriting user config.
+# Ensure Quickshell-owned Hyprland bindings exist without rewriting user config.
 set -euo pipefail
 
 keybindings="${HYPR_BINDINGS_CONF:-${HYPR_KEYBINDINGS_CONF:-$HOME/.config/hypr/bindings.conf}}"
-unbind_line="unbind = SUPER, SPACE"
-bind_line="bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open"
+managed_lines=(
+  "unbind = SUPER, SPACE"
+  "bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open"
+  "unbind = SUPER SHIFT, SPACE"
+  "bindd = SUPER SHIFT, SPACE, Toggle Quickshell bar, exec, bash -lc 'if qs list --all 2>/dev/null | grep -q \"$HOME/.config/quickshell/bar/shell.qml\"; then qs -c bar kill >/dev/null 2>&1 || true; else qs -n -d -c bar; fi'"
+)
+legacy_lines=(
+  "bindd = SUPER SHIFT, SPACE, Refresh Quickshell bar, exec, bash -lc 'qs -c bar kill; sleep 0.2; qs -n -d -c bar'"
+  "bindd = SUPER SHIFT, SPACE, Toggle-refresh Quickshell bar, exec, bash -lc 'qs -c bar kill >/dev/null 2>&1 || true; sleep 0.35; qs -n -d -c bar'"
+)
 
 mkdir -p "$(dirname "$keybindings")"
 
 if [[ ! -e "$keybindings" ]]; then
-  printf '%s\n%s\n' "$unbind_line" "$bind_line" > "$keybindings"
-  printf 'Hyprland launcher binding: file created\n'
+  printf '%s\n' "${managed_lines[@]}" > "$keybindings"
+  printf 'Hyprland Quickshell bindings: file created\n'
   exit 0
 fi
 
+tmp="$(mktemp)"
+changed=0
+while IFS= read -r line || [[ -n "$line" ]]; do
+  skip=0
+  for legacy in "${legacy_lines[@]}"; do
+    if [[ "$line" == "$legacy" ]]; then
+      skip=1
+      changed=1
+      break
+    fi
+  done
+  [[ "$skip" -eq 1 ]] && continue
+  printf '%s\n' "$line" >> "$tmp"
+done < "$keybindings"
+if [[ "$changed" -eq 1 ]]; then
+  mv "$tmp" "$keybindings"
+else
+  rm -f "$tmp"
+fi
+
 missing=()
-grep -Fxq "$unbind_line" "$keybindings" || missing+=("$unbind_line")
-grep -Fxq "$bind_line" "$keybindings" || missing+=("$bind_line")
+for line in "${managed_lines[@]}"; do
+  grep -Fxq "$line" "$keybindings" || missing+=("$line")
+done
 
 if ((${#missing[@]} == 0)); then
-  printf 'Hyprland launcher binding: binding already present\n'
+  printf 'Hyprland Quickshell bindings: bindings already present\n'
   exit 0
 fi
 
@@ -33,4 +62,4 @@ for line in "${missing[@]}"; do
   printf '%s\n' "$line" >> "$keybindings"
 done
 
-printf 'Hyprland launcher binding: missing binding added\n'
+printf 'Hyprland Quickshell bindings: missing bindings added\n'
