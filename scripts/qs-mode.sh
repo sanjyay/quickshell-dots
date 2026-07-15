@@ -160,6 +160,9 @@ switch_to_omarchy() {
 
 switch_to_quickshell() {
     previous="$(cat "$STATE_FILE" 2>/dev/null || printf 'omarchy')"
+    # Recreate the instance even when already in Quickshell mode so installs
+    # and helper updates cannot leave stale QML/IPC handlers running.
+    stop_quickshell
     install_qs_media_bindings
     set_launcher_binding quickshell
     hyprctl reload >/dev/null 2>&1 || true

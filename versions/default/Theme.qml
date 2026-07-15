@@ -924,6 +924,7 @@ Item {
     property string osdValue: ""
     property string osdDetail: ""
     property int osdSerial: 0
+    property int osdDataSerial: 0
     readonly property string osdPath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/qs-rise-osd.json"
     FileView {
         id: osdFile
@@ -934,6 +935,7 @@ Item {
                 theme.osdKind = event.kind || ""
                 theme.osdValue = event.value === undefined ? "" : String(event.value)
                 theme.osdDetail = event.detail || ""
+                theme.osdDataSerial++
             } catch (e) {
                 console.warn("osd: invalid runtime event")
             }

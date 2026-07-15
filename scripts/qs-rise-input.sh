@@ -15,7 +15,7 @@ show_osd() {
     tmp="${OSD_FILE}.tmp.$$"
     printf '%s\n' "$payload" > "$tmp"
     mv -f "$tmp" "$OSD_FILE"
-    qs -c "$QS_CONFIG" ipc call osd show >/dev/null 2>&1 || true
+    qs -c "$QS_CONFIG" ipc call osd flash >/dev/null 2>&1 || true
 }
 
 volume_value() { pamixer --get-volume 2>/dev/null || printf 0; }

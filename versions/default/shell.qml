@@ -41,7 +41,9 @@ ShellRoot {
 
     IpcHandler {
         target: "osd"
-        function show(): void { theme.notifyOsd() }
+        function flash(): void {
+            theme.notifyOsd()
+        }
     }
 
     IpcHandler {

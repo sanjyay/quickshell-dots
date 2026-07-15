@@ -47,7 +47,7 @@ require 'implicitWidth: recording \? row.implicitWidth \+ 6 : 0' "$screen_record
 require 'visible: implicitWidth > 0.5' "$screen_record"
 require 'enabled: rootMod.recording' "$screen_record"
 require 'property alias inputItem: pulseButton' "$pulse"
-require 'visible: island.visible && island.hint.length > 0' "$pulse"
+require 'visible: island.visible && \(island.hint.length > 0 \|\| island.osdFlash\)' "$pulse"
 require 'mask: Region \{ item: pulse.inputItem \}' "$shell"
 
 # Every module-level pointer surface must use the shared in-bounds control.

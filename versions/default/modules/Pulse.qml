@@ -10,7 +10,7 @@ Item {
 
     width: pill.width
     height: 44
-    visible: root.enablePulse && reveal > 0.01
+    visible: (root.enablePulse || osdFlash) && reveal > 0.01
     opacity: reveal
     scale: 0.94 + reveal * 0.06
     z: 80
@@ -33,6 +33,7 @@ Item {
     property bool lastCameraBlocked: false
     property int lastBrightness: -1
     property int lastNotificationSerial: -1
+    property bool osdFlash: false
 
     MprisSelect { id: mpris }
 
@@ -49,12 +50,23 @@ Item {
         hideTimer.restart()
     }
 
+    function flashOsd(t, d, durationMs) {
+        title = t
+        detail = d || ""
+        hint = ""
+        osdFlash = true
+        reveal = 1
+        hideTimer.interval = durationMs || 1200
+        hideTimer.restart()
+    }
+
     Timer {
         id: hideTimer
         interval: 1800
         repeat: false
         onTriggered: {
             island.reveal = 0
+            island.osdFlash = false
             if (root.osdVisible) root.osdVisible = false
         }
     }
@@ -68,7 +80,7 @@ Item {
 
     Connections {
         target: root
-        function onOsdSerialChanged() {
+        function onOsdDataSerialChanged() {
             var title = ""
             var detail = root.osdValue ? root.osdValue + "%" : ""
             if (root.osdKind === "volume") {
@@ -85,7 +97,7 @@ Item {
                 title = "Media"
                 detail = root.osdDetail || ""
             }
-            if (title !== "") island.flash(title, detail, "", 1200)
+            if (title !== "") island.flashOsd(title, detail, 1200)
         }
     }
 
@@ -225,7 +237,9 @@ Item {
             anchors.fill: parent
             theme: root
             traceName: "pulse-handler"
-            visible: island.visible && island.hint.length > 0
+            // Keep the mask alive for non-clickable OSD flashes too; otherwise
+            // the layer-shell mask clips the visual pulse when hint is empty.
+            visible: island.visible && (island.hint.length > 0 || island.osdFlash)
             enabled: island.hint.length > 0
             cursorShape: Qt.PointingHandCursor
             onClicked: {
