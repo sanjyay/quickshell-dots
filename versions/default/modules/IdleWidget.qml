@@ -20,7 +20,8 @@ Item {
 
     Text {
         anchors.centerIn: parent
-        text: "\uDB86\uDED6"   // coffee (Nerd Font / JetBrainsMono)
+        anchors.verticalCenterOffset: 2
+        text: "\uF0F4"   // coffee (Nerd Font / JetBrainsMono)
         color: root.seal
         font.family: root.mono
         font.pixelSize: 13

@@ -384,7 +384,7 @@ PanelWindow {
                 id: centerRow
                 anchors.verticalCenter: parent.verticalCenter
                 x: Math.round((parent.width - width) / 2)   // integer center → sharp text
-                spacing: 8
+                spacing: 4
                 ClockWidget   { id: clock; root: barSlot.root; barScreen: barSlot.screen; interactive: false }
                 Item {                               // indicator icons wrapper
                     visible: iconsRow.hasActive || width > 0.5

@@ -142,12 +142,12 @@ Item {
     property var barLayoutControllers: ({})
     property bool _barLayoutSyncing: false
 
-    readonly property bool anyPopupVisible: appLauncherVisible || calendarVisible || cpuVisible || aiUsageVisible
+    readonly property bool anyPopupVisible: menuVisible || clipboardVisible || captureVisible || appLauncherVisible || calendarVisible || cpuVisible || aiUsageVisible
         || memVisible || volVisible || controlVisible || networkVisible || bluetoothVisible
         || batteryVisible || mprisVisible
         || workspaceVisible || imagePickerVisible || mediaBrowserVisible || notifVisible
         || powerProfileVisible || archVisible || shellUpdateVisible || trayVisible || trayMenuVisible
-    readonly property bool keyboardPopupVisible: appLauncherVisible || imagePickerVisible || mediaBrowserVisible
+    readonly property bool keyboardPopupVisible: menuVisible || clipboardVisible || captureVisible || appLauncherVisible || imagePickerVisible || mediaBrowserVisible
 
     function registerBarLayoutController(screenName, controller) {
         if (!screenName || !controller) return
@@ -358,6 +358,9 @@ Item {
 
     function closePopups(except) {
         _closingPopups = true
+        if (except !== "menuVisible") menuVisible = false
+        if (except !== "clipboardVisible") clipboardVisible = false
+        if (except !== "captureVisible") captureVisible = false
         if (except !== "appLauncherVisible") appLauncherVisible = false
         if (except !== "calendarVisible") calendarVisible = false
         if (except !== "cpuVisible") cpuVisible = false
@@ -404,6 +407,26 @@ Item {
         activateFocusedPopupScreen()
         appLauncherVisible = true
     }
+
+    // ── Native Omarchy menu state ──
+    property bool menuVisible: false
+    property string menuRoute: "root"
+    onMenuVisibleChanged: popupOpened("menuVisible")
+
+    function openMenu(route) {
+        activateFocusedPopupScreen()
+        menuRoute = route || "root"
+        menuVisible = true
+    }
+
+    property bool clipboardVisible: false
+    onClipboardVisibleChanged: popupOpened("clipboardVisible")
+    function openClipboard() { activateFocusedPopupScreen(); clipboardVisible = true }
+
+    property bool captureVisible: false
+    property string captureAction: ""
+    onCaptureVisibleChanged: popupOpened("captureVisible")
+    function openCapture() { activateFocusedPopupScreen(); captureVisible = true }
 
     // ── pill/card border (default, non-borderless mode) ──
     // A premium "inactive window border" look: the surface tone (paper) nudged a

@@ -35,6 +35,8 @@ stop_omarchy_ui() {
 
 QS_BIND_BEGIN="# >>> quickshell-rise managed media bindings >>>"
 QS_BIND_END="# <<< quickshell-rise managed media bindings <<<"
+QS_MENU_BEGIN="# >>> quickshell-rise managed menu bindings >>>"
+QS_MENU_END="# <<< quickshell-rise managed menu bindings <<<"
 
 remove_qs_media_bindings() {
     [[ -f "$BINDINGS" ]] || return 0
@@ -46,6 +48,91 @@ remove_qs_media_bindings() {
         !skip { print }
     ' "$BINDINGS" > "$tmp"
     mv "$tmp" "$BINDINGS"
+}
+
+remove_qs_menu_bindings() {
+    [[ -f "$BINDINGS" ]] || return 0
+    local tmp
+    tmp="$(mktemp)"
+    awk -v begin="$QS_MENU_BEGIN" -v end="$QS_MENU_END" '
+        $0 == begin { skip=1; next }
+        $0 == end { skip=0; next }
+        !skip { print }
+    ' "$BINDINGS" > "$tmp"
+    mv "$tmp" "$BINDINGS"
+}
+
+install_qs_menu_bindings() {
+    [[ -f "$BINDINGS" ]] || return 0
+    remove_qs_menu_bindings
+    cat >> "$BINDINGS" <<'EOF'
+
+# >>> quickshell-rise managed menu bindings >>>
+unbind = SUPER, SPACE
+unbind = SUPER ALT, SPACE
+unbind = SUPER SHIFT, code:201
+unbind = SUPER, ESCAPE
+unbind = , XF86PowerOff
+unbind = SUPER CTRL, V
+unbind = SUPER CTRL, C
+unbind = , PRINT
+unbind = ALT, PRINT
+unbind = ALT CTRL, PRINT
+unbind = SUPER, PRINT
+unbind = SUPER CTRL, PRINT
+bind = SUPER, SPACE, exec, qs -c bar ipc call -- launcher open
+# Right Alt is a keysym, so this installed Hyprland version requires a
+# keysym-combination bind to distinguish it from left Alt.
+binds = Super_L&Alt_R, SPACE, exec, qs -c bar ipc call -- menu open root
+bindd = SUPER SHIFT, code:201, Quickshell menu, exec, qs -c bar ipc call -- menu open root
+bindd = SUPER, ESCAPE, Quickshell power menu, exec, qs -c bar ipc call -- menu open system
+bindd = , XF86PowerOff, Quickshell power menu, exec, qs -c bar ipc call -- menu open system
+bindd = SUPER CTRL, V, Quickshell clipboard, exec, qs -c bar ipc call -- clipboard open
+bindd = SUPER CTRL, C, Quickshell capture menu, exec, qs -c bar ipc call -- capture open
+bindd = , PRINT, Quickshell screenshot, exec, qs-capture screenshot
+bindd = ALT, PRINT, Quickshell screenrecording options, exec, qs -c bar ipc call -- capture recording
+bindd = ALT CTRL, PRINT, Quickshell capture menu, exec, qs -c bar ipc call -- capture open
+bindd = SUPER, PRINT, Quickshell color picker, exec, qs -c bar ipc call -- capture color
+bindd = SUPER CTRL, PRINT, Quickshell text extraction, exec, qs -c bar ipc call -- capture text
+# Scratch workspace: Omarchy defines this as special:scratchpad.
+binds = Super_L&Alt_R, S, movetoworkspacesilent, special:scratchpad
+# <<< quickshell-rise managed menu bindings <<<
+EOF
+}
+
+install_omarchy_menu_bindings() {
+    [[ -f "$BINDINGS" ]] || return 0
+    remove_qs_menu_bindings
+    cat >> "$BINDINGS" <<'EOF'
+
+# >>> quickshell-rise managed menu bindings >>>
+unbind = SUPER, SPACE
+unbind = SUPER ALT, SPACE
+unbind = Super_L&Alt_R, SPACE
+unbind = Super_L&Alt_R, S
+unbind = SUPER SHIFT, code:201
+unbind = SUPER, ESCAPE
+unbind = , XF86PowerOff
+unbind = SUPER CTRL, V
+unbind = SUPER CTRL, C
+unbind = , PRINT
+unbind = ALT, PRINT
+unbind = ALT CTRL, PRINT
+unbind = SUPER, PRINT
+unbind = SUPER CTRL, PRINT
+bindd = SUPER, SPACE, Launch apps, exec, omarchy-launch-walker
+bindd = SUPER ALT, SPACE, Omarchy menu, exec, omarchy-menu
+bindd = SUPER SHIFT, code:201, Omarchy menu, exec, omarchy-menu
+bindd = SUPER, ESCAPE, System menu, exec, omarchy-menu system
+bindd = , XF86PowerOff, Power menu, exec, omarchy-menu system
+bindd = SUPER CTRL, V, Clipboard manager, exec, omarchy-launch-walker -m clipboard
+bindd = SUPER CTRL, C, Capture menu, exec, omarchy-menu capture
+bindd = , PRINT, Screenshot, exec, omarchy-capture-screenshot
+bindd = ALT, PRINT, Screenrecording, exec, omarchy-menu screenrecord
+bindd = SUPER, PRINT, Color picker, exec, pkill hyprpicker || hyprpicker -a
+bindd = SUPER CTRL, PRINT, Extract text, exec, omarchy-capture-text-extraction
+# <<< quickshell-rise managed menu bindings <<<
+EOF
 }
 
 install_qs_media_bindings() {
@@ -150,8 +237,8 @@ start_omarchy() {
 switch_to_omarchy() {
     stop_quickshell
     remove_qs_media_bindings
+    install_omarchy_menu_bindings
     stop_omarchy_ui
-    set_launcher_binding omarchy
     hyprctl reload >/dev/null 2>&1 || true
     start_omarchy
     write_mode omarchy
@@ -164,7 +251,7 @@ switch_to_quickshell() {
     # and helper updates cannot leave stale QML/IPC handlers running.
     stop_quickshell
     install_qs_media_bindings
-    set_launcher_binding quickshell
+    install_qs_menu_bindings
     hyprctl reload >/dev/null 2>&1 || true
     # Reloading Hyprland can re-run generated desktop autostart units (notably
     # Walker), so stop Omarchy presentation services after the reload as well.

@@ -51,6 +51,35 @@ ShellRoot {
         function ping(): void { }
     }
 
+    IpcHandler {
+        target: "menu"
+        function open(route: string): void { theme.openMenu(route || "root") }
+        function close(): void { theme.menuVisible = false }
+        function toggle(): void {
+            if (theme.menuVisible) theme.menuVisible = false
+            else theme.openMenu("root")
+        }
+        function ping(): void { }
+    }
+
+    IpcHandler {
+        target: "clipboard"
+        function open(): void { theme.openClipboard() }
+        function close(): void { theme.clipboardVisible = false }
+        function ping(): void { }
+    }
+
+    IpcHandler {
+        target: "capture"
+        function open(): void { theme.captureAction = ""; theme.openCapture() }
+        function close(): void { theme.captureVisible = false }
+        function screenshot(): void { theme.captureAction = "screenshot"; theme.openCapture() }
+        function recording(): void { theme.captureAction = "recording"; theme.openCapture() }
+        function text(): void { theme.captureAction = "text"; theme.openCapture() }
+        function color(): void { theme.captureAction = "color"; theme.openCapture() }
+        function ping(): void { }
+    }
+
     // QtWayland creates a nameless 0x0 placeholder screen while no real output
     // exists; exclude it so no unusable layer surface is created. A new real
     // ShellScreen identity makes Variants destroy the old BarSlot and
@@ -296,6 +325,9 @@ ShellRoot {
     }
 
     TooltipOverlay { root: theme }
+    OmarchyMenuPanel { root: theme }
+    ClipboardHistoryPanel { root: theme }
+    CapturePanel { root: theme }
     AppLauncherPanel { root: theme }
     CalendarPopup { root: theme }
     ArchUpdaterPanel { root: theme }

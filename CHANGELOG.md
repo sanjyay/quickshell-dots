@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-07-16
+
+### Native Quickshell UI
+
+- Added a reversible Quickshell/Omarchy profile switch for the native menu,
+  clipboard picker, capture panel, power/session actions, and related
+  Hyprland bindings.
+- Added native Quickshell screenshot and screen-recording choices while
+  preserving Omarchy’s capture backends and restoring their original bindings
+  in the Omarchy profile.
+- Added a centered, keyboard-accessible Omarchy menu with nested navigation,
+  invisible type-ahead selection, outside-click dismissal, and launcher-style
+  focused-input handling.
+- Added a two-pane clipboard history picker with compact scrolling results,
+  full text previews, Elephant image previews, safe copy/delete actions, and
+  responsive monitor-aware sizing.
+- Added installer, uninstaller, runtime helper, and static validation coverage
+  for the new native surfaces.
+
+### Bar Alignment
+
+- Reduced the clock-to-idle-indicator spacing and aligned the idle indicator
+  with the clock while preserving the existing bar layout.
+
 ## 2026-07-12
 
 ### Widget Visibility

@@ -34,7 +34,7 @@ remove_hypr_quickshell_bindings() {
   local keybindings="${HYPR_BINDINGS_CONF:-${HYPR_KEYBINDINGS_CONF:-$HOME/.config/hypr/bindings.conf}}"
   [[ -f "$keybindings" ]] || return 0
 
-  local tmp removed=0 in_media_block=0
+  local tmp removed=0 in_media_block=0 in_menu_block=0
   tmp="$(mktemp)"
   while IFS= read -r line || [[ -n "$line" ]]; do
     if [[ "$line" == "# >>> quickshell-rise managed media bindings >>>" ]]; then
@@ -46,7 +46,17 @@ remove_hypr_quickshell_bindings() {
       in_media_block=0
       continue
     fi
+    if [[ "$line" == "# >>> quickshell-rise managed menu bindings >>>" ]]; then
+      in_menu_block=1
+      removed=1
+      continue
+    fi
+    if [[ "$line" == "# <<< quickshell-rise managed menu bindings <<<" ]]; then
+      in_menu_block=0
+      continue
+    fi
     [[ "$in_media_block" -eq 1 ]] && continue
+    [[ "$in_menu_block" -eq 1 ]] && continue
     case "$line" in
       "unbind = SUPER, SPACE"|\
       "bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open"|\
@@ -146,7 +156,7 @@ if [[ -e "$HOME/.local/bin/qs-mode" || -e "${XDG_STATE_HOME:-$HOME/.local/state}
   rm -f "$HOME/.local/bin/qs-mode" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode"
   info "Removed reversible UI mode switcher"
 fi
-rm -f "$HOME/.local/bin/qs-rise-input" "$HOME/.local/bin/qs-notification-silence" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/notifications-silenced"
+rm -f "$HOME/.local/bin/qs-rise-input" "$HOME/.local/bin/qs-menu-action" "$HOME/.local/bin/qs-clipboard" "$HOME/.local/bin/qs-capture" "$HOME/.local/bin/qs-notification-silence" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/notifications-silenced"
 rm -f "${XDG_RUNTIME_DIR:-/tmp}/qs-rise-osd.json"
 rmdir "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise" 2>/dev/null || true
 

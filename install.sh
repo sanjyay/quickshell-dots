@@ -302,6 +302,9 @@ if [[ -f "$src_repo/scripts/qs-mode.sh" ]]; then
   mkdir -p "$HOME/.local/bin" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise"
   install -m 755 "$src_repo/scripts/qs-mode.sh" "$HOME/.local/bin/qs-mode"
   install -m 755 "$src_repo/scripts/qs-rise-input.sh" "$HOME/.local/bin/qs-rise-input"
+  install -m 755 "$src_repo/scripts/qs-menu-action.sh" "$HOME/.local/bin/qs-menu-action"
+  install -m 755 "$src_repo/scripts/qs-clipboard.sh" "$HOME/.local/bin/qs-clipboard"
+  install -m 755 "$src_repo/scripts/qs-capture.sh" "$HOME/.local/bin/qs-capture"
   if [[ ! -e "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode" ]]; then
     printf 'quickshell\n' > "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode"
   fi
