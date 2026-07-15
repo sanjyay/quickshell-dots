@@ -297,6 +297,24 @@ if [[ -f "$src_repo/scripts/ensure-hypr-launcher-binding.sh" ]]; then
   bash "$src_repo/scripts/ensure-hypr-launcher-binding.sh" || warn "Hyprland Quickshell binding setup incomplete."
 fi
 
+# ── 4b1. reversible UI mode switcher ───────────────────────────
+if [[ -f "$src_repo/scripts/qs-mode.sh" ]]; then
+  mkdir -p "$HOME/.local/bin" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise"
+  install -m 755 "$src_repo/scripts/qs-mode.sh" "$HOME/.local/bin/qs-mode"
+  install -m 755 "$src_repo/scripts/qs-rise-input.sh" "$HOME/.local/bin/qs-rise-input"
+  if [[ ! -e "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode" ]]; then
+    printf 'quickshell\n' > "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode"
+  fi
+  if [[ ! -e "${XDG_RUNTIME_DIR:-/tmp}/qs-rise-osd.json" ]]; then
+    printf '{"kind":"","value":"","detail":""}\n' > "${XDG_RUNTIME_DIR:-/tmp}/qs-rise-osd.json"
+  fi
+  info "Installed reversible UI mode switcher (qs-mode quickshell|omarchy|status)"
+fi
+if [[ -f "$src_repo/scripts/qs-notification-silence.sh" ]]; then
+  mkdir -p "$HOME/.local/bin"
+  install -m 755 "$src_repo/scripts/qs-notification-silence.sh" "$HOME/.local/bin/qs-notification-silence"
+fi
+
 # ── 4a. ArchUpdater security gate (pre-install package verdicts) ─
 # Pure bash, no extra deps. The weekly fetch timer keeps the known-infected
 # list current; without any list the updater panel fail-closes to
@@ -327,14 +345,16 @@ if [[ -f "$src_repo/hooks/50-quickshell-bar.sh" ]]; then
   info "Theme hook installed (bar follows Omarchy themes)"
 fi
 
-# ── 6. stop waybar (would overlap) and start the bar now ────────
-pkill -x waybar 2>/dev/null && info "Stopped waybar (use the panel/control to manage)" || true
-# stop existing bar (supports both -c bar and -p $DEST modes)
-pkill -f "qs.*-c bar" 2>/dev/null || true
-pkill -f "quickshell -p $DEST" 2>/dev/null || true
-sleep 0.3
-setsid qs -n -d -c bar >/dev/null 2>&1 < /dev/null &
-info "Bar started — try it out."
+# ── 6. activate the Quickshell provider stack ──────────────────
+if [[ -x "$HOME/.local/bin/qs-mode" ]]; then
+  "$HOME/.local/bin/qs-mode" quickshell || warn "Quickshell mode health check failed; Omarchy providers were restored."
+else
+  pkill -x waybar 2>/dev/null || true
+  pkill -f "qs.*-c bar" 2>/dev/null || true
+  sleep 0.3
+  setsid qs -n -d -c bar >/dev/null 2>&1 < /dev/null &
+fi
+info "Quickshell UI mode activated — use qs-mode omarchy to restore Omarchy providers."
 
 # ── 6b. shell self-updater (never blocks the bar install) ───────
 install_shell_updater "$src_repo" || warn "Self-updater setup incomplete — the bar is fine; the update badge just won't appear."

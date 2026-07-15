@@ -39,6 +39,16 @@ ShellRoot {
         function refresh(): void { theme.archRefreshTick++ }
     }
 
+    IpcHandler {
+        target: "osd"
+        function show(): void { theme.notifyOsd() }
+    }
+
+    IpcHandler {
+        target: "health"
+        function ping(): void { }
+    }
+
     // QtWayland creates a nameless 0x0 placeholder screen while no real output
     // exists; exclude it so no unusable layer surface is created. A new real
     // ShellScreen identity makes Variants destroy the old BarSlot and

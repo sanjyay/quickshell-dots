@@ -20,6 +20,9 @@ fi
 
 # 1. stop the running bar
 # stop existing bar (supports both -c bar and -p $DEST modes)
+if [[ -x "$HOME/.local/bin/qs-mode" ]]; then
+  "$HOME/.local/bin/qs-mode" omarchy >/dev/null 2>&1 || true
+fi
 pkill -f "qs.*-c bar" 2>/dev/null && info "Stopped the bar" || true
 pkill -f "quickshell -p $DEST" 2>/dev/null && info "Stopped the bar" || true
 
@@ -31,9 +34,19 @@ remove_hypr_quickshell_bindings() {
   local keybindings="${HYPR_BINDINGS_CONF:-${HYPR_KEYBINDINGS_CONF:-$HOME/.config/hypr/bindings.conf}}"
   [[ -f "$keybindings" ]] || return 0
 
-  local tmp removed=0
+  local tmp removed=0 in_media_block=0
   tmp="$(mktemp)"
   while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == "# >>> quickshell-rise managed media bindings >>>" ]]; then
+      in_media_block=1
+      removed=1
+      continue
+    fi
+    if [[ "$line" == "# <<< quickshell-rise managed media bindings <<<" ]]; then
+      in_media_block=0
+      continue
+    fi
+    [[ "$in_media_block" -eq 1 ]] && continue
     case "$line" in
       "unbind = SUPER, SPACE"|\
       "bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open"|\
@@ -127,6 +140,15 @@ if [[ -e "$qsbindir/qs-theme-update-check.sh" || -e "$HOME/.cache/qs-theme-updat
         "$HOME/.cache/qs-theme-update.lock"
   info "Removed theme update checker (script, cache, lock)"
 fi
+
+# 1c.2 remove the reversible UI mode switcher and its project-owned state.
+if [[ -e "$HOME/.local/bin/qs-mode" || -e "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode" ]]; then
+  rm -f "$HOME/.local/bin/qs-mode" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode"
+  info "Removed reversible UI mode switcher"
+fi
+rm -f "$HOME/.local/bin/qs-rise-input" "$HOME/.local/bin/qs-notification-silence" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/notifications-silenced"
+rm -f "${XDG_RUNTIME_DIR:-/tmp}/qs-rise-osd.json"
+rmdir "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise" 2>/dev/null || true
 
 # 1d. remove the ArchUpdater security gate (script, fetch timer, list)
 if [[ -f "$bindir/qs-arch-security-gate.sh" || -f "$bindir/qs-aur-blacklist-fetch.sh" ]]; then

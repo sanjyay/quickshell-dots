@@ -71,12 +71,15 @@ Item {
         if (!playing) dropAnim.restart()
     }
 
+    // The bar pill is strictly for media that is playing right now. Do not
+    // keep a paused player visible just because its MPRIS metadata survives.
+    readonly property bool showNowPlaying: root.modMpris && playing && trackLabel.length > 0
     visible: implicitWidth > 0.5
-    implicitWidth: root.modMpris && (playing || root.mprisPausedPlayer === player) ? row.implicitWidth + 18 : 0
+    implicitWidth: showNowPlaying ? row.implicitWidth + 18 : 0
     implicitHeight: 28
     width: implicitWidth
     height: implicitHeight
-    opacity: root.modMpris && (playing || root.mprisPausedPlayer === player) ? 1 : 0
+    opacity: showNowPlaying ? 1 : 0
 
     Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 

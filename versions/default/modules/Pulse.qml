@@ -32,6 +32,7 @@ Item {
     property bool lastMicLive: false
     property bool lastCameraBlocked: false
     property int lastBrightness: -1
+    property int lastNotificationSerial: -1
 
     MprisSelect { id: mpris }
 
@@ -52,13 +53,51 @@ Item {
         id: hideTimer
         interval: 1800
         repeat: false
-        onTriggered: island.reveal = 0
+        onTriggered: {
+            island.reveal = 0
+            if (root.osdVisible) root.osdVisible = false
+        }
     }
 
     Connections {
         target: root
         function onUpdatePulseSerialChanged() {
             island.flash(root.updatePulseTitle, root.updatePulseDetail, root.updatePulseHint, 7000)
+        }
+    }
+
+    Connections {
+        target: root
+        function onOsdSerialChanged() {
+            var title = ""
+            var detail = root.osdValue ? root.osdValue + "%" : ""
+            if (root.osdKind === "volume") {
+                title = "Volume"
+                if (root.osdDetail === "true") detail = "Muted · " + detail
+            } else if (root.osdKind === "microphone") {
+                title = "Microphone"
+                if (root.osdDetail === "true") detail = "Muted · " + detail
+            } else if (root.osdKind === "brightness") {
+                title = "Brightness"
+            } else if (root.osdKind === "keyboard") {
+                title = "Keyboard brightness"
+            } else if (root.osdKind === "media") {
+                title = "Media"
+                detail = root.osdDetail || ""
+            }
+            if (title !== "") island.flash(title, detail, "", 1200)
+        }
+    }
+
+    Connections {
+        target: root
+        function onNotifSerialChanged() {
+            if (root.notifSerial <= island.lastNotificationSerial) return
+            island.lastNotificationSerial = root.notifSerial
+            var summary = root.notifLatestSummary || ""
+            var body = root.notifLatestBody || ""
+            var message = summary && body && body !== summary ? summary + " - " + body : (summary || body)
+            if (message !== "") island.flash("Notification", message, root.notifLatestApp || "", 4200)
         }
     }
 
@@ -190,8 +229,25 @@ Item {
             enabled: island.hint.length > 0
             cursorShape: Qt.PointingHandCursor
             onClicked: {
-                root.activeUpdateTab = "packages"
-                root.archVisible = true
+                if (island.title === "Notification") {
+                    var notification = root.notifLatestObject
+                    if (notification && notification.actions.length > 0) {
+                        var actions = notification.actions
+                        var invoked = false
+                        for (var i = 0; i < actions.length; i++) {
+                            if (actions[i].identifier === "default") {
+                                actions[i].invoke()
+                                invoked = true
+                                break
+                            }
+                        }
+                        if (!invoked) actions[0].invoke()
+                    }
+                    root.notifLatestObject = null
+                } else {
+                    root.activeUpdateTab = "packages"
+                    root.archVisible = true
+                }
                 island.reveal = 0
             }
         }

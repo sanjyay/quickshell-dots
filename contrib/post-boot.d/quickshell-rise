@@ -1,7 +1,8 @@
 #!/bin/bash
-# Quickshell Rise — launch the bar at session start.
-# stop waybar (omarchy re-autostarts it at login → would overlap), then launch
-# the bar detached so we don't block later post-boot.d hooks (omarchy-hook runs
-# them sequentially). -n bails out if an instance is already running (idempotent).
-pkill -x waybar 2>/dev/null || true
-setsid qs -n -d -c bar >/dev/null 2>&1 < /dev/null &
+# Quickshell Rise — restore the persisted UI provider mode at session start.
+if command -v qs-mode >/dev/null 2>&1; then
+  qs-mode "$(qs-mode status 2>/dev/null || printf quickshell)" >/dev/null 2>&1 || true
+else
+  pkill -x waybar 2>/dev/null || true
+  setsid qs -n -d -c bar >/dev/null 2>&1 < /dev/null &
+fi

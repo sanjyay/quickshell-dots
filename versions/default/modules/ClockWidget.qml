@@ -6,6 +6,7 @@ BarWidgetButton {
     id: rootMod
     required property var root
     property var barScreen: null
+    property bool interactive: true
     objectName: "clock-handler"
 
     property date now: new Date()
@@ -29,6 +30,7 @@ BarWidgetButton {
     readonly property bool debugLayout: Quickshell.env("QS_BAR_LAYOUT_DEBUG") === "1"
 
     visible: root.modClock
+    enabled: interactive
     implicitWidth: root.modClock ? Math.round(clockRow.implicitWidth) + 18 : 0
     // The bar's visible clock slot is 32px high. Keeping the interactive item
     // at that same height avoids a dead lower edge when the pill is compact.

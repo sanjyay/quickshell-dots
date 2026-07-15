@@ -876,6 +876,11 @@ Item {
     property string networkMode: "none"   // mirrored from NetworkWidget: wifi/ethernet/none
     property bool omarchyUpdateAvail: false   // mirrored from UpdateWidget (6h poll)
     property bool notifSilenced: false        // mirrored from NotificationSilenceWidget (DND)
+    property string notifLatestSummary: ""
+    property string notifLatestBody: ""
+    property string notifLatestApp: ""
+    property var notifLatestObject: null
+    property int notifSerial: 0
     property bool modNotifications: true      // notification bell inside the status group
     property string voxState: "idle"          // mirrored from VoxtypeWidget: idle/recording/transcribing
     property bool mprisActive: false          // mirrored from MprisWidget; keeps active media visible in compact layouts
@@ -912,6 +917,33 @@ Item {
     property bool modBattery:    true    // battery pill, shown only when hardware exists
     property bool modClock:      true    // center clock/date pill
     property bool volumeManual:  false   // user explicitly enabled the volume pill
+
+    // ── Quickshell transient OSD ───────────────────────────────
+    property bool osdVisible: false
+    property string osdKind: ""
+    property string osdValue: ""
+    property string osdDetail: ""
+    property int osdSerial: 0
+    readonly property string osdPath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/qs-rise-osd.json"
+    FileView {
+        id: osdFile
+        path: theme.osdPath
+        onLoaded: {
+            try {
+                var event = JSON.parse(osdFile.text())
+                theme.osdKind = event.kind || ""
+                theme.osdValue = event.value === undefined ? "" : String(event.value)
+                theme.osdDetail = event.detail || ""
+            } catch (e) {
+                console.warn("osd: invalid runtime event")
+            }
+        }
+    }
+    function notifyOsd() {
+        osdVisible = true
+        osdSerial++
+    }
+    onOsdSerialChanged: osdFile.reload()
 
     readonly property bool volumeWidgetVisible: modVolume && mprisPlaying
     readonly property bool aiWidgetVisible:     modClaude && (aiUsageManual || codexActive)

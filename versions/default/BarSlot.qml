@@ -347,17 +347,32 @@ PanelWindow {
 
     Component {
         id: compCenter                                   // G8: clock·date·indicators
-        Item {
+        BarWidgetButton {
             id: g8
+            objectName: "clock-container"
+            theme: barSlot.root
+            backgroundVisible: false
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            preventStealing: true
             implicitWidth: Math.round(centerRow.implicitWidth)
-            implicitHeight: 32
+            implicitHeight: barSlot.root.pillH
             width: implicitWidth
-            height: implicitHeight
+            height: barSlot.root.pillH
+
+            onEntered: clock.showTooltip()
+            onExited: clock.hideTooltip()
+            onClicked: function(mouse) {
+                if (mouse.button === Qt.LeftButton) clock.openCalendarPanel()
+                else if (mouse.button === Qt.RightButton) clock.openTimezonePicker()
+            }
+            onWheel: function(event) {
+                clock.toggleClockMode()
+                event.accepted = true
+            }
 
             Rectangle {
-                anchors.centerIn: parent
-                width: parent.implicitWidth
-                height: barSlot.root.pillH
+                id: centerBg
+                anchors.fill: parent
                 radius: barSlot.root.pillRadius
                 color: barSlot.root.pill
                 border.color: barSlot.root.pillBorder
@@ -370,7 +385,7 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 x: Math.round((parent.width - width) / 2)   // integer center → sharp text
                 spacing: 8
-                ClockWidget   { id: clock; root: barSlot.root; barScreen: barSlot.screen }
+                ClockWidget   { id: clock; root: barSlot.root; barScreen: barSlot.screen; interactive: false }
                 Item {                               // indicator icons wrapper
                     visible: iconsRow.hasActive || width > 0.5
                     width: iconsRow.implicitWidth

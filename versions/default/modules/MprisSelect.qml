@@ -6,8 +6,8 @@ import Quickshell.Services.Mpris
 // The bar widget and the panel both instantiate this, so they can never
 // disagree about the current player.
 //
-// playerctld (and the dead apps it proxies) can leave ghost entries that
-// report Stopped or carry no metadata. Treat those as "no player".
+// playerctld (and dead apps) can leave ghost entries that report Playing
+// after the real player has exited. Treat those as "no player".
 QtObject {
     id: sel
 
@@ -23,21 +23,21 @@ QtObject {
     function isReal(p) {
         if (!p) return false
         if (isProxy(p)) return false
-        if (p.playbackState === MprisPlaybackState.Stopped) return false
-        var hasMeta = (p.trackTitle && p.trackTitle.length > 0)
-        return hasMeta || p.playbackState === MprisPlaybackState.Playing
+        // A paused player is not active media. In particular, browsers and
+        // playerctld commonly retain paused metadata across a reboot, which
+        // made the now-playing pill appear with nothing actually playing.
+        return p.playbackState === MprisPlaybackState.Playing
+            && !!(p.trackTitle && p.trackTitle.length > 0)
     }
 
     readonly property var player: {
         var vals = Mpris.players.values
-        var paused = null
         for (var i = 0; i < vals.length; i++) {
             var p = vals[i]
             if (!isReal(p)) continue
-            if (p.playbackState === MprisPlaybackState.Playing) return p
-            if (p.playbackState === MprisPlaybackState.Paused && paused === null) paused = p
+            return p
         }
-        return paused
+        return null
     }
 
     readonly property bool active:  player !== null

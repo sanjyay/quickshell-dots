@@ -27,7 +27,7 @@ Item {
 
     Process {
         id: dndProc
-        command: ["bash", "-c", "makoctl mode 2>/dev/null | grep -q 'do-not-disturb' && echo ON || echo OFF"]
+        command: ["bash", "-c", "qs-notification-silence status"]
         running: false
         stdout: StdioCollector {
             onStreamFinished: { rootMod.silenced = this.text.trim() === "ON" }
@@ -39,7 +39,7 @@ Item {
         onTriggered: { dndProc.running = false; dndProc.running = true }
     }
 
-    Process { id: toggleProc; command: ["bash", "-c", "omarchy-toggle-notification-silencing"] }
+    Process { id: toggleProc; command: ["bash", "-c", "qs-notification-silence toggle"] }
 
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
 

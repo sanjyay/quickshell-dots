@@ -426,7 +426,7 @@ Item {
         interval: 3000; running: true; repeat: false
         onTriggered: {
             root.armed7 = true
-            root.lastNotifC = root.notifC
+            root.lastNotifLatest = root.notifLatest
             root.lastNet7 = root.netMode7
         }
     }
@@ -583,30 +583,17 @@ Item {
         pushText(psTrack, ar + (al ? " - " + al : ""), 1, "long")
     }
 
-    // new notification (the bar's mako poll counts up) → fetch newest, show
-    // message left of the clock and its source right of it
-    readonly property int notifC: theme.notifCount === undefined ? 0 : theme.notifCount
-    property int lastNotifC: -1
-    onNotifCChanged: {
-        var prev = lastNotifC
-        lastNotifC = notifC
-        if (armed7 && active && mode === 7 && !dnd7 && prev >= 0 && notifC > prev) notifFetch.running = true
+    // New notifications are published by the native Quickshell notification
+    // server through Theme; no mako polling is needed.
+    readonly property string notifLatest: {
+        var s = theme.notifLatestSummary || "", b = theme.notifLatestBody || ""
+        return s && b && b !== s ? s + " - " + b : (s || b)
     }
-    Process {
-        id: notifFetch
-        command: ["bash", "-c", "makoctl list -j 2>/dev/null | jq -c '.[0] // empty' 2>/dev/null"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var d
-                try { d = JSON.parse(this.text) } catch (e) { return }
-                if (!d) return
-                var e0 = d.length !== undefined ? d[0] : d
-                if (!e0) return
-                var s0 = e0.summary || "", b0 = e0.body || ""
-                var msg = s0 && b0 && b0 !== s0 ? s0 + " - " + b0 : (s0 || b0)
-                root.pushText(msg, e0.app_name || "NOTIFY", 1, "long")
-            }
-        }
+    property string lastNotifLatest: ""
+    onNotifLatestChanged: {
+        if (armed7 && active && mode === 7 && !dnd7 && notifLatest !== "" && notifLatest !== lastNotifLatest)
+            root.pushText(notifLatest, theme.notifLatestApp || "NOTIFY", 1, "long")
+        lastNotifLatest = notifLatest
     }
 
     // ── status-change pulses (sources: theme mirrors + Pipewire) ──

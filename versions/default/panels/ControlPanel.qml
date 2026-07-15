@@ -47,6 +47,18 @@ PanelWindow {
         }
     }
 
+    Process {
+        id: qsModeProc
+        command: ["bash", "-lc", "qs-mode quickshell"]
+        running: false
+    }
+
+    Process {
+        id: omarchyModeProc
+        command: ["bash", "-lc", "qs-mode omarchy"]
+        running: false
+    }
+
     // ── reusable tile: neutral by default, highlights only on hover ──
     component Tile: Rectangle {
         property string label
@@ -167,6 +179,24 @@ PanelWindow {
                     root.controlVisible = false
                     refreshProc.running = false
                     refreshProc.running = true
+                }
+            }
+            Tile {
+                width: parent.width
+                label: "Quickshell UI"
+                onActivated: {
+                    root.controlVisible = false
+                    qsModeProc.running = false
+                    qsModeProc.running = true
+                }
+            }
+            Tile {
+                width: parent.width
+                label: "Omarchy UI"
+                onActivated: {
+                    root.controlVisible = false
+                    omarchyModeProc.running = false
+                    omarchyModeProc.running = true
                 }
             }
             Tile {
@@ -372,62 +402,6 @@ PanelWindow {
 
             Rectangle { width: parent.width; height: 1; color: root.sep }
 
-            // ── PICKER style (theme/wallpaper/screenshot/video picker visual) ──
-            UiText {
-                text: "PICKER-STIL"
-                color: root.sumiHi; font.family: root.mono; font.pixelSize: 10; font.letterSpacing: 1
-            }
-            Row {
-                id: pickerRow
-                width: parent.width
-                spacing: 4
-                readonly property var opts: [
-                    { label: "Tanzaku",     mode: "tanzaku"     },
-                    { label: "Hearthstone", mode: "hearthstone" },
-                    { label: "Carousel",    mode: "carousel"    }
-                ]
-                // Tiles are sized to their label width (mono → length × charW)
-                // plus an equal share of the leftover space, so every tile gets
-                // the same side padding. Fixed 1/3-each made the long "Hearthstone"
-                // label touch its borders while the short labels had slack.
-                TextMetrics { id: pickMetrics; font.family: root.mono; font.pixelSize: 10; text: "0" }
-                readonly property real charW: pickMetrics.advanceWidth
-                readonly property real sumTextW: {
-                    var n = 0;
-                    for (var i = 0; i < opts.length; i++) n += opts[i].label.length;
-                    return n * charW;
-                }
-                readonly property real padEach: Math.max(0, (width - spacing * (opts.length - 1) - sumTextW) / (opts.length * 2))
-                Repeater {
-                    model: pickerRow.opts
-                    delegate: Rectangle {
-                        id: pickTile
-                        required property var modelData
-                        readonly property bool on:      root.pickerStyle === modelData.mode
-                        readonly property bool hovered: pickMa.containsMouse
-                        width: root.evenW(modelData.label.length * pickerRow.charW + pickerRow.padEach * 2)
-                        height: 25; radius: root.tileRadius
-                        color: on ? root.fillActive : hovered ? root.fillHover : root.fillIdle
-                        border.color: (on || hovered) ? root.seal : root.sep
-                        border.width: 1
-                        Behavior on color { ColorAnimation { duration: 120 } }
-                        UiText {
-                            anchors.centerIn: parent
-                            text: pickTile.modelData.label
-                            color: (pickTile.on || pickTile.hovered) ? root.seal : root.ink
-                            font.family: root.mono; font.pixelSize: 10
-                            font.weight: pickTile.on ? Font.Medium : Font.Normal
-                        }
-                        MouseArea {
-                            id: pickMa
-                            anchors.fill: parent; hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.pickerStyle = pickTile.modelData.mode
-                        }
-                    }
-                }
-            }
-
         }
     }
 
@@ -522,12 +496,6 @@ PanelWindow {
                 label: "Reactor"
                 active: root.barAnim === 7
                 onActivated: root.barAnim = root.barAnim === 7 ? 0 : 7
-            }
-            Tile {
-                width: parent.width
-                label: "Quotes"
-                active: root.barAnim === 8
-                onActivated: root.barAnim = root.barAnim === 8 ? 0 : 8
             }
         }
     }
