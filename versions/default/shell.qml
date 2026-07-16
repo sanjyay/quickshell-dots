@@ -63,6 +63,17 @@ ShellRoot {
     }
 
     IpcHandler {
+        target: "themeSwitcher"
+        function open(): void { theme.openThemeSwitcher() }
+        function close(): void { theme.themeSwitcherVisible = false }
+        function toggle(): void {
+            if (theme.themeSwitcherVisible) theme.themeSwitcherVisible = false
+            else theme.openThemeSwitcher()
+        }
+        function ping(): void { }
+    }
+
+    IpcHandler {
         target: "clipboard"
         function open(): void { theme.openClipboard() }
         function close(): void { theme.clipboardVisible = false }
@@ -266,7 +277,9 @@ ShellRoot {
         // The pulse is decorative while hidden. Its item retains a geometry for
         // animation, so using it directly as the layer mask blocks the bar below.
         // Restrict input to the actionable control only.
-        mask: Region { item: pulse.inputItem }
+        mask: Region {
+            item: pulse.inputItem.enabled ? pulse.inputItem : null
+        }
 
         Pulse {
             id: pulse
@@ -326,6 +339,7 @@ ShellRoot {
 
     TooltipOverlay { root: theme }
     OmarchyMenuPanel { root: theme }
+    ThemeSwitcherPanel { root: theme }
     ClipboardHistoryPanel { root: theme }
     CapturePanel { root: theme }
     AppLauncherPanel { root: theme }

@@ -5,8 +5,8 @@ import Quickshell.Io
 Item {
     id: rootMod
     required property var root
-
     property bool recording: false
+    property bool stopInFlight: false
     property int  elapsed:   0   // seconds
 
     function pad(n) { return n < 10 ? "0" + n : String(n) }
@@ -14,7 +14,7 @@ Item {
     visible: implicitWidth > 0.5
     implicitWidth: recording ? row.implicitWidth + 6 : 0
     clip: true
-    implicitHeight: 28
+    implicitHeight: 32
     width: implicitWidth
     height: implicitHeight
     opacity: recording ? 1 : 0
@@ -78,7 +78,7 @@ Item {
                 if (t.indexOf("REC") === 0) {
                     rootMod.recording = true
                     rootMod.elapsed = parseInt(t.split(" ")[1]) || 0
-                } else {
+                } else if (!rootMod.stopInFlight) {
                     rootMod.recording = false
                     rootMod.elapsed = 0
                 }
@@ -94,20 +94,40 @@ Item {
         onTriggered: { recProc.running = false; recProc.running = true }
     }
 
-    Process { id: toggleProc; command: ["bash", "-c", "omarchy-capture-screenrecording --stop-recording"] }
+    Process {
+        id: toggleProc
+        command: ["omarchy-capture-screenrecording", "--stop-recording"]
+        onExited: function(code) {
+            rootMod.stopInFlight = false
+            if (code === 0) {
+                rootMod.recording = false
+                rootMod.elapsed = 0
+            }
+            recProc.running = false
+            recProc.running = true
+            if (code !== 0)
+                console.warn("ScreenRecordWidget: stop command exited with code " + code)
+        }
+    }
 
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
 
     BarWidgetButton {
+        id: recordButton
+        theme: rootMod.root
+        traceName: "recording-timer-handler"
         anchors.fill: parent
-        enabled: rootMod.recording
+        enabled: rootMod.recording && !rootMod.stopInFlight
+        preventStealing: true
         hoverEnabled: true; cursorShape: Qt.PointingHandCursor
         onEntered: tip.show()
-        onExited:  { tip.hide() }
+        onExited: tip.hide()
         onClicked: {
             tip.hide()
-            toggleProc.running = false; toggleProc.running = true
-            Qt.callLater(function() { recProc.running = false; recProc.running = true })
+            if (!rootMod.recording || rootMod.stopInFlight) return
+            rootMod.stopInFlight = true
+            toggleProc.running = false
+            toggleProc.running = true
         }
     }
 }

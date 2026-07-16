@@ -347,32 +347,21 @@ PanelWindow {
 
     Component {
         id: compCenter                                   // G8: clock·date·indicators
-        BarWidgetButton {
+        Item {
             id: g8
             objectName: "clock-container"
-            theme: barSlot.root
-            backgroundVisible: false
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
-            preventStealing: true
-            implicitWidth: Math.round(centerRow.implicitWidth)
-            implicitHeight: barSlot.root.pillH
+            implicitWidth: Math.round(clock.implicitWidth
+                + (indicatorWrapper.visible ? 4 : 0)
+                + indicatorWrapper.width)
+            implicitHeight: 32
             width: implicitWidth
-            height: barSlot.root.pillH
-
-            onEntered: clock.showTooltip()
-            onExited: clock.hideTooltip()
-            onClicked: function(mouse) {
-                if (mouse.button === Qt.LeftButton) clock.openCalendarPanel()
-                else if (mouse.button === Qt.RightButton) clock.openTimezonePicker()
-            }
-            onWheel: function(event) {
-                clock.toggleClockMode()
-                event.accepted = true
-            }
+            height: 32
 
             Rectangle {
                 id: centerBg
-                anchors.fill: parent
+                anchors.centerIn: parent
+                width: parent.width
+                height: barSlot.root.pillH
                 radius: barSlot.root.pillRadius
                 color: barSlot.root.pill
                 border.color: barSlot.root.pillBorder
@@ -384,12 +373,47 @@ PanelWindow {
                 id: centerRow
                 anchors.verticalCenter: parent.verticalCenter
                 x: Math.round((parent.width - width) / 2)   // integer center → sharp text
-                spacing: 4
-                ClockWidget   { id: clock; root: barSlot.root; barScreen: barSlot.screen; interactive: false }
+                spacing: 0
+                BarWidgetButton {
+                    id: clockSegment
+                    objectName: "clock-handler"
+                    theme: barSlot.root
+                    width: Math.max(0, g8.width - indicatorWrapper.width)
+                    height: 32
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    preventStealing: true
+                    Accessible.name: "Clock and calendar"
+                    Accessible.description: clock.tooltipText
+
+                    onEntered: clock.showTooltip()
+                    onExited: clock.hideTooltip()
+                    onClicked: function(mouse) {
+                        if (mouse.button === Qt.LeftButton) clock.openCalendarPanel()
+                        else if (mouse.button === Qt.RightButton) clock.openTimezonePicker()
+                    }
+                    onWheel: function(event) {
+                        clock.toggleClockMode()
+                        event.accepted = true
+                    }
+                    onEscapePressed: function(event) {
+                        if (!barSlot.root.calendarVisible) return
+                        clock.closeCalendarPanel()
+                        event.accepted = true
+                    }
+
+                    ClockWidget {
+                        id: clock
+                        root: barSlot.root
+                        barScreen: barSlot.screen
+                        interactive: false
+                    }
+                }
                 Item {                               // indicator icons wrapper
+                    id: indicatorWrapper
+                    anchors.verticalCenter: parent.verticalCenter
                     visible: iconsRow.hasActive || width > 0.5
                     width: iconsRow.implicitWidth
-                    height: 28
+                    height: 32
                     clip: true
                     opacity: iconsRow.hasActive ? 1 : 0
                     Behavior on width   { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
@@ -413,26 +437,6 @@ PanelWindow {
                         ShellUpdateWidget        { id: shellUpdateInd;   root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
                     }
                 }
-            }
-
-            Rectangle {
-                visible: barSlot.root.pointerTrace
-                anchors.fill: parent
-                color: "transparent"
-                border.color: "#ffaa22"
-                border.width: 1
-                z: 90
-            }
-            Rectangle {
-                visible: barSlot.root.pointerTrace
-                x: centerRow.x + clock.x
-                y: centerRow.y + clock.y
-                width: clock.width
-                height: clock.height
-                color: "transparent"
-                border.color: "#ff3344"
-                border.width: 2
-                z: 91
             }
 
         }

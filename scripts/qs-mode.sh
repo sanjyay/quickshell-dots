@@ -62,8 +62,18 @@ remove_qs_menu_bindings() {
     mv "$tmp" "$BINDINGS"
 }
 
+remove_standalone_theme_binding() {
+    [[ -f "$BINDINGS" ]] || return 0
+    local tmp
+    tmp="$(mktemp)"
+    awk '$0 != "bind = SUPER CTRL SHIFT, SPACE, exec, qs -c bar ipc call themeSwitcher toggle"' \
+        "$BINDINGS" > "$tmp"
+    mv "$tmp" "$BINDINGS"
+}
+
 install_qs_menu_bindings() {
     [[ -f "$BINDINGS" ]] || return 0
+    remove_standalone_theme_binding
     remove_qs_menu_bindings
     cat >> "$BINDINGS" <<'EOF'
 
@@ -81,6 +91,8 @@ unbind = ALT CTRL, PRINT
 unbind = SUPER, PRINT
 unbind = SUPER CTRL, PRINT
 bind = SUPER, SPACE, exec, qs -c bar ipc call -- launcher open
+unbind = SUPER CTRL SHIFT, SPACE
+bind = SUPER CTRL SHIFT, SPACE, exec, qs -c bar ipc call themeSwitcher toggle
 # Right Alt is a keysym, so this installed Hyprland version requires a
 # keysym-combination bind to distinguish it from left Alt.
 binds = Super_L&Alt_R, SPACE, exec, qs -c bar ipc call -- menu open root
@@ -102,6 +114,7 @@ EOF
 
 install_omarchy_menu_bindings() {
     [[ -f "$BINDINGS" ]] || return 0
+    remove_standalone_theme_binding
     remove_qs_menu_bindings
     cat >> "$BINDINGS" <<'EOF'
 

@@ -64,7 +64,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Split groups | positional pill splits + Stream, Surge, Bolt, Bolt 2 gap animations |
 | Magnetic hover | subtle pointer-only pill scale and neighbor pull animation without layout reflow |
 | Pulse | independent top overlay for short-lived system events, visible during fullscreen because it is not inside the bar window |
-| Keybind IPC | `qs -c bar ipc call picker theme\|wallpaper\|screenshots\|videos` |
+| Keybind IPC | `qs -c bar ipc call themeSwitcher toggle` plus wallpaper/media picker IPC |
 | Super menu | Quickshell-rendered Omarchy actions, nested sections, type-ahead, keyboard navigation, and no Walker submenu handoff |
 | Per-widget panels | click widget to open its popup |
 
@@ -159,19 +159,19 @@ Common actions:
 <details>
 <summary>Theme / wallpaper keybinds</summary>
 
-Omarchy binds theme and wallpaper menus to these keys by default:
+The installed Quickshell bindings provide a native theme switcher and wallpaper picker:
 
 | Action | Key | Omarchy default |
 |---|---|---|
-| Theme | `Super` + `Shift` + `Ctrl` + `Space` | `omarchy-menu theme` |
-| Wallpaper | `Super` + `Ctrl` + `Space` | `omarchy-menu background` |
+| Theme | `Super` + `Ctrl` + `Shift` + `Space` | Quickshell theme switcher |
+| Wallpaper | `Super` + `Ctrl` + `Space` | Quickshell wallpaper picker |
 
 To route those keys to this bar's pickers, add this to `~/.config/hypr/bindings.conf`:
 
 ```conf
-unbind = SUPER SHIFT CTRL, SPACE
+unbind = SUPER CTRL SHIFT, SPACE
+bind = SUPER CTRL SHIFT, SPACE, exec, qs -c bar ipc call themeSwitcher toggle
 unbind = SUPER CTRL, SPACE
-bindd  = SUPER SHIFT CTRL, SPACE, Theme picker,     exec, qs -c bar ipc call picker theme
 bindd  = SUPER CTRL, SPACE,       Wallpaper picker, exec, qs -c bar ipc call picker wallpaper
 ```
 

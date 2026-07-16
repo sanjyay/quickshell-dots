@@ -147,12 +147,12 @@ Item {
     property var barLayoutControllers: ({})
     property bool _barLayoutSyncing: false
 
-    readonly property bool anyPopupVisible: menuVisible || clipboardVisible || captureVisible || appLauncherVisible || calendarVisible || cpuVisible || aiUsageVisible
+    readonly property bool anyPopupVisible: menuVisible || themeSwitcherVisible || clipboardVisible || captureVisible || appLauncherVisible || calendarVisible || cpuVisible || aiUsageVisible
         || memVisible || volVisible || controlVisible || networkVisible || bluetoothVisible
         || batteryVisible || mprisVisible
         || workspaceVisible || imagePickerVisible || mediaBrowserVisible || notifVisible
         || powerProfileVisible || archVisible || shellUpdateVisible || trayVisible || trayMenuVisible
-    readonly property bool keyboardPopupVisible: menuVisible || clipboardVisible || captureVisible || appLauncherVisible || imagePickerVisible || mediaBrowserVisible
+    readonly property bool keyboardPopupVisible: menuVisible || themeSwitcherVisible || clipboardVisible || captureVisible || appLauncherVisible || imagePickerVisible || mediaBrowserVisible
 
     function registerBarLayoutController(screenName, controller) {
         if (!screenName || !controller) return
@@ -364,6 +364,7 @@ Item {
     function closePopups(except) {
         _closingPopups = true
         if (except !== "menuVisible") menuVisible = false
+        if (except !== "themeSwitcherVisible") themeSwitcherVisible = false
         if (except !== "clipboardVisible") clipboardVisible = false
         if (except !== "captureVisible") captureVisible = false
         if (except !== "appLauncherVisible") appLauncherVisible = false
@@ -411,6 +412,20 @@ Item {
     function openAppLauncher() {
         activateFocusedPopupScreen()
         appLauncherVisible = true
+    }
+
+    // ── Native Omarchy theme switcher ──
+    property bool themeSwitcherVisible: false
+    onThemeSwitcherVisibleChanged: popupOpened("themeSwitcherVisible")
+
+    function openThemeSwitcher() {
+        activateFocusedPopupScreen()
+        themeSwitcherVisible = true
+    }
+
+    function reloadThemePalette() {
+        paletteReader.running = false
+        paletteReader.running = true
     }
 
     // ── Native Omarchy menu state ──
@@ -1699,8 +1714,7 @@ Item {
             theme.applyLauncherConfig(p);
         }
         function reload(): void {
-            paletteReader.running = false;
-            paletteReader.running = true;
+            theme.reloadThemePalette()
         }
     }
 
@@ -1709,7 +1723,7 @@ Item {
     //  function name `theme` shadowing the `id: theme`)
     IpcHandler {
         target: "picker"
-        function theme(): void       { openImagePicker("theme") }
+        function theme(): void       { openThemeSwitcher() }
         function wallpaper(): void   { openImagePicker("wallpaper") }
         function screenshots(): void { openMediaBrowser("screenshots") }
         function videos(): void      { openMediaBrowser("videos") }

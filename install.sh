@@ -303,6 +303,7 @@ if [[ -f "$src_repo/scripts/qs-mode.sh" ]]; then
   install -m 755 "$src_repo/scripts/qs-mode.sh" "$HOME/.local/bin/qs-mode"
   install -m 755 "$src_repo/scripts/qs-rise-input.sh" "$HOME/.local/bin/qs-rise-input"
   install -m 755 "$src_repo/scripts/qs-menu-action.sh" "$HOME/.local/bin/qs-menu-action"
+  install -m 755 "$src_repo/scripts/qs-theme-switcher" "$HOME/.local/bin/qs-theme-switcher"
   install -m 755 "$src_repo/scripts/qs-clipboard.sh" "$HOME/.local/bin/qs-clipboard"
   install -m 755 "$src_repo/scripts/qs-capture.sh" "$HOME/.local/bin/qs-capture"
   if [[ ! -e "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode" ]]; then

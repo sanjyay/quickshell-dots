@@ -4,6 +4,11 @@
 
 ### Native Quickshell UI
 
+- Added a native Omarchy theme switcher with user/stock theme discovery,
+  asynchronous previews, animated cover-flow navigation, debounced instant
+  application, rollback handling, and live palette refresh without Walker.
+- Routed the installed theme binding, existing theme-picker IPC, and Super menu
+  Style → Theme action to the same Quickshell theme-switcher panel.
 - Added a reversible Quickshell/Omarchy profile switch for the native menu,
   clipboard picker, capture panel, power/session actions, and related
   Hyprland bindings.

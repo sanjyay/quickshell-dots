@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Native Quickshell theme-switcher data provider.  This deliberately scans the
+# same two roots used by omarchy-theme-list instead of sourcing omarchy-menu or
+# parsing its Walker provider.
+
+mode="${1:-list}"
+home="${HOME:?}"
+user_root="$home/.config/omarchy/themes"
+official_root="${OMARCHY_PATH:-$home/.local/share/omarchy}/themes"
+cache_root="${XDG_CACHE_HOME:-$home/.cache}/quickshell-theme-switcher"
+metadata_cache="$cache_root/themes.tsv"
+
+display_name() {
+    printf '%s\n' "$1" | sed -E 's/_/ /g; s/-/ /g; s/(^|[ ])([a-z]) /\1\U\2 /g; s/(^|[ ])([a-z])/\1\U\2/g'
+}
+
+valid_id() {
+    [[ "$1" =~ ^[A-Za-z0-9._-]+$ ]]
+}
+
+first_preview() {
+    local dir="$1"
+    local candidate
+    for candidate in \
+        "$dir/preview.png" "$dir/preview.jpg" "$dir/preview.jpeg" "$dir/preview.webp"; do
+        [[ -f "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
+    done
+    while IFS= read -r -d '' candidate; do
+        printf '%s\n' "$candidate"
+        return 0
+    done < <(find -L "$dir/backgrounds" -maxdepth 1 -type f \
+        \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) \
+        -print0 2>/dev/null | sort -z)
+    return 1
+}
+
+palette_value() {
+    local file="$1" key="$2" fallback="$3"
+    [[ -f "$file" ]] || { printf '%s\n' "$fallback"; return; }
+    awk -F'"' -v wanted="$key" '$1 ~ "^[[:space:]]*" wanted "[[:space:]]*=" { print $2; exit }' "$file" \
+        | grep -E '^#[[:xdigit:]]{6,8}$' | head -n 1 || printf '%s\n' "$fallback"
+}
+
+generated_preview() {
+    local id="$1" dir="$2" colors="$dir/colors.toml" sig out bg fg accent
+    valid_id "$id" || return 1
+    mkdir -p "$cache_root"
+    sig="$(stat -c '%Y-%s' "$dir" "$colors" 2>/dev/null | tr '\n' '-')"
+    sig="${sig//[^0-9-]/}"
+    out="$cache_root/$id-${sig:-0}.svg"
+    if [[ ! -s "$out" ]]; then
+        bg="$(palette_value "$colors" background '#181616')"
+        fg="$(palette_value "$colors" foreground '#c5c9c5')"
+        accent="$(palette_value "$colors" color1 '#c4746e')"
+        printf '%s\n' \
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">' \
+            "<rect width=\"640\" height=\"360\" fill=\"$bg\"/>" \
+            "<rect x=\"22\" y=\"24\" width=\"596\" height=\"34\" rx=\"8\" fill=\"$fg\" opacity=\".16\"/>" \
+            "<rect x=\"22\" y=\"82\" width=\"180\" height=\"238\" rx=\"10\" fill=\"$fg\" opacity=\".10\"/>" \
+            "<rect x=\"224\" y=\"82\" width=\"394\" height=\"108\" rx=\"10\" fill=\"$fg\" opacity=\".12\"/>" \
+            "<rect x=\"224\" y=\"208\" width=\"394\" height=\"112\" rx=\"10\" fill=\"$accent\" opacity=\".72\"/>" \
+            "<rect x=\"44\" y=\"280\" width=\"136\" height=\"8\" rx=\"4\" fill=\"$accent\"/>" \
+            '</svg>' > "$out"
+    fi
+    printf '%s\n' "$out"
+}
+
+cached_source_preview() {
+    local id="$1" source="$2" ext stamp link
+    valid_id "$id" || return 1
+    ext="${source##*.}"
+    stamp="$(stat -c '%Y' "$source" 2>/dev/null || printf '0')"
+    link="$cache_root/$id-${stamp}.${ext,,}"
+    mkdir -p "$cache_root"
+    ln -sfn -- "$source" "$link"
+    printf '%s\n' "$link"
+}
+
+theme_dir() {
+    local id="$1"
+    valid_id "$id" || return 1
+    if [[ -d "$user_root/$id" ]]; then printf '%s\n' "$user_root/$id"; return; fi
+    [[ -d "$official_root/$id" ]] && printf '%s\n' "$official_root/$id"
+}
+
+case "$mode" in
+    cache)
+        cat "$metadata_cache" 2>/dev/null || true
+        ;;
+    current)
+        if [[ -f "$home/.config/omarchy/current/theme.name" ]]; then
+            tr -d '\r\n' < "$home/.config/omarchy/current/theme.name"
+            printf '\n'
+        else
+            basename "$(readlink -f "$home/.config/omarchy/current/theme" 2>/dev/null || true)"
+        fi
+        ;;
+    list)
+        declare -A seen=()
+        mkdir -p "$cache_root"
+        list_tmp="$(mktemp "$cache_root/.themes.XXXXXX")"
+        trap 'rm -f "$list_tmp"' EXIT
+        find "$user_root" "$official_root" -mindepth 1 -maxdepth 1 \
+            \( -type d -o -type l \) -print 2>/dev/null \
+            | while IFS= read -r dir; do
+                [[ -d "$dir" ]] || continue
+                id="${dir##*/}"
+                valid_id "$id" || continue
+                [[ -f "$dir/colors.toml" || -d "$dir/backgrounds" || -f "$dir/preview.png" \
+                    || -f "$dir/preview.jpg" || -f "$dir/preview.jpeg" || -f "$dir/preview.webp" ]] || continue
+                [[ -n "${seen[$id]:-}" ]] && continue
+                seen[$id]=1
+                preview="$(first_preview "$dir" 2>/dev/null || true)"
+                if [[ -n "$preview" ]]; then
+                    preview="$(cached_source_preview "$id" "$preview")"
+                else
+                    preview="$(generated_preview "$id" "$dir" 2>/dev/null || true)"
+                fi
+                [[ -n "$preview" ]] || continue
+                printf '%s\t%s\t%s\t%s\n' "$id" "$(display_name "$id")" "$preview" "$dir"
+            done | sort -t $'\t' -k1,1 > "$list_tmp"
+        mv -f "$list_tmp" "$metadata_cache"
+        trap - EXIT
+        cat "$metadata_cache"
+        ;;
+    preview)
+        id="${2:-}"
+        dir="$(theme_dir "$id" 2>/dev/null || true)"
+        [[ -n "$dir" ]] || exit 2
+        if preview="$(first_preview "$dir" 2>/dev/null)"; then
+            cached_source_preview "$id" "$preview"
+        else
+            generated_preview "$id" "$dir"
+        fi
+        ;;
+    *)
+        printf 'usage: %s {list|cache|current|preview <theme-id>}\n' "$0" >&2
+        exit 2
+        ;;
+esac

@@ -226,6 +226,10 @@ PanelWindow {
 
         var action = String(entry.actionId || "").trim()
         if (!action) return
+        if (action === "open-theme-switcher") {
+            root.openThemeSwitcher()
+            return
+        }
         root.menuVisible = false
         actionProc.command = ["qs-menu-action", action]
         actionProc.running = false
