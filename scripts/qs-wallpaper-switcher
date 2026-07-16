@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+mode="${1:-list}"
+home="${HOME:?}"
+cache_root="${XDG_CACHE_HOME:-$home/.cache}/quickshell-wallpaper-switcher"
+metadata_cache="$cache_root/wallpapers.tsv"
+current_link="$home/.config/omarchy/current/background"
+
+current_theme_name() {
+  local theme
+  theme="$(readlink -f "$home/.config/omarchy/current/theme" 2>/dev/null || true)"
+  [[ -n "$theme" ]] && basename "$theme"
+}
+
+display_name() {
+  local name="$1" stem
+  stem="${name%.*}"
+  stem="$(printf '%s' "$stem" | sed -E 's/^[0-9]+[-_. ]+//; s/[-_]+/ /g; s/[[:space:]]+/ /g; s/^ | $//g')"
+  if [[ "$stem" =~ ^[[:xdigit:]]{20,}$ ]]; then
+    printf 'Wallpaper %s\n' "${stem:0:8}"
+  elif [[ -n "$stem" ]]; then
+    printf '%s\n' "$stem"
+  else
+    printf '%s\n' "$name"
+  fi
+}
+
+write_list() {
+  local theme bundled user dir path canonical base tmp
+  theme="$(current_theme_name)"
+  bundled="$home/.config/omarchy/current/theme/backgrounds"
+  user="$home/.config/omarchy/backgrounds/$theme"
+  mkdir -p "$cache_root"
+  tmp="$(mktemp "$cache_root/.wallpapers.XXXXXX")"
+  trap 'rm -f "$tmp"' EXIT
+  declare -A seen=()
+  for dir in "$bundled" "$user"; do
+    [[ -d "$dir" ]] || continue
+    while IFS= read -r -d '' path; do
+      base="${path##*/}"
+      [[ "$base" != *$'\t'* && "$base" != *$'\n'* && "$base" != *$'\r'* ]] || continue
+      [[ -z "${seen[$base]:-}" ]] || continue
+      canonical="$(readlink -f -- "$path" 2>/dev/null || true)"
+      [[ -f "$canonical" ]] || continue
+      seen[$base]=1
+      printf '%s\t%s\n' "$canonical" "$(display_name "$base")" >> "$tmp"
+    done < <(find -L "$dir" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.bmp' -o -iname '*.webp' \) -print0 2>/dev/null | sort -z)
+  done
+  mv -f "$tmp" "$metadata_cache"
+  trap - EXIT
+  cat "$metadata_cache"
+}
+
+case "$mode" in
+  list) write_list ;;
+  cache) cat "$metadata_cache" 2>/dev/null || true ;;
+  current) readlink -f -- "$current_link" 2>/dev/null || true ;;
+  *) printf 'usage: %s {list|cache|current}\n' "$0" >&2; exit 2 ;;
+esac

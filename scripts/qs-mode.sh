@@ -66,7 +66,10 @@ remove_standalone_theme_binding() {
     [[ -f "$BINDINGS" ]] || return 0
     local tmp
     tmp="$(mktemp)"
-    awk '$0 != "bind = SUPER CTRL SHIFT, SPACE, exec, qs -c bar ipc call themeSwitcher toggle"' \
+    awk '$0 != "bind = SUPER CTRL SHIFT, SPACE, exec, qs -c bar ipc call themeSwitcher toggle" &&
+         $0 != "bindd = SUPER CTRL, SPACE, Quickshell wallpaper switcher, exec, qs -c bar ipc call -- wallpaperSwitcher toggle" &&
+         $0 != "bindd = SUPER CTRL, SPACE, Wallpaper picker, exec, qs -c bar ipc call picker wallpaper" &&
+         $0 != "bindd  = SUPER CTRL, SPACE,       Wallpaper picker, exec, qs -c bar ipc call picker wallpaper"' \
         "$BINDINGS" > "$tmp"
     mv "$tmp" "$BINDINGS"
 }
@@ -93,6 +96,8 @@ unbind = SUPER CTRL, PRINT
 bind = SUPER, SPACE, exec, qs -c bar ipc call -- launcher open
 unbind = SUPER CTRL SHIFT, SPACE
 bind = SUPER CTRL SHIFT, SPACE, exec, qs -c bar ipc call themeSwitcher toggle
+unbind = SUPER CTRL, SPACE
+bindd = SUPER CTRL, SPACE, Quickshell wallpaper switcher, exec, qs -c bar ipc call -- wallpaperSwitcher toggle
 # Right Alt is a keysym, so this installed Hyprland version requires a
 # keysym-combination bind to distinguish it from left Alt.
 binds = Super_L&Alt_R, SPACE, exec, qs -c bar ipc call -- menu open root

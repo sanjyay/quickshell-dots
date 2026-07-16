@@ -159,7 +159,7 @@ Common actions:
 <details>
 <summary>Theme / wallpaper keybinds</summary>
 
-The installed Quickshell bindings provide a native theme switcher and wallpaper picker:
+The installed Quickshell bindings provide native theme and wallpaper switchers:
 
 | Action | Key | Omarchy default |
 |---|---|---|
@@ -172,7 +172,7 @@ To route those keys to this bar's pickers, add this to `~/.config/hypr/bindings.
 unbind = SUPER CTRL SHIFT, SPACE
 bind = SUPER CTRL SHIFT, SPACE, exec, qs -c bar ipc call themeSwitcher toggle
 unbind = SUPER CTRL, SPACE
-bindd  = SUPER CTRL, SPACE,       Wallpaper picker, exec, qs -c bar ipc call picker wallpaper
+bindd = SUPER CTRL, SPACE, Quickshell wallpaper switcher, exec, qs -c bar ipc call -- wallpaperSwitcher toggle
 ```
 
 Then run:
@@ -187,6 +187,8 @@ Other picker IPC commands:
 qs -c bar ipc call picker screenshots
 qs -c bar ipc call picker videos
 ```
+
+`qs -c bar ipc call picker wallpaper` remains a compatibility alias for the native wallpaper switcher.
 
 </details>
 

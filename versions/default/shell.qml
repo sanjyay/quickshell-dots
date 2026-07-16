@@ -74,6 +74,17 @@ ShellRoot {
     }
 
     IpcHandler {
+        target: "wallpaperSwitcher"
+        function open(): void { theme.openWallpaperSwitcher() }
+        function close(): void { theme.wallpaperSwitcherVisible = false }
+        function toggle(): void {
+            if (theme.wallpaperSwitcherVisible) theme.wallpaperSwitcherVisible = false
+            else theme.openWallpaperSwitcher()
+        }
+        function ping(): void { }
+    }
+
+    IpcHandler {
         target: "clipboard"
         function open(): void { theme.openClipboard() }
         function close(): void { theme.clipboardVisible = false }
@@ -340,6 +351,7 @@ ShellRoot {
     TooltipOverlay { root: theme }
     OmarchyMenuPanel { root: theme }
     ThemeSwitcherPanel { root: theme }
+    WallpaperSwitcherPanel { root: theme }
     ClipboardHistoryPanel { root: theme }
     CapturePanel { root: theme }
     AppLauncherPanel { root: theme }

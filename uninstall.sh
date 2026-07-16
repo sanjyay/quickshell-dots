@@ -62,6 +62,9 @@ remove_hypr_quickshell_bindings() {
       "bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open"|\
       "unbind = SUPER SHIFT, SPACE"|\
       "bind = SUPER CTRL SHIFT, SPACE, exec, qs -c bar ipc call themeSwitcher toggle"|\
+      "unbind = SUPER CTRL, SPACE"|\
+      "bindd = SUPER CTRL, SPACE, Quickshell wallpaper switcher, exec, qs -c bar ipc call -- wallpaperSwitcher toggle"|\
+      "bindd = SUPER CTRL, SPACE, Wallpaper picker, exec, qs -c bar ipc call picker wallpaper"|\
       "bindd = SUPER SHIFT, SPACE, Refresh Quickshell bar, exec, bash -lc 'qs -c bar kill; sleep 0.2; qs -n -d -c bar'"|\
       "bindd = SUPER SHIFT, SPACE, Toggle-refresh Quickshell bar, exec, bash -lc 'qs -c bar kill >/dev/null 2>&1 || true; sleep 0.35; qs -n -d -c bar'"|\
       "bindd = SUPER SHIFT, SPACE, Toggle Quickshell bar, exec, bash -lc 'if qs list --all 2>/dev/null | grep -q \"$HOME/.config/quickshell/bar/shell.qml\"; then qs -c bar kill >/dev/null 2>&1 || true; else qs -n -d -c bar; fi'")
@@ -157,8 +160,9 @@ if [[ -e "$HOME/.local/bin/qs-mode" || -e "${XDG_STATE_HOME:-$HOME/.local/state}
   rm -f "$HOME/.local/bin/qs-mode" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode"
   info "Removed reversible UI mode switcher"
 fi
-rm -f "$HOME/.local/bin/qs-rise-input" "$HOME/.local/bin/qs-menu-action" "$HOME/.local/bin/qs-theme-switcher" "$HOME/.local/bin/qs-clipboard" "$HOME/.local/bin/qs-capture" "$HOME/.local/bin/qs-notification-silence" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/notifications-silenced"
+rm -f "$HOME/.local/bin/qs-rise-input" "$HOME/.local/bin/qs-menu-action" "$HOME/.local/bin/qs-theme-switcher" "$HOME/.local/bin/qs-wallpaper-switcher" "$HOME/.local/bin/qs-clipboard" "$HOME/.local/bin/qs-capture" "$HOME/.local/bin/qs-notification-silence" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/notifications-silenced"
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-theme-switcher"
+rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-wallpaper-switcher"
 rm -f "${XDG_RUNTIME_DIR:-/tmp}/qs-rise-osd.json"
 rmdir "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise" 2>/dev/null || true
 

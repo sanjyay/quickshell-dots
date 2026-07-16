@@ -43,7 +43,7 @@ case "$action" in
   system-shutdown) exec omarchy-system-shutdown ;;
 
   style-hyprland) exec omarchy-launch-editor "$HOME/.config/hypr/looknfeel.conf" ;;
-  style-background) exec omarchy-theme-bg-set ;;
+  style-background) exec qs -c bar ipc call -- wallpaperSwitcher open ;;
   style-screensaver-edit-text|style-screensaver-set-from-image|style-screensaver-restore-default)
     printf 'Screensaver customization is handled by the installed Omarchy helper.\n' >&2
     exit 64

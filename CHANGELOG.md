@@ -4,6 +4,10 @@
 
 ### Native Quickshell UI
 
+- Added a native Omarchy wallpaper switcher with active-theme discovery,
+  adaptive circular cover-flow navigation, debounced application and verified
+  rollback, plus native menu, widget, IPC, and Hyprland shortcut routing.
+
 - Added a native Omarchy theme switcher with user/stock theme discovery,
   asynchronous previews, animated cover-flow navigation, debounced instant
   application, rollback handling, and live palette refresh without Walker.

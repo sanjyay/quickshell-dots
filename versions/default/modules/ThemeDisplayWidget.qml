@@ -16,7 +16,7 @@ Item {
         text: String.fromCodePoint(0xF0194)
         renderType: Text.QtRendering
         font.family: root.mono; font.pixelSize: 14
-        color: root.imagePickerVisible
+        color: root.themeSwitcherVisible || root.wallpaperSwitcherVisible
             ? root.seal
             : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.65)
         Behavior on color { ColorAnimation { duration: 150 } }
@@ -36,13 +36,9 @@ Item {
         onExited:  tip.hide()
         onClicked: function(mouse) {
             tip.hide()
-            if (root.imagePickerVisible) {
-                root.imagePickerVisible = false
-                return
-            }
             root.activatePopupScreen(rootMod.screen)
-            root.imagePickerMode    = (mouse.button === Qt.RightButton) ? "wallpaper" : "theme"
-            root.imagePickerVisible = true
+            if (mouse.button === Qt.RightButton) root.openWallpaperSwitcher()
+            else root.openThemeSwitcher()
         }
     }
 }

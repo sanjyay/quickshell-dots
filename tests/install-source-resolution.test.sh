@@ -14,6 +14,8 @@ require 'printf '\''%s\n'\'' "$source_ref" > "$stage/.qsrise-source"' "$repo/ins
 require 'verify_installed_copy()' "$repo/install.sh"
 require 'Installed $rel does not match' "$repo/install.sh"
 require 'shell.qml' "$repo/install.sh"
+require 'panels/WallpaperSwitcherPanel.qml' "$repo/install.sh"
+require 'Installed qs-wallpaper-switcher does not match source' "$repo/install.sh"
 
 require 'DEST/.qsrise-source' "$repo/scripts/qs-shell-check-update.sh"
 require 'DEST/.qsrise-source' "$repo/scripts/qs-shell-apply-update.sh"

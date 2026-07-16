@@ -230,6 +230,10 @@ PanelWindow {
             root.openThemeSwitcher()
             return
         }
+        if (action === "open-wallpaper-switcher") {
+            root.openWallpaperSwitcher()
+            return
+        }
         root.menuVisible = false
         actionProc.command = ["qs-menu-action", action]
         actionProc.running = false
