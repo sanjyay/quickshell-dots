@@ -34,7 +34,7 @@ remove_hypr_quickshell_bindings() {
   local keybindings="${HYPR_BINDINGS_CONF:-${HYPR_KEYBINDINGS_CONF:-$HOME/.config/hypr/bindings.conf}}"
   [[ -f "$keybindings" ]] || return 0
 
-  local tmp removed=0 in_media_block=0 in_menu_block=0
+  local tmp removed=0 in_media_block=0 in_menu_block=0 in_notification_block=0
   tmp="$(mktemp)"
   while IFS= read -r line || [[ -n "$line" ]]; do
     if [[ "$line" == "# >>> quickshell-rise managed media bindings >>>" ]]; then
@@ -55,8 +55,11 @@ remove_hypr_quickshell_bindings() {
       in_menu_block=0
       continue
     fi
+    if [[ "$line" == "# >>> quickshell-rise managed notification bindings >>>" ]]; then in_notification_block=1; removed=1; continue; fi
+    if [[ "$line" == "# <<< quickshell-rise managed notification bindings <<<" ]]; then in_notification_block=0; continue; fi
     [[ "$in_media_block" -eq 1 ]] && continue
     [[ "$in_menu_block" -eq 1 ]] && continue
+    [[ "$in_notification_block" -eq 1 ]] && continue
     case "$line" in
       "unbind = SUPER, SPACE"|\
       "bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open"|\
@@ -161,9 +164,14 @@ if [[ -e "$HOME/.local/bin/qs-mode" || -e "${XDG_STATE_HOME:-$HOME/.local/state}
   info "Removed reversible UI mode switcher"
 fi
 rm -f "$HOME/.local/bin/qs-rise-input" "$HOME/.local/bin/qs-menu-action" "$HOME/.local/bin/qs-theme-switcher" "$HOME/.local/bin/qs-wallpaper-switcher" "$HOME/.local/bin/qs-clipboard" "$HOME/.local/bin/qs-capture" "$HOME/.local/bin/qs-notification-silence" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/notifications-silenced"
+if [[ -f "$HOME/.local/bin/swayosd-client" ]] && grep -q 'quickshell-rise-owned-swayosd-client' "$HOME/.local/bin/swayosd-client"; then rm -f "$HOME/.local/bin/swayosd-client"; fi
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-theme-switcher"
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-wallpaper-switcher"
 rm -f "${XDG_RUNTIME_DIR:-/tmp}/qs-rise-osd.json"
+rm -f "${XDG_CACHE_HOME:-$HOME/.cache}/qs-rise-notifications.json"
+systemctl --user unmask swayosd-server.service >/dev/null 2>&1 || true
+systemctl --user enable --now swayosd-server.service >/dev/null 2>&1 || true
+if command -v mako >/dev/null 2>&1 && ! pgrep -x mako >/dev/null 2>&1; then setsid mako >/dev/null 2>&1 < /dev/null & fi
 rmdir "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise" 2>/dev/null || true
 
 # 1d. remove the ArchUpdater security gate (script, fetch timer, list)
@@ -193,7 +201,10 @@ boot="$HOME/.config/omarchy/hooks/post-boot.d/quickshell-rise"
 hook="$HOME/.config/omarchy/hooks/theme-set.d/50-quickshell-bar.sh"
 [[ -f "$hook" ]] && { rm -f "$hook"; info "Removed theme hook"; }
 
-# 4. remove the config — restore the most recent backup if one exists
+# 4. remove the config — restore the most recent backup if one exists.
+# Optional status widgets and their information popups (including Tailscale)
+# live only inside this owned tree; uninstalling them must never change their
+# underlying system services.
 # (ownership already verified at the top: $DEST is ours, or does not exist)
 restored=false
 if [[ -d "$DEST" ]]; then

@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# quickshell-rise-owned-swayosd-client
+set -euo pipefail
+mode="$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode" 2>/dev/null || printf omarchy)"
+if [[ "$mode" != quickshell ]]; then exec /usr/bin/swayosd-client "$@"; fi
+
+case " $* " in
+  *" --output-volume raise "*) exec qs-rise-input volume up ;;
+  *" --output-volume lower "*) exec qs-rise-input volume down ;;
+  *" --output-volume mute-toggle "*) exec qs-rise-input volume mute ;;
+  *" --input-volume mute-toggle "*) exec qs-rise-input mic mute ;;
+  *" --brightness raise "*) exec qs-rise-input brightness up ;;
+  *" --brightness lower "*) exec qs-rise-input brightness down ;;
+  *" --playerctl next "*) exec qs-rise-input media next ;;
+  *" --playerctl previous "*) exec qs-rise-input media previous ;;
+  *" --playerctl play-pause "*) exec qs-rise-input media play-pause ;;
+  *" --caps-lock "*) exec qs-rise-input lock "Caps Lock" ;;
+  *" --num-lock "*) exec qs-rise-input lock "Num Lock" ;;
+esac
+
+kind=state value="" detail="" icon=""
+while (($#)); do
+    case "$1" in
+        --custom-message) detail="${2:-}"; shift ;;
+        --custom-icon) icon="${2:-}"; shift ;;
+        --custom-progress) value="${2:-}"; shift ;;
+    esac
+    shift
+done
+exec qs-rise-input osd "$kind" "$value" "$detail" "$icon"

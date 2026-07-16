@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-07-17
+
+### Tailscale Widget
+
+- Added a default-off Tailscale status widget to the existing Widgets panel,
+  persisted widget flags, and draggable bar-slot registry without introducing
+  a separate configuration path. The full pill toggles the connection on
+  left-click, right-click opens a native connection-information popup, and
+  hover intentionally exposes no details.
+
 ## 2026-07-16
 
 ### Native Quickshell UI
@@ -61,6 +71,13 @@
 - Persisted the new notification, volume, and AI visibility preferences in the widget cache.
 
 ## 2026-07-10
+
+### Native Notifications And Hardware OSD
+
+- Replaced Pulse with a native per-monitor notification stack and a dedicated non-interactive hardware OSD.
+- Centralized D-Bus notification ownership, replacement IDs, timeouts, actions, DND, transient handling, and the 50-entry history cache.
+- Added mode-aware SwayOSD compatibility routing and durable Mako/SwayOSD renderer exclusion while Quickshell mode is active.
+- Expanded managed hardware and notification bindings while preserving Omarchy provider restoration.
 
 ### Pulse And Cleanup
 

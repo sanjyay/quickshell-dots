@@ -41,9 +41,31 @@ ShellRoot {
 
     IpcHandler {
         target: "osd"
-        function flash(): void {
-            theme.notifyOsd()
+        function show(kind: string, value: string, detail: string, icon: string, screen: string): void {
+            theme.showHardwareOsd(kind, value, detail, icon, screen)
         }
+    }
+
+    NotificationManager { id: notificationManager; root: theme }
+    Connections {
+        target: theme
+        function onPackageUpdatesAnnounced(count) { notificationManager.announcePackageUpdates(count) }
+    }
+    Connections {
+        target: cameraSwitchMonitor
+        function onCameraEnabledChanged() {
+            if (cameraSwitchMonitor.stateKnown)
+                theme.showHardwareOsd("camera", "", cameraSwitchMonitor.cameraEnabled ? "Camera enabled" : "Camera blocked", "", "")
+        }
+    }
+
+    IpcHandler {
+        target: "notifications"
+        function dismiss(): void { if (notificationManager.toasts.length) notificationManager.close(notificationManager.toasts[0].key, true) }
+        function dismissAll(): void { notificationManager.dismissAll() }
+        function toggleDnd(): void { theme.notifSilenced = !theme.notifSilenced }
+        function invoke(): void { if (notificationManager.toasts.length) notificationManager.invoke(notificationManager.toasts[0], "") }
+        function restore(): void { theme.activateFocusedPopupScreen(); theme.notifVisible = true }
     }
 
     IpcHandler {
@@ -270,39 +292,6 @@ ShellRoot {
             && !root.isActivePopupScreenName(targetScreen.name)
     }
 
-    component PulseOverlay: PanelWindow {
-        id: pulseWindow
-
-        required property var root
-        required property var targetScreen
-
-        screen: targetScreen
-        color: "transparent"
-        anchors { top: true; left: true; right: true }
-        implicitHeight: 58
-        exclusionMode: ExclusionMode.Ignore
-        WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.focusable: false
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-        WlrLayershell.namespace: "quickshell-pulse"
-        // The pulse is decorative while hidden. Its item retains a geometry for
-        // animation, so using it directly as the layer mask blocks the bar below.
-        // Restrict input to the actionable control only.
-        mask: Region {
-            item: pulse.inputItem.enabled ? pulse.inputItem : null
-        }
-
-        Pulse {
-            id: pulse
-            objectName: "pulse-overlay"
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            anchors.topMargin: 7
-            root: pulseWindow.root
-            cameraSwitch: pulseWindow.root.cameraSwitch
-        }
-    }
-
     Variants {
         model: root.barScreens
 
@@ -339,9 +328,20 @@ ShellRoot {
         model: root.barScreens
 
         delegate: Component {
-            PulseOverlay {
+            NotificationToastOverlay {
                 required property var modelData
+                root: theme
+                manager: notificationManager
+                targetScreen: modelData
+            }
+        }
+    }
 
+    Variants {
+        model: root.barScreens
+        delegate: Component {
+            HardwareOsdOverlay {
+                required property var modelData
                 root: theme
                 targetScreen: modelData
             }
@@ -364,9 +364,10 @@ ShellRoot {
     AiUsagePanel { root: theme }
     VolumePanel { root: theme }
     TrayPanel { root: theme }
-    NotificationPanel { root: theme }
+    NotificationPanel { root: theme; manager: notificationManager }
     NetworkPanel { root: theme }
     BluetoothPanel { root: theme }
+    TailscalePanel { root: theme }
     BatteryPanel { root: theme }
     MprisPanel { root: theme }
     WorkspacePanel { root: theme }

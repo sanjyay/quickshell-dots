@@ -7,7 +7,7 @@ managed_lines=(
   "unbind = SUPER, SPACE"
   "bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open"
   "unbind = SUPER SHIFT, SPACE"
-  "bindd = SUPER SHIFT, SPACE, Toggle Quickshell bar, exec, bash -lc 'if qs list --all 2>/dev/null | grep -q \"$HOME/.config/quickshell/bar/shell.qml\"; then qs -c bar kill >/dev/null 2>&1 || true; else qs -n -d -c bar; fi'"
+  "bindd = SUPER SHIFT, SPACE, Toggle desktop provider, exec, bash -lc 'if [[ \"$(qs-mode status)\" == quickshell ]]; then qs-mode omarchy; else qs-mode quickshell; fi'"
 )
 legacy_lines=(
   "bindd = SUPER SHIFT, SPACE, Refresh Quickshell bar, exec, bash -lc 'qs -c bar kill; sleep 0.2; qs -n -d -c bar'"

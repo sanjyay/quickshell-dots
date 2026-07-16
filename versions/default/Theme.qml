@@ -16,7 +16,10 @@ Item {
 
     property var cameraSwitch: null
 
-    Component.onCompleted: console.log("Theme.qml completed cameraSwitch=" + (cameraSwitch ? cameraSwitch.monitorVersion : "null"))
+    Component.onCompleted: {
+        console.log("Theme.qml completed cameraSwitch=" + (cameraSwitch ? cameraSwitch.monitorVersion : "null"))
+        refreshTailscale()
+    }
     onCameraSwitchChanged: console.log("Theme.qml cameraSwitch changed cameraSwitch=" + (cameraSwitch ? cameraSwitch.monitorVersion : "null"))
 
     readonly property string colorsPath: Quickshell.env("HOME") + "/.config/omarchy/current/theme/colors.toml"
@@ -32,7 +35,7 @@ Item {
     property color color03: "#c8b36a"   // colors.toml color3
     property color sealRaw:    "#c4746e"
     property color accentHint: sealRaw    // filled by palette; default = same as red
-    property bool enablePulse: true
+    readonly property int barReservedExtent: 38
     property string barColor: "red"
     readonly property bool pointerTrace: Quickshell.env("QS_POINTER_TRACE") === "1"
     property real pointerTraceX: -1
@@ -149,7 +152,7 @@ Item {
 
     readonly property bool anyPopupVisible: menuVisible || themeSwitcherVisible || wallpaperSwitcherVisible || clipboardVisible || captureVisible || appLauncherVisible || calendarVisible || cpuVisible || aiUsageVisible
         || memVisible || volVisible || controlVisible || networkVisible || bluetoothVisible
-        || batteryVisible || mprisVisible
+        || batteryVisible || mprisVisible || tailscaleVisible
         || workspaceVisible || imagePickerVisible || mediaBrowserVisible || notifVisible
         || powerProfileVisible || archVisible || shellUpdateVisible || trayVisible || trayMenuVisible
     readonly property bool keyboardPopupVisible: menuVisible || themeSwitcherVisible || wallpaperSwitcherVisible || clipboardVisible || captureVisible || appLauncherVisible || imagePickerVisible || mediaBrowserVisible
@@ -323,6 +326,7 @@ Item {
         else if (name === "mpris") mprisBarX = x
         else if (name === "launcher") launcherBarX = x
         else if (name === "shellUpdate") shellUpdateBarX = x
+        else if (name === "tailscale") tailscaleBarX = x
         else if (name === "trayMenu") trayMenuX = x
     }
 
@@ -388,6 +392,7 @@ Item {
         if (except !== "shellUpdateVisible") shellUpdateVisible = false
         if (except !== "trayVisible") trayVisible = false
         if (except !== "trayMenuVisible") trayMenuVisible = false
+        if (except !== "tailscaleVisible") tailscaleVisible = false
         hideTooltip()
         _closingPopups = false
     }
@@ -986,36 +991,101 @@ Item {
     property bool modPrivacyCamera: true
     property bool modBattery:    true    // battery pill, shown only when hardware exists
     property bool modClock:      true    // center clock/date pill
+    property bool modTailscale:  false   // optional Tailscale status pill; default off
     property bool volumeManual:  false   // user explicitly enabled the volume pill
+
+    // Shared, read-only Tailscale probe. The widget never changes daemon state.
+    property bool tailscaleAvailable: false
+    property string tailscaleStatus: "unknown"
+    property string tailscaleHostName: ""
+    property string tailscaleAddress: ""
+    property string tailscaleTailnet: ""
+    property string tailscaleBackendState: "Unknown"
+    property int tailscalePeerCount: 0
+
+    function refreshTailscale() {
+        tailscaleStatusProc.running = false
+        tailscaleStatusProc.running = true
+    }
+
+    Process {
+        id: tailscaleStatusProc
+        command: ["bash", "-lc",
+            "if ! command -v tailscale >/dev/null 2>&1; then printf '__UNAVAILABLE__\\n'; "
+            + "else tailscale status --json 2>/dev/null || printf '__ERROR__\\n'; fi"]
+        running: false
+        stdout: StdioCollector { id: tailscaleStatusOut }
+        onExited: {
+            var output = tailscaleStatusOut.text.trim()
+            if (output === "__UNAVAILABLE__") {
+                theme.tailscaleAvailable = false
+                theme.tailscaleStatus = "unavailable"
+                theme.tailscaleHostName = ""
+                theme.tailscaleAddress = ""
+                theme.tailscaleTailnet = ""
+                theme.tailscaleBackendState = "Unavailable"
+                theme.tailscalePeerCount = 0
+                return
+            }
+            theme.tailscaleAvailable = true
+            if (output === "__ERROR__" || output === "") {
+                theme.tailscaleStatus = "disconnected"
+                theme.tailscaleBackendState = "Stopped"
+                theme.tailscalePeerCount = 0
+                return
+            }
+            try {
+                var state = JSON.parse(output)
+                var backend = String(state.BackendState || "Unknown")
+                theme.tailscaleBackendState = backend
+                var self = state.Self || ({})
+                theme.tailscaleStatus = backend === "Running" && self.Online
+                    ? "connected"
+                    : (backend === "NeedsLogin" ? "login-required" : "disconnected")
+                theme.tailscaleHostName = String(self.HostName || self.DNSName || "").replace(/\.$/, "")
+                var addresses = state.TailscaleIPs || self.TailscaleIPs || []
+                theme.tailscaleAddress = addresses.length > 0 ? String(addresses[0]) : ""
+                theme.tailscaleTailnet = state.CurrentTailnet ? String(state.CurrentTailnet.Name || "") : ""
+                var peers = state.Peer || ({})
+                var onlinePeers = 0
+                for (var peerId in peers) if (peers[peerId] && peers[peerId].Online) onlinePeers++
+                theme.tailscalePeerCount = onlinePeers
+            } catch (e) {
+                theme.tailscaleStatus = "disconnected"
+                theme.tailscaleBackendState = "Unknown"
+                theme.tailscalePeerCount = 0
+            }
+        }
+    }
+
+    Timer {
+        interval: 10000
+        running: theme.modTailscale
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: theme.refreshTailscale()
+    }
 
     // ── Quickshell transient OSD ───────────────────────────────
     property bool osdVisible: false
     property string osdKind: ""
     property string osdValue: ""
     property string osdDetail: ""
+    property string osdIcon: ""
+    property string osdScreenName: ""
     property int osdSerial: 0
-    property int osdDataSerial: 0
-    readonly property string osdPath: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/qs-rise-osd.json"
-    FileView {
-        id: osdFile
-        path: theme.osdPath
-        onLoaded: {
-            try {
-                var event = JSON.parse(osdFile.text())
-                theme.osdKind = event.kind || ""
-                theme.osdValue = event.value === undefined ? "" : String(event.value)
-                theme.osdDetail = event.detail || ""
-                theme.osdDataSerial++
-            } catch (e) {
-                console.warn("osd: invalid runtime event")
-            }
-        }
-    }
-    function notifyOsd() {
+    function showHardwareOsd(kind, value, detail, icon, screenName) {
+        osdKind = kind || "status"
+        osdValue = value === undefined ? "" : String(value)
+        osdDetail = detail || ""
+        osdIcon = icon || ""
+        if (screenName) osdScreenName = screenName
+        else { activateFocusedPopupScreen(); osdScreenName = activePopupScreenName }
         osdVisible = true
         osdSerial++
     }
-    onOsdSerialChanged: osdFile.reload()
+    Timer { id: osdDismissTimer; interval: 1200; onTriggered: theme.osdVisible = false }
+    onOsdSerialChanged: osdDismissTimer.restart()
 
     readonly property bool volumeWidgetVisible: modVolume && mprisPlaying
     readonly property bool aiWidgetVisible:     modClaude && (aiUsageManual || codexActive)
@@ -1056,10 +1126,7 @@ Item {
     property bool   updatesAvailable: false
     property int    updateCount: 0
     property int    previousUpdateCount: 0
-    property int    updatePulseSerial: 0
-    property string updatePulseTitle: ""
-    property string updatePulseDetail: ""
-    property string updatePulseHint: ""
+    signal packageUpdatesAnnounced(int count)
 
     // ── widget/workspace state persistence ──
     readonly property string widgetsCachePath: Quickshell.env("HOME") + "/.cache/quickshell_widgets"
@@ -1091,6 +1158,10 @@ Item {
         if (!modClock) calendarVisible = false
         if (_widgetsLoaded) saveWidgets()
     }
+    onModTailscaleChanged: {
+        if (modTailscale) refreshTailscale()
+        if (_widgetsLoaded) saveWidgets()
+    }
     onAiToolChanged:        if (_widgetsLoaded) saveWidgets()
     onWorkspaceModeChanged: if (_widgetsLoaded) saveWidgets()
     onPickerStyleChanged:   if (_widgetsLoaded) saveWidgets()
@@ -1108,7 +1179,6 @@ Item {
     onBarPositionChanged:      if (_widgetsLoaded) saveWidgets()
     onArchUpdateDayChanged: if (_widgetsLoaded) saveWidgets()
     onArchUpdateScheduleActiveChanged: if (_widgetsLoaded) saveWidgets()
-    onEnablePulseChanged: if (_widgetsLoaded) saveWidgets()
 
     readonly property var archUpdateDayOptions: [
         { id: "monday",    label: "Mon", index: 1 },
@@ -1165,9 +1235,6 @@ Item {
             updatesAvailable = false
             updateCount = 0
             previousUpdateCount = 0
-            updatePulseTitle = ""
-            updatePulseDetail = ""
-            updatePulseHint = ""
             return
         }
 
@@ -1177,10 +1244,7 @@ Item {
 
         previousUpdateCount = nextCount
         if (!notificationKey) return
-        updatePulseTitle = "Updates Available"
-        updatePulseDetail = nextCount + (nextCount === 1 ? " package ready" : " packages ready")
-        updatePulseHint = "Click to update"
-        updatePulseSerial++
+        packageUpdatesAnnounced(nextCount)
     }
 
     function saveWidgets() {
@@ -1220,10 +1284,11 @@ Item {
                  + (modPrivacyCamera ? "1" : "0") + " "   // +28 camera privacy pill
                  + (modClock ? "1" : "0") + " "            // +29 clock/date pill
                  + "0 "                                    // +30 reserved cache field
-                 + (enablePulse ? "1" : "0") + " "         // +31 pulse
+                 + "0 "                                    // +31 reserved (legacy Pulse)
                  + (modNotifications ? "1" : "0") + " "   // +32 notification bell
                  + (volumeManual ? "1" : "0") + " "       // +33 volume manual override
-                 + (aiUsageManual ? "1" : "0")            // +34 AI manual override
+                 + (aiUsageManual ? "1" : "0") + " "      // +34 AI manual override
+                 + (modTailscale ? "1" : "0")              // +35 optional Tailscale widget
         widgetSaveProc.command = ["bash", "-c",
             "echo '" + line + "' > '" + widgetsCachePath + "'"]
         widgetSaveProc.running = false
@@ -1427,10 +1492,10 @@ Item {
                     if (parts.length > wsField + 28) theme.modPrivacyCamera = parts[wsField + 28] !== "0"
                     else theme.modPrivacyCamera = theme.modPrivacy
                     if (parts.length > wsField + 29) theme.modClock = parts[wsField + 29] !== "0"
-                    if (parts.length > wsField + 31) theme.enablePulse = parts[wsField + 31] !== "0"
                     if (parts.length > wsField + 32) theme.modNotifications = parts[wsField + 32] !== "0"
                     if (parts.length > wsField + 33) theme.volumeManual = parts[wsField + 33] === "1"
                     if (parts.length > wsField + 34) theme.aiUsageManual = parts[wsField + 34] === "1"
+                    if (parts.length > wsField + 35) theme.modTailscale = parts[wsField + 35] === "1"
                 }
                 theme._widgetsLoaded = true
             }
@@ -1450,6 +1515,11 @@ Item {
     onMprisVisibleChanged: popupOpened("mprisVisible")
     property bool workspaceVisible: false
     onWorkspaceVisibleChanged: popupOpened("workspaceVisible")
+    property bool tailscaleVisible: false
+    onTailscaleVisibleChanged: {
+        popupOpened("tailscaleVisible")
+        if (tailscaleVisible) refreshTailscale()
+    }
 
     // ── Image picker state (theme/wallpaper carousel) ──
     property bool   imagePickerVisible:  false
@@ -1665,6 +1735,7 @@ Item {
     property real powerBarX:      0
     property real mprisBarX:      0
     property real launcherBarX:   6   // ControlPanel follows the Launcher/Control group
+    property real tailscaleBarX:  0
 
     // ── Tray context-menu state (themed menu, rendered by TrayMenu.qml) ──
     property bool trayMenuVisible: false

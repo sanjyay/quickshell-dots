@@ -194,6 +194,11 @@ PanelWindow {
         var parts = str.split("|")
         if (parts.length !== 3) return
         var l = parts[0].split(","), c = parts[1].split(","), r = parts[2].split(",")
+        // Migrate pre-Tailscale order caches without discarding the user's
+        // existing placement: append the new default-off group to the right.
+        if (l.length === leftModel.count && c.length === centerModel.count
+                && r.length === rightModel.count - 1 && r.indexOf("G15") < 0)
+            r.push("G15")
         // F12: only apply a cache that is a valid permutation of all registry ids (correct region
         // sizes, every id known, no duplicate, none missing) — a corrupt cache would otherwise
         // duplicate one widget and silently drop another. On reject, keep the default order.
@@ -231,7 +236,7 @@ PanelWindow {
     // reset the 3 region models back to the default group order
     function resetOrder() {
         var dL = ["G1","G2","G13","G3","G4","G5","G6","G7"]
-        var dR = ["G9","G10","G11","G14","G12"]
+        var dR = ["G9","G10","G11","G15","G14","G12"]
         for (var i = 0; i < dL.length; i++) leftModel.setProperty(i, "gid", dL[i])
         centerModel.setProperty(0, "gid", "G8")
         for (var j = 0; j < dR.length; j++) rightModel.setProperty(j, "gid", dR[j])
@@ -241,12 +246,12 @@ PanelWindow {
     property var layoutController: ({
         splitAll: function () {
             island.leftSplits     = [true, true, true, true, true, true, true]
-            island.rightSplits    = [true, true, true, true]
+            island.rightSplits    = [true, true, true, true, true]
             island.boundarySplits = [true, true]
         },
         mergeAll: function () {
             island.leftSplits     = [false, false, false, false, false, false, false]
-            island.rightSplits    = [false, false, false, false]
+            island.rightSplits    = [false, false, false, false, false]
             island.boundarySplits = [false, false]
             barSlot.root.barAnim  = 0
         },
@@ -465,13 +470,14 @@ PanelWindow {
     }
     Component { id: compPower;      PowerProfileWidget { root: barSlot.root } }
     Component { id: compBattery;    BatteryWidget      { root: barSlot.root } }
+    Component { id: compTailscale;  TailscaleWidget    { root: barSlot.root } }
 
     readonly property var registry: ({
         "G1": compLauncher, "G2": compWorkspace, "G13": compArch, "G3": compStatus,
         "G4": compMem, "G5": compCpu, "G6": compVol, "G7": compClaude,
         "G8": compCenter,
         "G9": compMpris, "G10": compQuick, "G11": compNetwork,
-        "G12": compBattery, "G14": compPower
+        "G12": compBattery, "G14": compPower, "G15": compTailscale
     })
 
     // ───────────────────── reusable region row of slots ─────────────────────
@@ -675,7 +681,7 @@ PanelWindow {
 
         // ── split state (positional, per within-region gap) ──
         property var leftSplits:  [false, false, false, false, false, false, false]   // gaps in leftModel
-        property var rightSplits: [false, false, false, false]   // gaps in rightModel
+        property var rightSplits: [false, false, false, false, false]   // gaps in rightModel
         property var boundarySplits: [false, false]   // [left↔center, center↔right]
 
         readonly property real lcBoundaryX: leftRowItem.x + leftRowItem.width + 9    // just right of Claude
@@ -831,7 +837,7 @@ PanelWindow {
         ListModel {
             id: rightModel
             ListElement { gid: "G9" }  ListElement { gid: "G10" } ListElement { gid: "G11" }
-            ListElement { gid: "G14" } ListElement { gid: "G12" }
+            ListElement { gid: "G15" } ListElement { gid: "G14" } ListElement { gid: "G12" }
         }
 
         SlotRow {
@@ -920,7 +926,8 @@ PanelWindow {
                 bluetooth:    island.groupX("G11", 0.5),
                 power:        island.groupX("G14", 0.5),
                 mpris:        island.groupX("G9",  0.5),
-                launcher:     island.groupX("G1",  0.5)
+                launcher:     island.groupX("G1",  0.5),
+                tailscale:    island.groupX("G15", 0.5)
             }
         }
         onPanelAnchorsChanged: barSlot.root.publishBarAnchors(panelScreenName, panelAnchors)

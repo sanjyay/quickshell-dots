@@ -108,7 +108,7 @@ addAction("setup.system-sleep", "setup", "System Sleep", "•", "setup-system-sl
 addGroup("setup.defaults", "setup", "Defaults")
 addGroup("setup.security", "setup", "Security")
 addGroup("setup.config", "setup", "Config")
-for (var config of ["Hyprland", "Hypridle", "Hyprlock", "Hyprsunset", "SwayOSD", "Walker", "Waybar", "XCompose"])
+for (var config of ["Hyprland", "Hypridle", "Hyprlock", "Hyprsunset", "Walker", "Waybar", "XCompose"])
     addAction("setup.config." + config.toLowerCase(), "setup.config", config, "•", "setup-config-" + config.toLowerCase())
 for (var security of ["Fingerprint", "Fido2"])
     addAction("setup.security." + security.toLowerCase(), "setup.security", security, "•", "setup-security-" + security.toLowerCase())
@@ -154,8 +154,8 @@ for (var updateAction of ["Omarchy", "Extra Themes", "Firmware", "Password", "Ti
 for (var updateGroup of ["Channel", "Config", "Process", "Hardware"])
     addGroup("update." + updateGroup.toLowerCase().replace(/ /g, "-"), "update", updateGroup)
 addLeaves("update.channel", ["Stable", "RC", "Edge", "Dev"], "update-channel")
-addLeaves("update.config", ["Hyprland", "Hypridle", "Hyprlock", "Hyprsunset", "Plymouth", "SwayOSD", "Tmux", "Walker", "Waybar"], "update-config")
-addLeaves("update.process", ["Hypridle", "Hyprsunset", "Mako", "SwayOSD", "Walker", "Waybar"], "update-process")
+addLeaves("update.config", ["Hyprland", "Hypridle", "Hyprlock", "Hyprsunset", "Plymouth", "Tmux", "Walker", "Waybar"], "update-config")
+addLeaves("update.process", ["Hypridle", "Hyprsunset", "Walker", "Waybar"], "update-process")
 addLeaves("update.hardware", ["Audio", "Wi-Fi", "Bluetooth", "Trackpad"], "update-hardware")
 
 // Screen-recording choices are actions, not a second menu engine.

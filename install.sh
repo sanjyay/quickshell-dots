@@ -175,7 +175,7 @@ install_theme_updater() {
 
 # ── 1. dependencies ─────────────────────────────────────────────
 need=(qs git jq curl)
-opt=(pamixer brightnessctl powerprofilesctl bluetoothctl iwctl makoctl hypridle)
+opt=(pamixer brightnessctl powerprofilesctl bluetoothctl iwctl hypridle)
 miss=()
 for b in "${need[@]}"; do command -v "$b" >/dev/null 2>&1 || miss+=("$b"); done
 if ((${#miss[@]})); then
@@ -282,7 +282,12 @@ verify_installed_copy() {
              modules/ClockWidget.qml \
              modules/ClaudeWidget.qml \
              modules/ScreenRecordWidget.qml \
+             modules/TailscaleWidget.qml \
+             panels/TailscalePanel.qml \
              panels/WallpaperSwitcherPanel.qml \
+             NotificationManager.qml \
+             NotificationToastOverlay.qml \
+             HardwareOsdOverlay.qml \
              shell.qml; do
     cmp -s "$src_repo/versions/$CONFIG_DIR/$rel" "$DEST/$rel" || {
       err "Installed $rel does not match $src_repo/versions/$CONFIG_DIR/$rel"
@@ -303,6 +308,13 @@ if [[ -f "$src_repo/scripts/qs-mode.sh" ]]; then
   mkdir -p "$HOME/.local/bin" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise"
   install -m 755 "$src_repo/scripts/qs-mode.sh" "$HOME/.local/bin/qs-mode"
   install -m 755 "$src_repo/scripts/qs-rise-input.sh" "$HOME/.local/bin/qs-rise-input"
+  bridge="$HOME/.local/bin/swayosd-client"
+  if [[ -e "$bridge" ]] && ! grep -q 'quickshell-rise-owned-swayosd-client' "$bridge"; then
+    err "Refusing to overwrite unrelated $bridge"
+    exit 1
+  fi
+  install -m 755 "$src_repo/scripts/swayosd-client" "$bridge"
+  cmp -s "$src_repo/scripts/swayosd-client" "$bridge" || { err "Installed SwayOSD bridge does not match source"; exit 1; }
   install -m 755 "$src_repo/scripts/qs-menu-action.sh" "$HOME/.local/bin/qs-menu-action"
   install -m 755 "$src_repo/scripts/qs-theme-switcher" "$HOME/.local/bin/qs-theme-switcher"
   install -m 755 "$src_repo/scripts/qs-wallpaper-switcher" "$HOME/.local/bin/qs-wallpaper-switcher"
@@ -311,9 +323,6 @@ if [[ -f "$src_repo/scripts/qs-mode.sh" ]]; then
   install -m 755 "$src_repo/scripts/qs-capture.sh" "$HOME/.local/bin/qs-capture"
   if [[ ! -e "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode" ]]; then
     printf 'quickshell\n' > "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode"
-  fi
-  if [[ ! -e "${XDG_RUNTIME_DIR:-/tmp}/qs-rise-osd.json" ]]; then
-    printf '{"kind":"","value":"","detail":""}\n' > "${XDG_RUNTIME_DIR:-/tmp}/qs-rise-osd.json"
   fi
   info "Installed reversible UI mode switcher (qs-mode quickshell|omarchy|status)"
 fi

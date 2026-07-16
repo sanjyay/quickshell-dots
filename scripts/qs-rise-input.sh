@@ -4,18 +4,11 @@ set -euo pipefail
 
 STATE_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode"
 QS_CONFIG="bar"
-OSD_FILE="${XDG_RUNTIME_DIR:-/tmp}/qs-rise-osd.json"
 
 [[ "$(cat "$STATE_FILE" 2>/dev/null || printf omarchy)" == quickshell ]] || exit 0
 
 show_osd() {
-    local payload tmp
-    payload="$(printf '{\"kind\":\"%s\",\"value\":\"%s\",\"detail\":\"%s\"}' \
-        "$1" "$2" "${3:-}")"
-    tmp="${OSD_FILE}.tmp.$$"
-    printf '%s\n' "$payload" > "$tmp"
-    mv -f "$tmp" "$OSD_FILE"
-    qs -c "$QS_CONFIG" ipc call osd flash >/dev/null 2>&1 || true
+    qs -c "$QS_CONFIG" ipc call -- osd show "$1" "$2" "${3:-}" "${4:-}" "${5:-}" >/dev/null 2>&1 || true
 }
 
 volume_value() { pamixer --get-volume 2>/dev/null || printf 0; }
@@ -71,11 +64,31 @@ keyboard_action() {
     case "$action" in
         up) current=$((current + max / 10)); (( current > max )) && current=$max ;;
         down) current=$((current - max / 10)); (( current < 0 )) && current=0 ;;
+        cycle) current=$((current >= max ? 0 : current + max / 3)); (( current > max )) && current=$max ;;
         *) exit 2 ;;
     esac
     brightnessctl -d "$device" set "$current" >/dev/null
     value=$((current * 100 / max))
     show_osd keyboard "$value"
+}
+
+touchpad_action() {
+    local action="$1" state
+    case "$action" in
+        on) state=true ;; off) state=false ;;
+        toggle) state="$(hyprctl getoption device:touchpad:enabled -j 2>/dev/null | sed -n 's/.*"int"[[:space:]]*:[[:space:]]*\([01]\).*/\1/p')"; [[ "$state" == 1 ]] && state=false || state=true ;;
+        *) exit 2 ;;
+    esac
+    hyprctl keyword device:touchpad:enabled "$state" >/dev/null
+    show_osd touchpad "" "$([[ "$state" == true ]] && printf Enabled || printf Disabled)"
+}
+
+state_action() { show_osd "$1" "${2:-}" "${3:-}" "${4:-}" "${5:-}"; }
+
+lock_action() {
+    local key="$1" state=Off
+    command -v xset >/dev/null 2>&1 && state="$(xset q 2>/dev/null | sed -n "s/.*${key}:[[:space:]]*\(on\|off\).*/\1/ip" | head -n1)"
+    show_osd "${key,,}" "" "${key} ${state^}"
 }
 
 media_action() {
@@ -88,11 +101,20 @@ media_action() {
     show_osd media "" "$1"
 }
 
+audio_output_action() {
+    omarchy-audio-output-switch
+    show_osd audio-output "" "Audio output switched"
+}
+
 case "${1:-}" in
     volume) volume_action "${2:-}" ;;
     mic) mic_action ;;
     brightness) backlight_action "${2:-}" ;;
     keyboard) keyboard_action "${2:-}" ;;
     media) media_action "${2:-}" ;;
-    *) printf 'usage: qs-rise-input {volume|mic|brightness|keyboard|media} ...\n' >&2; exit 2 ;;
+    audio-output) audio_output_action ;;
+    touchpad) touchpad_action "${2:-toggle}" ;;
+    lock) lock_action "${2:-Caps Lock}" ;;
+    osd) shift; state_action "$@" ;;
+    *) printf 'usage: qs-rise-input {volume|mic|brightness|keyboard|media|audio-output|touchpad|lock|osd} ...\n' >&2; exit 2 ;;
 esac

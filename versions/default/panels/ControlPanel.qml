@@ -544,6 +544,12 @@ PanelWindow {
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "AI usage";    active: root.aiWidgetVisible; onActivated: root.toggleAiWidget() }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Power Prof."; active: root.modPower;     onActivated: root.modPower = !root.modPower }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Network";     active: root.modNetwork; onActivated: root.modNetwork = !root.modNetwork }
+                Tile {
+                    width: root.evenW((wwCol.width - 8) / 2)
+                    label: root.tailscaleStatus === "unavailable" ? "Tailscale · N/A" : "Tailscale"
+                    active: root.modTailscale
+                    onActivated: root.modTailscale = !root.modTailscale
+                }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Bluetooth";   active: root.modBluetooth; onActivated: root.modBluetooth = !root.modBluetooth }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Status";      active: root.modStatus;  onActivated: root.modStatus = !root.modStatus }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Notifications"; active: root.modNotifications; onActivated: root.modNotifications = !root.modNotifications }
@@ -557,7 +563,6 @@ PanelWindow {
                 }
                 Tile { width: root.evenW((wwCol.width - 8) / 2); label: "Battery";     visible: root.hasBattery; active: root.modBattery; onActivated: root.modBattery = !root.modBattery }
             }
-            Tile { width: parent.width; label: "Pulse"; active: root.enablePulse; onActivated: root.enablePulse = !root.enablePulse }
             Grid {
                 width: parent.width
                 columns: 2

@@ -12,7 +12,9 @@ Item {
     readonly property var  player:  sel.player
     readonly property bool active:  sel.active
     readonly property bool playing: sel.playing
-    readonly property int titleWidth: 68
+    // Inline transport controls were removed; give their former width to the
+    // existing metadata marquee without changing the pill's overall footprint.
+    readonly property int titleWidth: 119
 
     onActiveChanged: {
         root.mprisActive = active
@@ -103,54 +105,6 @@ Item {
         visible: rootMod.active
         anchors.centerIn: parent
         spacing: 4
-
-        // ── prev ──
-        IconText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: ""
-            font.pixelSize: 13
-            color: (rootMod.player && rootMod.player.canGoPrevious)
-                ? Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.7)
-                : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.22)
-            Behavior on color { ColorAnimation { duration: 150 } }
-            BarWidgetButton {
-                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                onClicked: if (rootMod.player) rootMod.player.previous()
-            }
-        }
-
-        // ── play / pause ──
-        IconText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: rootMod.playing ? "" : ""
-            font.pixelSize: 13
-            color: root.seal
-            BarWidgetButton {
-                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    if (!rootMod.player) return
-                    var current = rootMod.player
-                    if (rootMod.playing) root.rememberMprisPausedPlayer(current)
-                    else root.forgetMprisPausedPlayer(current)
-                    current.togglePlaying()
-                }
-            }
-        }
-
-        // ── next ──
-        IconText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: ""
-            font.pixelSize: 13
-            color: (rootMod.player && rootMod.player.canGoNext)
-                ? Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.7)
-                : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.22)
-            Behavior on color { ColorAnimation { duration: 150 } }
-            BarWidgetButton {
-                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                onClicked: if (rootMod.player) rootMod.player.next()
-            }
-        }
 
         // hidden alpha-mask source for the marquee fade — defined BEFORE the masked
         // item so the layer.effect can resolve the id; visible:false → no Row layout.

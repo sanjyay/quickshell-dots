@@ -1,13 +1,12 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import Quickshell.Services.Notifications
-import Quickshell.Io
 import "../modules"
 
 PanelWindow {
     id: notifPanel
     required property var root
+    required property var manager
 
     screen: root.activePopupScreen
     color: "transparent"
@@ -18,141 +17,15 @@ PanelWindow {
 
     readonly property int barBottom: 35
     readonly property int gap: 8
-    readonly property string cachePath: Quickshell.env("HOME") + "/.cache/qs-rise-notifications.json"
-    property var recent: []
-    property var dismissed: ({})
-    property bool cacheLoaded: false
-    property string lastSaved: ""
-
-    readonly property var pending: {
-        var out = []
-        for (var i = 0; i < recent.length; i++)
-            if (!dismissed[recent[i].key]) out.push(recent[i])
-        return out
-    }
-    readonly property int unreadCount: pending.length
+    readonly property var pending: manager.recent
+    readonly property int unreadCount: manager.unreadCount
     readonly property int listCap: Math.max(120, Math.min(420, notifPanel.height - 220))
 
     Binding { target: root; property: "notifCount"; value: notifPanel.unreadCount }
 
-    FileView {
-        id: cacheFile
-        path: notifPanel.cachePath
-        onLoaded: {
-            try {
-                var saved = JSON.parse(cacheFile.text())
-                notifPanel.recent = Array.isArray(saved.recent) ? saved.recent : []
-                notifPanel.dismissed = saved.dismissed && typeof saved.dismissed === "object" ? saved.dismissed : ({})
-                notifPanel.lastSaved = cacheFile.text()
-            } catch (e) {
-                notifPanel.recent = []
-                notifPanel.dismissed = ({})
-            }
-            notifPanel.cacheLoaded = true
-        }
-        onLoadFailed: notifPanel.cacheLoaded = true
-    }
-
-    Component.onCompleted: cacheFile.reload()
-
-    function saveCache() {
-        if (!cacheLoaded) return
-        var savedRecent = []
-        for (var i = 0; i < recent.length; i++) {
-            var item = recent[i]
-            savedRecent.push({ key: item.key, appName: item.appName, summary: item.summary,
-                               body: item.body, active: false })
-        }
-        var state = JSON.stringify({ recent: savedRecent, dismissed: dismissed })
-        if (state === lastSaved) return
-        lastSaved = state
-        cacheFile.setText(state)
-    }
-
-    function accept(notification) {
-        if (root.notifSilenced) {
-            notification.dismiss()
-            return
-        }
-        notification.tracked = true
-        var entry = {
-            key: "notification:" + notification.id + ":" + Date.now(),
-            notification: notification,
-            appName: notification.appName || "App",
-            summary: notification.summary || "",
-            body: notification.body || "",
-            active: true
-        }
-        recent = [entry].concat(recent).slice(0, 50)
-        root.notifLatestSummary = entry.summary
-        root.notifLatestBody = entry.body
-        root.notifLatestApp = entry.appName
-        root.notifLatestObject = notification
-        root.notifSerial++
-        notification.closed.connect(function() { markClosed(entry.key) })
-        saveCache()
-    }
-
-    function markClosed(key) {
-        var updated = []
-        for (var i = 0; i < recent.length; i++) {
-            var item = recent[i]
-            if (item.key === key) item.active = false
-            updated.push(item)
-        }
-        recent = updated
-        saveCache()
-    }
-
-    function dismissOne(entry) {
-        var next = {}
-        for (var key in dismissed) next[key] = true
-        next[entry.key] = true
-        dismissed = next
-        if (entry.notification) entry.notification.dismiss()
-        saveCache()
-    }
-
-    function dismissAll() {
-        var next = {}
-        for (var i = 0; i < recent.length; i++) {
-            next[recent[i].key] = true
-            if (recent[i].notification) recent[i].notification.dismiss()
-        }
-        dismissed = next
-        recent = []
-        saveCache()
-    }
-
-    function openNotification(entry) {
-        if (entry.notification && entry.notification.actions.length > 0) {
-            var actions = entry.notification.actions
-            var invoked = false
-            for (var i = 0; i < actions.length; i++) {
-                if (actions[i].identifier === "default") {
-                    actions[i].invoke()
-                    invoked = true
-                    break
-                }
-            }
-            if (!invoked) actions[0].invoke()
-        }
-        root.notifVisible = false
-    }
-
-    NotificationServer {
-        id: notificationServer
-        keepOnReload: true
-        persistenceSupported: false
-        bodySupported: true
-        bodyMarkupSupported: false
-        bodyHyperlinksSupported: true
-        bodyImagesSupported: true
-        actionsSupported: true
-        actionIconsSupported: true
-        imageSupported: true
-        onNotification: function(notification) { notifPanel.accept(notification) }
-    }
+    function dismissOne(entry) { manager.dismissHistory(entry) }
+    function dismissAll() { manager.dismissAll() }
+    function openNotification(entry) { manager.invoke(entry, ""); root.notifVisible = false }
 
     property real reveal: root.notifVisible ? 1 : 0
     Behavior on reveal {

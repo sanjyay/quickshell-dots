@@ -7,7 +7,6 @@ calendar="$repo/versions/default/panels/CalendarPopup.qml"
 bar="$repo/versions/default/BarSlot.qml"
 screen_record="$repo/versions/default/modules/ScreenRecordWidget.qml"
 button="$repo/versions/default/modules/BarWidgetButton.qml"
-pulse="$repo/versions/default/modules/Pulse.qml"
 shell="$repo/versions/default/shell.qml"
 
 require() { rg -q -- "$1" "$2" || { printf 'FAIL: missing %s in %s\n' "$1" "$2" >&2; exit 1; }; }
@@ -74,9 +73,8 @@ require 'else if \(!rootMod.stopInFlight\)' "$screen_record"
 forbid 'bash.*--stop-recording' "$screen_record"
 forbid 'contentInputPriority' "$button"
 forbid 'contentInputPriority' "$bar"
-require 'property alias inputItem: pulseButton' "$pulse"
-require 'visible: island.visible && \(island.hint.length > 0 \|\| island.osdFlash\)' "$pulse"
-require 'item: pulse.inputItem.enabled \? pulse.inputItem : null' "$shell"
+require 'NotificationToastOverlay' "$shell"
+require 'HardwareOsdOverlay' "$shell"
 
 # Every module-level pointer surface must use the shared in-bounds control.
 if rg -q --glob '!BarWidgetButton.qml' 'MouseArea[[:space:]]*\{' "$repo/versions/default/modules"; then

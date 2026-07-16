@@ -33,12 +33,12 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Bar layout | unlock mode, drag/drop widget groups, persistent order, split groups, magnetic hover, top/bottom position |
 | Control center | quick actions, widget toggles, notification visibility, workspace modes, bar style, and split controls |
 | Pickers | theme, wallpaper, screenshot, and video pickers with Tanzaku, Hearthstone, and Carousel styles |
-| Core widgets | workspaces, playback-aware volume, System info (CPU/GPU/RAM), battery, power profile, network, Bluetooth, weather, MPRIS, tray, notifications |
+| Core widgets | workspaces, playback-aware volume, System info (CPU/GPU/RAM), battery, power profile, network, optional Tailscale status, Bluetooth, weather, MPRIS, tray, notifications |
 | Privacy tools | microphone mute indicator/toggle and Lenovo LOQ camera kill-switch status |
 | Updates | shell update badge, weekly scheduled package update badge, Arch/AUR counter, known-infected AUR safety check |
 | AI usage | Claude, Codex, and OpenCode usage pill with provider switcher, detail panel, and automatic Codex activity visibility |
 | Super menu | native Quickshell Omarchy menu with nested navigation, empty states, backend action dispatch, and no Walker submenu fallback |
-| Pulse | top-center overlay for brightness, media, microphone, and camera changes, visible even when the bar is hidden by fullscreen |
+| Native surfaces | top-right notification stack plus a compact upper-centred hardware OSD, both per monitor and visible in fullscreen |
 
 <details>
 <summary>Full feature list</summary>
@@ -53,8 +53,9 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Workspaces | switch, overview, 10 / 5 / active-only modes, dots / numbers / magic styles |
 | Weather | current conditions, metric / imperial toggle |
 | Clock | time, calendar, scroll 24h / 12h toggle, timezone picker |
+| Tailscale | optional, reorderable status; left-click toggles `tailscale up` / `tailscale down`, right-click opens connection details, and hover stays silent |
 | MPRIS | media controls |
-| Notifications | mako history, unread count, clear |
+| Notifications | native `org.freedesktop.Notifications` service, four-card top-right stack, actions, DND, history, unread count, and clear |
 | System monitors | compact System info widget with CPU/GPU temperatures, CPU/GPU usage, VRAM, and RAM usage |
 | Privacy tools | microphone mute state, active microphone clients, Lenovo LOQ camera hardware switch status |
 | Speed test | manual Cloudflare speed test in the network panel |
@@ -63,7 +64,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Bar style | border, shadow, frost, pill radius, top/bottom position |
 | Split groups | positional pill splits + Stream, Surge, Bolt, Bolt 2 gap animations |
 | Magnetic hover | subtle pointer-only pill scale and neighbor pull animation without layout reflow |
-| Pulse | independent top overlay for short-lived system events, visible during fullscreen because it is not inside the bar window |
+| Hardware OSD | non-interactive upper-centred volume, brightness, media, lock, radio, profile, camera, and display-state feedback |
 | Keybind IPC | `qs -c bar ipc call themeSwitcher toggle` plus wallpaper/media picker IPC |
 | Super menu | Quickshell-rendered Omarchy actions, nested sections, type-ahead, keyboard navigation, and no Walker submenu handoff |
 | Per-widget panels | click widget to open its popup |
@@ -72,7 +73,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 
 ## Requirements
 
-Built for **Omarchy / Hyprland**. It integrates with `omarchy-*` helpers, Omarchy theme files, Hyprland, mako, MPRIS players, and Omarchy's hook system.
+Built for **Omarchy / Hyprland**. In Quickshell mode it owns `org.freedesktop.Notifications` and hardware OSD presentation; `qs-mode omarchy` restores Mako, SwayOSD, Waybar, and upstream bindings. It also integrates with `omarchy-*` helpers, Omarchy theme files, Hyprland, MPRIS players, and Omarchy's hook system.
 
 Required packages are checked by the installer:
 
@@ -150,7 +151,7 @@ Common actions:
 | Weather | panel | - | force refresh | - |
 | Voxtype | cycle model | - | config | - |
 | Workspace | switch workspace | - | overview | - |
-| MPRIS | inline controls | - | toggle panel | - |
+| MPRIS | play / pause | - | toggle panel | - |
 | Tray bar widget | toggle tray panel | - | - | - |
 | Tray icon | activate | context menu | hide icon | - |
 

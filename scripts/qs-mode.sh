@@ -30,6 +30,7 @@ stop_omarchy_ui() {
         pkill -x walker >/dev/null 2>&1 || true
     fi
     systemctl --user disable --now swayosd-server.service >/dev/null 2>&1 || true
+    systemctl --user mask --runtime swayosd-server.service >/dev/null 2>&1 || true
     pkill -x swayosd-server >/dev/null 2>&1 || true
 }
 
@@ -37,6 +38,8 @@ QS_BIND_BEGIN="# >>> quickshell-rise managed media bindings >>>"
 QS_BIND_END="# <<< quickshell-rise managed media bindings <<<"
 QS_MENU_BEGIN="# >>> quickshell-rise managed menu bindings >>>"
 QS_MENU_END="# <<< quickshell-rise managed menu bindings <<<"
+QS_NOTIF_BEGIN="# >>> quickshell-rise managed notification bindings >>>"
+QS_NOTIF_END="# <<< quickshell-rise managed notification bindings <<<"
 
 remove_qs_media_bindings() {
     [[ -f "$BINDINGS" ]] || return 0
@@ -169,6 +172,11 @@ unbind = SHIFT, XF86MonBrightnessUp
 unbind = SHIFT, XF86MonBrightnessDown
 unbind = , XF86KbdBrightnessUp
 unbind = , XF86KbdBrightnessDown
+unbind = , XF86KbdLightOnOff
+unbind = , XF86TouchpadOn
+unbind = , XF86TouchpadOff
+unbind = , XF86TouchpadToggle
+unbind = , XF86AudioCycleOutput
 unbind = ALT, XF86AudioRaiseVolume
 unbind = ALT, XF86AudioLowerVolume
 unbind = ALT, XF86MonBrightnessUp
@@ -187,6 +195,13 @@ bindeld = SHIFT, XF86MonBrightnessUp, Quickshell brightness max, exec, qs-rise-i
 bindeld = SHIFT, XF86MonBrightnessDown, Quickshell brightness min, exec, qs-rise-input brightness min
 bindeld = , XF86KbdBrightnessUp, Quickshell keyboard brightness up, exec, qs-rise-input keyboard up
 bindeld = , XF86KbdBrightnessDown, Quickshell keyboard brightness down, exec, qs-rise-input keyboard down
+bindeld = , XF86KbdLightOnOff, Quickshell keyboard brightness cycle, exec, qs-rise-input keyboard cycle
+bindeld = , XF86TouchpadOn, Quickshell touchpad on, exec, qs-rise-input touchpad on
+bindeld = , XF86TouchpadOff, Quickshell touchpad off, exec, qs-rise-input touchpad off
+bindeld = , XF86TouchpadToggle, Quickshell touchpad toggle, exec, qs-rise-input touchpad toggle
+bindeld = , XF86AudioCycleOutput, Quickshell audio output, exec, qs-rise-input audio-output
+bindnr = , Caps_Lock, exec, qs-rise-input lock "Caps Lock"
+bindnr = , Num_Lock, exec, qs-rise-input lock "Num Lock"
 bindeld = ALT, XF86AudioRaiseVolume, Quickshell volume up precise, exec, qs-rise-input volume precise-up
 bindeld = ALT, XF86AudioLowerVolume, Quickshell volume down precise, exec, qs-rise-input volume precise-down
 bindeld = ALT, XF86MonBrightnessUp, Quickshell brightness up precise, exec, qs-rise-input brightness precise-up
@@ -196,6 +211,27 @@ bindld = , XF86AudioPause, Quickshell media pause, exec, qs-rise-input media pla
 bindld = , XF86AudioPlay, Quickshell media play, exec, qs-rise-input media play-pause
 bindld = , XF86AudioPrev, Quickshell previous track, exec, qs-rise-input media previous
 # <<< quickshell-rise managed media bindings <<<
+EOF
+}
+
+remove_qs_notification_bindings() {
+    [[ -f "$BINDINGS" ]] || return 0
+    local tmp; tmp="$(mktemp)"
+    awk -v begin="$QS_NOTIF_BEGIN" -v end="$QS_NOTIF_END" '$0 == begin { skip=1; next } $0 == end { skip=0; next } !skip { print }' "$BINDINGS" > "$tmp"
+    mv "$tmp" "$BINDINGS"
+}
+
+install_qs_notification_bindings() {
+    [[ -f "$BINDINGS" ]] || return 0
+    remove_qs_notification_bindings
+    cat >> "$BINDINGS" <<'EOF'
+
+# >>> quickshell-rise managed notification bindings >>>
+bindd = SUPER, COMMA, Dismiss notification, exec, qs -c bar ipc call -- notifications dismiss
+bindd = SUPER SHIFT, COMMA, Dismiss all notifications, exec, qs -c bar ipc call -- notifications dismissAll
+bindd = SUPER CTRL, COMMA, Toggle notification DND, exec, qs -c bar ipc call -- notifications toggleDnd
+bindd = SUPER ALT, COMMA, Invoke notification, exec, qs -c bar ipc call -- notifications invoke
+# <<< quickshell-rise managed notification bindings <<<
 EOF
 }
 
@@ -238,6 +274,7 @@ start_quickshell() {
 }
 
 start_omarchy() {
+    systemctl --user unmask swayosd-server.service >/dev/null 2>&1 || true
     if command -v omarchy >/dev/null 2>&1; then
         omarchy restart waybar >/dev/null 2>&1 || true
         omarchy restart walker >/dev/null 2>&1 || true
@@ -255,6 +292,7 @@ start_omarchy() {
 switch_to_omarchy() {
     stop_quickshell
     remove_qs_media_bindings
+    remove_qs_notification_bindings
     install_omarchy_menu_bindings
     stop_omarchy_ui
     hyprctl reload >/dev/null 2>&1 || true
@@ -269,6 +307,7 @@ switch_to_quickshell() {
     # and helper updates cannot leave stale QML/IPC handlers running.
     stop_quickshell
     install_qs_media_bindings
+    install_qs_notification_bindings
     install_qs_menu_bindings
     hyprctl reload >/dev/null 2>&1 || true
     # Reloading Hyprland can re-run generated desktop autostart units (notably
