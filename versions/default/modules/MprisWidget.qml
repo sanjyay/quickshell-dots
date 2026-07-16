@@ -8,7 +8,7 @@ Item {
     required property var root
 
     // shared player selection (ghost-filtering) — see MprisSelect.qml
-    MprisSelect { id: sel }
+    MprisSelect { id: sel; pausedPlayers: root.mprisPausedPlayers }
     readonly property var  player:  sel.player
     readonly property bool active:  sel.active
     readonly property bool playing: sel.playing
@@ -71,9 +71,9 @@ Item {
         if (!playing) dropAnim.restart()
     }
 
-    // The bar pill is strictly for media that is playing right now. Do not
-    // keep a paused player visible just because its MPRIS metadata survives.
-    readonly property bool showNowPlaying: root.modMpris && playing && trackLabel.length > 0
+    // Keep players paused through this widget available. Unrelated paused or
+    // stale MPRIS entries remain filtered by MprisSelect.
+    readonly property bool showNowPlaying: root.modMpris && active && trackLabel.length > 0
     visible: implicitWidth > 0.5
     implicitWidth: showNowPlaying ? row.implicitWidth + 18 : 0
     implicitHeight: 28
@@ -129,8 +129,10 @@ Item {
                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                 onClicked: {
                     if (!rootMod.player) return
-                    root.mprisPausedPlayer = rootMod.playing ? rootMod.player : null
-                    rootMod.player.togglePlaying()
+                    var current = rootMod.player
+                    if (rootMod.playing) root.rememberMprisPausedPlayer(current)
+                    else root.forgetMprisPausedPlayer(current)
+                    current.togglePlaying()
                 }
             }
         }
@@ -299,8 +301,10 @@ Item {
             tip.hide()
             if (mouse.button === Qt.LeftButton) {
                 if (rootMod.player) {
-                    root.mprisPausedPlayer = rootMod.playing ? rootMod.player : null
-                    rootMod.player.togglePlaying()
+                    var current = rootMod.player
+                    if (rootMod.playing) root.rememberMprisPausedPlayer(current)
+                    else root.forgetMprisPausedPlayer(current)
+                    current.togglePlaying()
                 } else root.mprisVisible = !root.mprisVisible
             } else {
                 root.mprisVisible = !root.mprisVisible

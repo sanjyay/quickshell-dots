@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 case "${1:-menu}" in
-  menu) omarchy-menu capture ;;
+  menu) exec qs -c bar ipc call -- capture open ;;
   screenshot) omarchy-capture-screenshot ;;
   recording) omarchy-capture-screenrecording ;;
   recording-no-audio) omarchy-capture-screenrecording ;;

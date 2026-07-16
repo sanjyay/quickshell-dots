@@ -11,6 +11,10 @@ import Quickshell.Services.Mpris
 QtObject {
     id: sel
 
+    // Only players paused through the bar are eligible when nothing is
+    // currently playing.  This keeps ordinary stale MPRIS entries hidden.
+    property var pausedPlayers: []
+
     // playerctld is an aggregator proxy: it mirrors the last player and
     // freezes its state (often "Playing") once that player quits, leaving a
     // ghost entry. Real players always appear under their own bus name too,
@@ -23,11 +27,11 @@ QtObject {
     function isReal(p) {
         if (!p) return false
         if (isProxy(p)) return false
-        // A paused player is not active media. In particular, browsers and
-        // playerctld commonly retain paused metadata across a reboot, which
-        // made the now-playing pill appear with nothing actually playing.
-        return p.playbackState === MprisPlaybackState.Playing
-            && !!(p.trackTitle && p.trackTitle.length > 0)
+        return p.playbackState === MprisPlaybackState.Playing && hasTrack(p)
+    }
+
+    function hasTrack(p) {
+        return !!(p && p.trackTitle && p.trackTitle.length > 0)
     }
 
     readonly property var player: {
@@ -36,6 +40,19 @@ QtObject {
             var p = vals[i]
             if (!isReal(p)) continue
             return p
+        }
+
+        // Prefer the most recently paused player that still exists.  A new
+        // player can temporarily take precedence while it is playing; once it
+        // closes, the older bar-paused track becomes available again.
+        var remembered = pausedPlayers || []
+        for (var r = remembered.length - 1; r >= 0; r--) {
+            var candidate = remembered[r]
+            if (!hasTrack(candidate) || isProxy(candidate)
+                    || candidate.playbackState === MprisPlaybackState.Playing) continue
+            for (var j = 0; j < vals.length; j++) {
+                if (vals[j] === candidate) return candidate
+            }
         }
         return null
     }

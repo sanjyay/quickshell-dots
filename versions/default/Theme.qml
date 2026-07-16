@@ -98,6 +98,11 @@ Item {
         return "Red"
     }
     readonly property string mono:  "JetBrainsMono Nerd Font"
+    readonly property int menuRowHeight: 42
+    readonly property int menuRowSpacing: 3
+    readonly property int menuFontSize: 18
+    readonly property int menuFontWeight: Font.DemiBold
+    readonly property int menuRowRadius: 6
 
     // ── transparency knobs (0.0 = fully transparent, 1.0 = opaque) ──
     property real barOpacity:  0.94   // große Insel / Split-Sektionen
@@ -908,7 +913,24 @@ Item {
     property string voxState: "idle"          // mirrored from VoxtypeWidget: idle/recording/transcribing
     property bool mprisActive: false          // mirrored from MprisWidget; keeps active media visible in compact layouts
     readonly property bool mprisPlaying: mediaSelection.playing // true only while a real MPRIS player is playing
-    property var mprisPausedPlayer: null     // keep the specific player visible after a bar-widget pause
+    property var mprisPausedPlayers: []     // recent players paused through the bar
+
+    function rememberMprisPausedPlayer(player) {
+        if (!player) return
+        var next = []
+        for (var i = 0; i < mprisPausedPlayers.length; i++)
+            if (mprisPausedPlayers[i] !== player) next.push(mprisPausedPlayers[i])
+        next.push(player)
+        mprisPausedPlayers = next
+    }
+
+    function forgetMprisPausedPlayer(player) {
+        if (!player) return
+        var next = []
+        for (var i = 0; i < mprisPausedPlayers.length; i++)
+            if (mprisPausedPlayers[i] !== player) next.push(mprisPausedPlayers[i])
+        mprisPausedPlayers = next
+    }
     property bool codexActive: false          // mirrored from ClaudeWidget's Codex process probe
     // battery presence (laptop) — drives the Battery indicator tile's visibility.
     // Direct UPower check, event-driven.

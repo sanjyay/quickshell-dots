@@ -7,12 +7,29 @@
 - Added a reversible Quickshell/Omarchy profile switch for the native menu,
   clipboard picker, capture panel, power/session actions, and related
   Hyprland bindings.
+- Refactored the custom Omarchy Super menu to use a structured internal
+  Quickshell menu/action model, keeping normal nested navigation and empty
+  submenu states out of Walker while preserving Omarchy backend commands for
+  final actions.
+- Removed the root Learn entry from the custom Super menu.
+- Made long nested Super menu action lists grow to their content when screen
+  space permits, tighten only those nested rows, and scroll only when the list
+  cannot fit inside the monitor work area.
+- Fixed no-result and back-navigation paths so the custom Super menu stays
+  inside Quickshell instead of revealing the original Omarchy/Walker menu.
 - Added native Quickshell screenshot and screen-recording choices while
   preserving Omarchy’s capture backends and restoring their original bindings
   in the Omarchy profile.
+- Fixed keyboard navigation in the capture and screen-recording choice panels.
 - Added a centered, keyboard-accessible Omarchy menu with nested navigation,
   invisible type-ahead selection, outside-click dismissal, and launcher-style
   focused-input handling.
+- Restyled the custom app launcher to share the Super menu typography, row
+  density, selection styling, opaque panel surface, and scrollbar language
+  while preserving app discovery, filtering, launching, and keyboard behavior.
+- Kept Now Playing visible for media paused through the bar widget, including
+  returning to the earlier paused track after newer playback closes, while
+  still filtering ordinary stale paused MPRIS entries.
 - Added a two-pane clipboard history picker with compact scrolling results,
   full text previews, Elephant image previews, safe copy/delete actions, and
   responsive monitor-aware sizing.

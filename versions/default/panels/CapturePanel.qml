@@ -32,6 +32,11 @@ PanelWindow {
         proc.command = [Quickshell.env("HOME") + "/.local/bin/qs-capture", action]
         proc.running = false; proc.running = true
     }
+
+    function moveSelection(delta) {
+        if (panel.rows.length <= 0) return
+        list.select((list.selectedIndex + delta + panel.rows.length) % panel.rows.length)
+    }
     MouseArea { anchors.fill: parent; onClicked: root.captureVisible = false }
     Rectangle {
         id: card
@@ -66,16 +71,26 @@ PanelWindow {
             }
         }
         Keys.onPressed: function(event) {
-            if (event.key === Qt.Key_Escape) {
+            if (event.key === Qt.Key_Down) {
+                panel.moveSelection(1)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Up) {
+                panel.moveSelection(-1)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Escape) {
                 if (panel.recordingChoices) { panel.recordingChoices = false; list.selectedIndex = 0 }
                 else root.captureVisible = false
-            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) panel.run(panel.rows[list.selectedIndex].action)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                panel.run(panel.rows[list.selectedIndex].action)
+                event.accepted = true
+            }
         }
     }
     Process { id: proc }
     onVisibleChanged: if (visible) {
         recordingChoices = root.captureAction === "recording"
         root.activateFocusedPopupScreen()
-        Qt.callLater(function() { card.forceActiveFocus() })
+        Qt.callLater(function() { card.focus = true; card.forceActiveFocus() })
     }
 }

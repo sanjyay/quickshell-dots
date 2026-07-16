@@ -1,113 +1,173 @@
 .pragma library
 
-// The action IDs are stable UI contracts. Shell execution is deliberately
-// delegated to qs-menu-action.sh; this file contains no executable commands.
-var entries = [
-    { id: "apps", parent: "root", kind: "action", icon: "󰀻", label: "Apps", detail: "Application launcher", action: "apps" },
-    { id: "learn", parent: "root", kind: "menu", icon: "󰧑", label: "Learn", detail: "Manuals and reference" },
-    { id: "trigger", parent: "root", kind: "menu", icon: "󱓞", label: "Trigger", detail: "Capture, share and toggles" },
-    { id: "style", parent: "root", kind: "menu", icon: "", label: "Style", detail: "Theme, wallpaper and appearance" },
-    { id: "setup", parent: "root", kind: "menu", icon: "", label: "Setup", detail: "Devices and configuration" },
-    { id: "install", parent: "root", kind: "menu", icon: "󰉉", label: "Install", detail: "Packages and applications" },
-    { id: "remove", parent: "root", kind: "menu", icon: "󰭌", label: "Remove", detail: "Uninstall applications and features" },
-    { id: "update", parent: "root", kind: "menu", icon: "", label: "Update", detail: "System and service updates" },
-    { id: "about", parent: "root", kind: "action", icon: "", label: "About", detail: "About this system", action: "about" },
-    { id: "system", parent: "root", kind: "menu", icon: "", label: "System", detail: "Power and session" },
+// This is the Quickshell-owned menu tree.  It contains presentation data and
+// stable action IDs only; backend command execution remains in
+// scripts/qs-menu-action.sh.  Submenus are data, never commands.
+var menus = { root: [] }
+var menuInfo = { root: { id: "root", label: "Menu", type: "submenu" } }
 
-    { id: "learn.keybindings", parent: "learn", kind: "action", icon: "", label: "Keybindings", action: "learn.keybindings" },
-    { id: "learn.omarchy", parent: "learn", kind: "action", icon: "", label: "Omarchy", action: "learn.omarchy" },
-    { id: "learn.hyprland", parent: "learn", kind: "action", icon: "", label: "Hyprland", action: "learn.hyprland" },
-    { id: "learn.arch", parent: "learn", kind: "action", icon: "󰣇", label: "Arch", action: "learn.arch" },
-    { id: "learn.neovim", parent: "learn", kind: "action", icon: "", label: "Neovim", action: "learn.neovim" },
-    { id: "learn.bash", parent: "learn", kind: "action", icon: "󱆃", label: "Bash", action: "learn.bash" },
-
-    { id: "trigger.reminder", parent: "trigger", kind: "menu", icon: "󰔛", label: "Reminder" },
-    { id: "trigger.capture", parent: "trigger", kind: "menu", icon: "", label: "Capture" },
-    { id: "trigger.transcode", parent: "trigger", kind: "action", icon: "󰧸", label: "Transcode", action: "trigger.transcode" },
-    { id: "trigger.share", parent: "trigger", kind: "menu", icon: "", label: "Share" },
-    { id: "trigger.toggle", parent: "trigger", kind: "menu", icon: "󰔎", label: "Toggle" },
-    { id: "trigger.hardware", parent: "trigger", kind: "menu", icon: "", label: "Hardware" },
-    { id: "trigger.capture.screenshot", parent: "trigger.capture", kind: "action", icon: "", label: "Screenshot", action: "capture.screenshot" },
-    { id: "trigger.capture.screenrecord", parent: "trigger.capture", kind: "action", icon: "", label: "Screenrecord", action: "capture.screenrecord" },
-    { id: "trigger.capture.text", parent: "trigger.capture", kind: "action", icon: "󰴑", label: "Text Extraction", action: "capture.text" },
-    { id: "trigger.capture.color", parent: "trigger.capture", kind: "action", icon: "󰃉", label: "Color", action: "capture.color" },
-    { id: "trigger.reminder.set", parent: "trigger.reminder", kind: "action", icon: "󰔛", label: "Set one", action: "reminder.set" },
-    { id: "trigger.reminder.show", parent: "trigger.reminder", kind: "action", icon: "󰔛", label: "Show all", action: "reminder.show" },
-    { id: "trigger.reminder.clear", parent: "trigger.reminder", kind: "action", icon: "󰔛", label: "Clear all", action: "reminder.clear" },
-    { id: "trigger.share.clipboard", parent: "trigger.share", kind: "action", icon: "", label: "Clipboard", action: "share.clipboard" },
-    { id: "trigger.share.file", parent: "trigger.share", kind: "action", icon: "", label: "File", action: "share.file" },
-    { id: "trigger.share.folder", parent: "trigger.share", kind: "action", icon: "", label: "Folder", action: "share.folder" },
-
-    { id: "system.screensaver", parent: "system", kind: "action", icon: "󱄄", label: "Screensaver", action: "system.screensaver" },
-    { id: "system.lock", parent: "system", kind: "action", icon: "", label: "Lock", action: "system.lock" },
-    { id: "system.suspend", parent: "system", kind: "action", icon: "󰒲", label: "Suspend", action: "system.suspend", confirm: false },
-    { id: "system.hibernate", parent: "system", kind: "action", icon: "󰤁", label: "Hibernate", action: "system.hibernate", confirm: false },
-    { id: "system.logout", parent: "system", kind: "action", icon: "󰍃", label: "Logout", action: "system.logout", confirm: true },
-    { id: "system.restart", parent: "system", kind: "action", icon: "󰜉", label: "Restart", action: "system.restart", confirm: true },
-    { id: "system.shutdown", parent: "system", kind: "action", icon: "󰐥", label: "Shutdown", action: "system.shutdown", confirm: true }
-]
-
-// The installed Omarchy menu has a large set of backend-driven leaves. Keep
-// those routes visible in the native menu as well; the dispatcher deliberately
-// hands package/configuration work back to Omarchy's trusted helpers.
-function addMenu(id, parent, label, detail) { entries.push({ id: id, parent: parent, kind: "menu", icon: "•", label: label, detail: detail || "" }) }
-function addAction(id, parent, label, action) { entries.push({ id: id, parent: parent, kind: "action", icon: "•", label: label, action: action || id }) }
-function addLegacyLeaves(parent, labels, route) {
-    for (var i = 0; i < labels.length; i++)
-        addAction(parent + "." + labels[i].toLowerCase().replace(/[^a-z0-9]+/g, "-"), parent, labels[i], "legacy." + route)
+function addMenu(id, parent, label, icon, detail) {
+    var entry = {
+        id: id,
+        icon: icon || "•",
+        label: label,
+        detail: detail || "",
+        type: "submenu",
+        submenuId: id
+    }
+    if (!menus[parent]) menus[parent] = []
+    menus[parent].push(entry)
+    if (!menus[id]) menus[id] = []
+    menuInfo[id] = { id: id, label: label, type: "submenu" }
 }
 
-addMenu("style.theme", "style", "Theme", "Choose the active theme")
-addMenu("style.font", "style", "Font", "Choose the system font")
-addAction("style.unlocks", "style", "Unlock", "legacy.style.unlocks")
-addAction("style.background", "style", "Background", "legacy.style.background")
-addAction("style.hyprland", "style", "Hyprland", "legacy.style.hyprland")
-addMenu("style.screensaver", "style", "Screensaver", "Screensaver branding")
-addMenu("style.about", "style", "About", "About branding")
+function addAction(id, parent, label, icon, actionId) {
+    var entry = {
+        id: id,
+        icon: icon || "•",
+        label: label,
+        type: "action",
+        actionId: actionId || id
+    }
+    if (!menus[parent]) menus[parent] = []
+    menus[parent].push(entry)
+}
+
+function addGroup(id, parent, label) {
+    addMenu(id, parent, label, "•")
+}
+
+function addLeaves(parent, labels, actionPrefix) {
+    for (var i = 0; i < labels.length; i++) {
+        var id = parent + "." + labels[i].toLowerCase().replace(/[^a-z0-9]+/g, "-")
+        addAction(id, parent, labels[i], "•", actionPrefix + "-" + id.slice(parent.length + 1))
+    }
+}
+
+// Root menu.  Icons, labels, and details intentionally match the existing UI.
+addAction("apps", "root", "Apps", "󰀻", "open-app-launcher")
+addMenu("trigger", "root", "Trigger", "󱓞", "Capture, share and toggles")
+addMenu("style", "root", "Style", "", "Theme, wallpaper and appearance")
+addMenu("setup", "root", "Setup", "", "Devices and configuration")
+addMenu("install", "root", "Install", "󰉉", "Packages and applications")
+addMenu("remove", "root", "Remove", "󰭌", "Uninstall applications and features")
+addMenu("update", "root", "Update", "", "System and service updates")
+addAction("about", "root", "About", "", "open-about")
+addMenu("system", "root", "System", "", "Power and session")
+
+// Trigger
+addMenu("trigger.reminder", "trigger", "Reminder", "󰔛")
+addMenu("trigger.capture", "trigger", "Capture", "")
+addAction("trigger.transcode", "trigger", "Transcode", "󰧸", "trigger-transcode")
+addMenu("trigger.share", "trigger", "Share", "")
+addMenu("trigger.toggle", "trigger", "Toggle", "󰔎")
+addMenu("trigger.hardware", "trigger", "Hardware", "")
+addAction("trigger.capture.screenshot", "trigger.capture", "Screenshot", "", "capture-screenshot")
+addAction("trigger.capture.screenrecord", "trigger.capture", "Screenrecord", "", "capture-screenrecord")
+addAction("trigger.capture.text", "trigger.capture", "Text Extraction", "󰴑", "capture-text")
+addAction("trigger.capture.color", "trigger.capture", "Color", "󰃉", "capture-color")
+addAction("trigger.reminder.set", "trigger.reminder", "Set one", "󰔛", "reminder-set")
+addAction("trigger.reminder.show", "trigger.reminder", "Show all", "󰔛", "reminder-show")
+addAction("trigger.reminder.clear", "trigger.reminder", "Clear all", "󰔛", "reminder-clear")
+addAction("trigger.share.clipboard", "trigger.share", "Clipboard", "", "share-clipboard")
+addAction("trigger.share.file", "trigger.share", "File", "", "share-file")
+addAction("trigger.share.folder", "trigger.share", "Folder", "", "share-folder")
+
+// System
+addAction("system.screensaver", "system", "Screensaver", "󱄄", "system-screensaver")
+addAction("system.lock", "system", "Lock", "", "system-lock")
+addAction("system.suspend", "system", "Suspend", "󰒲", "system-suspend")
+addAction("system.hibernate", "system", "Hibernate", "󰤁", "system-hibernate")
+addAction("system.logout", "system", "Logout", "󰍃", "system-logout")
+addAction("system.restart", "system", "Restart", "󰜉", "system-restart")
+addAction("system.shutdown", "system", "Shutdown", "󰐥", "system-shutdown")
+
+// Style
+addGroup("style.theme", "style", "Theme")
+// Unlocks are generated by an upstream Walker provider. Represent the
+// provider boundary as a normal Quickshell submenu, never an external menu.
+addGroup("style.unlocks", "style", "Unlock")
+addAction("style.background", "style", "Background", "•", "style-background")
+addAction("style.hyprland", "style", "Hyprland", "•", "style-hyprland")
+addGroup("style.font", "style", "Font")
+addGroup("style.screensaver", "style", "Screensaver")
+addGroup("style.about", "style", "About")
 for (var styleLeaf of ["Edit Text", "Set From Image", "Restore Default"]) {
-    addAction("style.screensaver." + styleLeaf.toLowerCase().replace(/ /g, "-"), "style.screensaver", styleLeaf, "legacy.style.screensaver")
-    addAction("style.about." + styleLeaf.toLowerCase().replace(/ /g, "-"), "style.about", styleLeaf, "legacy.style.about")
+    var styleId = styleLeaf.toLowerCase().replace(/ /g, "-")
+    addAction("style.screensaver." + styleId, "style.screensaver", styleLeaf, "•", "style-screensaver-" + styleId)
+    addAction("style.about." + styleId, "style.about", styleLeaf, "•", "style-about-" + styleId)
 }
 
-for (var setup of ["Audio", "Wifi", "Bluetooth", "Power Profile", "System Sleep", "Monitors", "Keybindings", "Input", "Defaults", "DNS", "Security", "Config"])
-    addMenu("setup." + setup.toLowerCase().replace(/ /g, "-"), "setup", setup)
+// Setup
+for (var setup of ["Audio", "Wifi", "Bluetooth", "Monitors", "Keybindings", "Input", "DNS"])
+    addAction("setup." + setup.toLowerCase().replace(/ /g, "-"), "setup", setup, "•", "setup-" + setup.toLowerCase().replace(/ /g, "-"))
+addGroup("setup.power-profile", "setup", "Power Profile")
+for (var profile of ["Performance", "Balanced", "Power Saver"])
+    addAction("setup.power-profile." + profile.toLowerCase().replace(/ /g, "-"), "setup.power-profile", profile, "•", "setup-power-profile-" + profile.toLowerCase().replace(/ /g, "-"))
+addAction("setup.system-sleep", "setup", "System Sleep", "•", "setup-system-sleep")
+addGroup("setup.defaults", "setup", "Defaults")
+addGroup("setup.security", "setup", "Security")
+addGroup("setup.config", "setup", "Config")
 for (var config of ["Hyprland", "Hypridle", "Hyprlock", "Hyprsunset", "SwayOSD", "Walker", "Waybar", "XCompose"])
-    addAction("setup.config." + config.toLowerCase(), "setup.config", config, "legacy.setup.config")
+    addAction("setup.config." + config.toLowerCase(), "setup.config", config, "•", "setup-config-" + config.toLowerCase())
 for (var security of ["Fingerprint", "Fido2"])
-    addAction("setup.security." + security.toLowerCase(), "setup.security", security, "legacy.setup.security")
+    addAction("setup.security." + security.toLowerCase(), "setup.security", security, "•", "setup-security-" + security.toLowerCase())
 for (var def of ["Browser", "Terminal", "Editor"])
-    addMenu("setup.defaults." + def.toLowerCase(), "setup.defaults", def)
+    addGroup("setup.defaults." + def.toLowerCase(), "setup.defaults", def)
+addLeaves("setup.defaults.browser", ["Chrome", "Edge", "Brave", "Brave Origin", "Firefox", "Zen"], "setup-default-browser")
+addLeaves("setup.defaults.terminal", ["Alacritty", "Foot", "Ghostty", "Kitty"], "setup-default-terminal")
+addLeaves("setup.defaults.editor", ["Neovim", "VSCode", "Cursor", "Zed", "Sublime", "Helix", "Vim", "Emacs"], "setup-default-editor")
 
-for (var installGroup of ["Package", "AUR", "Web App", "TUI", "Service", "Style", "Development", "Editor", "Terminal", "Browser", "AI", "Gaming", "Windows"])
-    addMenu("install." + installGroup.toLowerCase().replace(/ /g, "-"), "install", installGroup)
-for (var removeGroup of ["Package", "Web App", "TUI", "Development", "Theme", "Browser", "Dictation", "Gaming", "Windows", "Preinstalls", "Security"])
-    addMenu("remove." + removeGroup.toLowerCase().replace(/ /g, "-"), "remove", removeGroup)
-for (var updateGroup of ["Omarchy", "Channel", "Config", "Extra Themes", "Process", "Hardware", "Firmware", "Password", "Timezone", "Time"])
-    addMenu("update." + updateGroup.toLowerCase().replace(/ /g, "-"), "update", updateGroup)
+// Install
+addAction("install.package", "install", "Package", "•", "install-package")
+addAction("install.aur", "install", "AUR", "•", "install-aur")
+addAction("install.web-app", "install", "Web App", "•", "install-web-app")
+addAction("install.tui", "install", "TUI", "•", "install-tui")
+for (var installGroup of ["Service", "Style", "Development", "Editor", "Terminal", "Browser", "AI", "Gaming"])
+    addGroup("install." + installGroup.toLowerCase().replace(/ /g, "-"), "install", installGroup)
+addAction("install.windows", "install", "Windows", "•", "install-windows")
+addLeaves("install.service", ["Dropbox", "Tailscale", "NordVPN", "ONCE", "Bitwarden", "Chromium Account"], "install-service")
+addLeaves("install.style", ["Theme", "Background", "Font"], "install-style")
+addLeaves("install.development", ["Ruby on Rails", "Docker DB", "JavaScript", "Go", "PHP", "Python", "Elixir", "Zig", "Rust", "Java", ".NET", "OCaml", "Clojure", "Scala"], "install-development")
+addLeaves("install.editor", ["VSCode", "Cursor", "Zed", "Sublime Text", "Helix", "Vim", "Emacs"], "install-editor")
+addLeaves("install.terminal", ["Alacritty", "Foot", "Ghostty", "Kitty"], "install-terminal")
+addLeaves("install.browser", ["Chrome", "Edge", "Brave", "Brave Origin", "Firefox", "Zen"], "install-browser")
+addLeaves("install.ai", ["Dictation", "LM Studio", "Ollama", "Crush"], "install-ai")
+addLeaves("install.gaming", ["Steam", "RetroArch", "Minecraft", "NVIDIA GeForce NOW", "Xbox Cloud Gaming", "Xbox Controller", "Moonlight", "Lutris", "Heroic"], "install-gaming")
 
-addLegacyLeaves("install.service", ["Dropbox", "Tailscale", "NordVPN", "ONCE", "Bitwarden", "Chromium Account"], "install.service")
-addLegacyLeaves("install.style", ["Theme", "Background", "Font"], "install.style")
-addLegacyLeaves("install.development", ["Ruby on Rails", "Docker DB", "JavaScript", "Go", "PHP", "Python", "Elixir", "Zig", "Rust", "Java", ".NET", "OCaml", "Clojure", "Scala"], "install.development")
-addLegacyLeaves("install.editor", ["VSCode", "Cursor", "Zed", "Sublime Text", "Helix", "Vim", "Emacs"], "install.editor")
-addLegacyLeaves("install.terminal", ["Alacritty", "Foot", "Ghostty", "Kitty"], "install.terminal")
-addLegacyLeaves("install.browser", ["Chrome", "Edge", "Brave", "Brave Origin", "Firefox", "Zen"], "install.browser")
-addLegacyLeaves("install.ai", ["Dictation", "LM Studio", "Ollama", "Crush"], "install.ai")
-addLegacyLeaves("install.gaming", ["Steam", "RetroArch", "Minecraft", "NVIDIA GeForce NOW", "Xbox Cloud Gaming", "Xbox Controller", "Moonlight", "Lutris", "Heroic"], "install.gaming")
-addLegacyLeaves("remove.development", ["Ruby on Rails", "JavaScript", "Go", "PHP", "Python", "Elixir", "Zig", "Rust", "Java", ".NET", "OCaml", "Clojure", "Scala"], "remove.development")
-addLegacyLeaves("remove.browser", ["Chrome", "Edge", "Brave", "Brave Origin", "Firefox", "Zen"], "remove.browser")
-addLegacyLeaves("remove.gaming", ["Steam", "RetroArch", "Minecraft", "NVIDIA GeForce NOW", "Xbox Cloud Gaming", "Xbox Controller", "Moonlight", "Lutris", "Heroic"], "remove.gaming")
-addLegacyLeaves("update.channel", ["Stable", "RC", "Edge", "Dev"], "update.channel")
-addLegacyLeaves("update.config", ["Hyprland", "Hypridle", "Hyprlock", "Hyprsunset", "Plymouth", "SwayOSD", "Tmux", "Walker", "Waybar"], "update.config")
-addLegacyLeaves("update.process", ["Hypridle", "Hyprsunset", "Mako", "SwayOSD", "Walker", "Waybar"], "update.process")
-addLegacyLeaves("update.hardware", ["Audio", "Wi-Fi", "Bluetooth", "Trackpad"], "update.hardware")
+// Remove
+addAction("remove.package", "remove", "Package", "•", "remove-package")
+addAction("remove.web-app", "remove", "Web App", "•", "remove-web-app")
+addAction("remove.tui", "remove", "TUI", "•", "remove-tui")
+for (var removeGroup of ["Development", "Theme", "Browser", "Dictation", "Gaming"])
+    addGroup("remove." + removeGroup.toLowerCase().replace(/ /g, "-"), "remove", removeGroup)
+addAction("remove.windows", "remove", "Windows", "•", "remove-windows")
+addAction("remove.preinstalls", "remove", "Preinstalls", "•", "remove-preinstalls")
+addGroup("remove.security", "remove", "Security")
+addLeaves("remove.development", ["Ruby on Rails", "JavaScript", "Go", "PHP", "Python", "Elixir", "Zig", "Rust", "Java", ".NET", "OCaml", "Clojure", "Scala"], "remove-development")
+addLeaves("remove.browser", ["Chrome", "Edge", "Brave", "Brave Origin", "Firefox", "Zen"], "remove-browser")
+addLeaves("remove.gaming", ["Steam", "RetroArch", "Minecraft", "NVIDIA GeForce NOW", "Xbox Cloud Gaming", "Xbox Controller", "Moonlight", "Lutris", "Heroic"], "remove-gaming")
 
-for (var captureMode of ["With no audio", "With desktop audio", "With desktop + microphone audio", "With desktop + microphone audio + webcam"])
-    addAction("trigger.capture.recording." + captureMode.toLowerCase().replace(/[^a-z]+/g, "-"), "trigger.capture", captureMode, "capture.screenrecord")
+// Update
+for (var updateAction of ["Omarchy", "Extra Themes", "Firmware", "Password", "Timezone", "Time"])
+    addAction("update." + updateAction.toLowerCase().replace(/ /g, "-"), "update", updateAction, "•", "update-" + updateAction.toLowerCase().replace(/ /g, "-"))
+for (var updateGroup of ["Channel", "Config", "Process", "Hardware"])
+    addGroup("update." + updateGroup.toLowerCase().replace(/ /g, "-"), "update", updateGroup)
+addLeaves("update.channel", ["Stable", "RC", "Edge", "Dev"], "update-channel")
+addLeaves("update.config", ["Hyprland", "Hypridle", "Hyprlock", "Hyprsunset", "Plymouth", "SwayOSD", "Tmux", "Walker", "Waybar"], "update-config")
+addLeaves("update.process", ["Hypridle", "Hyprsunset", "Mako", "SwayOSD", "Walker", "Waybar"], "update-process")
+addLeaves("update.hardware", ["Audio", "Wi-Fi", "Bluetooth", "Trackpad"], "update-hardware")
 
-function children(parent) {
-    return entries.filter(function(entry) { return entry.parent === parent })
+// Screen-recording choices are actions, not a second menu engine.
+for (var captureMode of ["With no audio", "With desktop audio", "With desktop + microphone audio", "With desktop + microphone audio + webcam"]) {
+    var captureId = captureMode.toLowerCase().replace(/[^a-z]+/g, "-")
+    addAction("trigger.capture.recording." + captureId, "trigger.capture", captureMode, "•", "capture-screenrecord")
+}
+
+function children(id) {
+    return menus[id] || []
 }
 
 function find(id) {
-    return entries.find(function(entry) { return entry.id === id }) || null
+    return menuInfo[id] || null
 }

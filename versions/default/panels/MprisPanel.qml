@@ -23,7 +23,7 @@ PanelWindow {
     // ── pick a REAL active player ───────────────────────────────────
     // Selection (incl. ghost-filtering) lives in MprisSelect so the bar
     // widget and this panel always agree on the active player.
-    MprisSelect { id: sel }
+    MprisSelect { id: sel; pausedPlayers: root.mprisPausedPlayers }
     readonly property var  player:  sel.player
     readonly property bool active:  sel.active
     readonly property bool playing: sel.playing

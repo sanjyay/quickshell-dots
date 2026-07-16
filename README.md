@@ -37,6 +37,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Privacy tools | microphone mute indicator/toggle and Lenovo LOQ camera kill-switch status |
 | Updates | shell update badge, weekly scheduled package update badge, Arch/AUR counter, known-infected AUR safety check |
 | AI usage | Claude, Codex, and OpenCode usage pill with provider switcher, detail panel, and automatic Codex activity visibility |
+| Super menu | native Quickshell Omarchy menu with nested navigation, empty states, backend action dispatch, and no Walker submenu fallback |
 | Pulse | top-center overlay for brightness, media, microphone, and camera changes, visible even when the bar is hidden by fullscreen |
 
 <details>
@@ -64,6 +65,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Magnetic hover | subtle pointer-only pill scale and neighbor pull animation without layout reflow |
 | Pulse | independent top overlay for short-lived system events, visible during fullscreen because it is not inside the bar window |
 | Keybind IPC | `qs -c bar ipc call picker theme\|wallpaper\|screenshots\|videos` |
+| Super menu | Quickshell-rendered Omarchy actions, nested sections, type-ahead, keyboard navigation, and no Walker submenu handoff |
 | Per-widget panels | click widget to open its popup |
 
 </details>
@@ -125,8 +127,10 @@ Common actions:
 - Use the self-update badge when it appears to update this shell from inside the bar.
 - Use the System info widget for quick CPU/GPU temperatures; click it for CPU, GPU, VRAM, and RAM details. The GPU probe supports NVIDIA and DRM/sysfs GPU data for temperature, utilization, and VRAM where the driver exposes it.
 - Use the network cluster for network, Bluetooth, microphone, and camera privacy controls.
-- The app launcher displays cached applications immediately from `~/.cache/quickshell/app-launcher/apps.json` and silently refreshes the cache in the background.
-- Media and volume pills stay out of the bar until a real MPRIS player is playing.
+- The Super menu is rendered and navigated by Quickshell. It keeps nested Omarchy action pages, empty submenu states, type-ahead, back navigation, and keyboard focus inside the custom themed menu while still running Omarchy's backend commands for final actions.
+- The app launcher displays cached applications immediately from `~/.cache/quickshell/app-launcher/apps.json`, silently refreshes the cache in the background, and uses the same visual density and selection styling as the Super menu.
+- Media and volume pills stay out of the bar until a real MPRIS player is playing. If you pause media by clicking the Now Playing widget, that player stays available in the bar and media panel until you resume it or the player disappears.
+- The capture panel supports keyboard navigation, including the screen-recording audio choices, with `Up`, `Down`, `Enter`, and `Esc`.
 - The AI pill shows remaining 5h Codex allowance in the bar when manually enabled or when Codex is active. Click it to open the usage panel, which shows the weekly Codex window and other AI providers.
 
 <details>

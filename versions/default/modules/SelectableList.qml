@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 
 Item {
     id: listRoot
@@ -9,6 +10,7 @@ Item {
     property int rowHeight: 34
     property int fontSize: 18
     property int fontWeight: Font.DemiBold
+    property int rowRadius: 6
     property color textColor: "white"
     property color mutedColor: "gray"
     property color accentColor: "white"
@@ -16,6 +18,8 @@ Item {
     property color borderColor: "transparent"
     property string emptyText: "No results"
     property string query: ""
+    property bool showScrollBar: false
+    property int rowSpacing: 3
 
     signal activated(int index)
     signal hovered(int index)
@@ -39,10 +43,15 @@ Item {
         anchors.fill: parent
         clip: true
         interactive: true
-        spacing: 3
+        spacing: listRoot.rowSpacing
         highlightMoveDuration: 0
         currentIndex: 0
         keyNavigationEnabled: false
+
+        ScrollBar.vertical: ScrollBar {
+            visible: listRoot.showScrollBar && view.contentHeight > view.height
+            policy: ScrollBar.AsNeeded
+        }
 
         delegate: Rectangle {
             required property int index
@@ -53,7 +62,7 @@ Item {
 
             width: view.width
             height: listRoot.rowHeight
-            radius: 6
+            radius: listRoot.rowRadius
             color: index === listRoot.selectedIndex ? listRoot.selectedColor : "transparent"
             border.color: index === listRoot.selectedIndex ? listRoot.borderColor : "transparent"
             border.width: index === listRoot.selectedIndex ? 1 : 0

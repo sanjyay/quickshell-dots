@@ -20,9 +20,10 @@ PanelWindow {
     readonly property int barBottom: 35
     readonly property int gap: 8
     readonly property int panelWidth: 430
-    readonly property int rowHeight: 56
-    readonly property int rowSpacing: 4
-    readonly property int maxListHeight: 286
+    readonly property int rowHeight: root.menuRowHeight
+    readonly property int rowSpacing: root.menuRowSpacing
+    readonly property int maxVisibleRows: 6
+    readonly property int maxListHeight: maxVisibleRows * rowHeight + (maxVisibleRows - 1) * rowSpacing
     readonly property int currentListHeight: filteredApps.length > 0
         ? Math.min(maxListHeight, filteredApps.length * rowHeight + Math.max(0, filteredApps.length - 1) * rowSpacing)
         : 80
@@ -35,10 +36,11 @@ PanelWindow {
     property real reveal: root.appLauncherVisible ? 1 : 0
     readonly property string cachePath: Quickshell.env("HOME") + "/.cache/quickshell/app-launcher/apps.json"
     readonly property color launcherAccent: root.seal
-    readonly property color launcherAccentText: Qt.lighter(root.seal, 1.18)
-    readonly property color launcherSelectedText: Qt.lighter(root.indigo, 1.35)
-    readonly property color rowHighlight: Qt.rgba(1, 1, 1, 0.08)
-    readonly property color rowHighlightStrong: Qt.rgba(1, 1, 1, 0.12)
+    readonly property color launcherAccentText: root.seal
+    readonly property color launcherSelectedText: root.ink
+    readonly property color rowHighlight: root.fillHover
+    readonly property color rowHighlightStrong: root.seal
+    readonly property color launcherSurface: Qt.rgba(root.paper.r, root.paper.g, root.paper.b, 1)
 
     readonly property var filteredApps: {
         var q = query.trim().toLowerCase()
@@ -280,7 +282,7 @@ PanelWindow {
         width: appPanel.panelWidth
         height: appPanel.panelHeight
         radius: appPanel.reveal > 0.001 ? root.pillRadius : 0
-        color: root.bg
+        color: appPanel.launcherSurface
         border.color: root.pillBorder
         border.width: root.pillBorderW
         PillShadow { theme: root }
@@ -312,15 +314,15 @@ PanelWindow {
         Column {
             anchors.fill: parent
             anchors.margins: 14
-            spacing: 10
+            spacing: root.menuRowSpacing + 7
 
             Rectangle {
                 width: parent.width
                 height: 38
-                radius: root.tileRadius
-                color: root.fillIdle
-                border.color: searchField.activeFocus ? appPanel.launcherAccent : root.sep
-                border.width: 1
+                radius: root.menuRowRadius
+                color: appPanel.launcherSurface
+                border.color: appPanel.launcherAccent
+                border.width: root.pillBorderW
                 Behavior on border.color { ColorAnimation { duration: 120 } }
 
                 UiText {
@@ -330,7 +332,7 @@ PanelWindow {
                     text: ""
                     color: appPanel.launcherAccentText
                     font.family: root.mono
-                    font.pixelSize: 13
+                    font.pixelSize: root.menuFontSize
                 }
 
                 TextInput {
@@ -345,7 +347,8 @@ PanelWindow {
                     selectionColor: appPanel.rowHighlight
                     selectedTextColor: root.ink
                     font.family: root.mono
-                    font.pixelSize: 13
+                    font.pixelSize: root.menuFontSize
+                    font.weight: root.menuFontWeight
                     clip: true
                     onTextChanged: {
                         appPanel.query = text
@@ -375,7 +378,8 @@ PanelWindow {
                     text: "Search apps"
                     color: root.sumi
                     font.family: root.mono
-                    font.pixelSize: 13
+                    font.pixelSize: root.menuFontSize
+                    font.weight: root.menuFontWeight
                 }
             }
 
@@ -404,27 +408,26 @@ PanelWindow {
 
                     Rectangle {
                         anchors.fill: parent
-                        anchors.leftMargin: 2
-                        anchors.rightMargin: 2
-                        radius: 12
+                        radius: root.menuRowRadius
                         color: row.active ? appPanel.rowHighlight : "transparent"
                         border.color: row.active ? appPanel.rowHighlightStrong : "transparent"
-                        border.width: 1
+                        border.width: row.active ? root.pillBorderW : 0
                         Behavior on color { ColorAnimation { duration: 100 } }
                         Behavior on border.color { ColorAnimation { duration: 100 } }
                     }
 
                     UiText {
                         anchors.left: parent.left
-                        anchors.leftMargin: 22
+                        anchors.leftMargin: 42
                         anchors.right: parent.right
-                        anchors.rightMargin: 22
+                        anchors.rightMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
                         text: row.modelData.name
                         color: row.active ? appPanel.launcherSelectedText : appPanel.launcherAccentText
                         elide: Text.ElideRight
                         font.family: root.mono
-                        font.pixelSize: 13
+                        font.pixelSize: root.menuFontSize
+                        font.weight: root.menuFontWeight
                         Behavior on color { ColorAnimation { duration: 100 } }
                     }
 

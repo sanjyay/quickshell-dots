@@ -25,9 +25,19 @@ PanelWindow {
     property string statusText: ""
     property string pendingAction: ""
     readonly property bool inputDebug: Quickshell.env("QS_MENU_INPUT_DEBUG") === "1"
-    readonly property int menuRowHeight: 42
-    readonly property int menuListHeight: Math.min(480, Math.max(menuRowHeight,
-        rows().length * menuRowHeight + Math.max(0, rows().length - 1) * 3))
+    readonly property bool nestedMenu: activeMenu !== "root"
+    readonly property int menuRowHeight: nestedMenu ? 36 : root.menuRowHeight
+    readonly property int menuRowSpacing: nestedMenu ? 2 : root.menuRowSpacing
+    readonly property int menuListNaturalHeight: Math.max(menuRowHeight,
+        rows().length * menuRowHeight + Math.max(0, rows().length - 1) * menuRowSpacing)
+    // The nested header, separator, breadcrumb, Column spacing, and card margins.
+    // Keep this explicit so the card never clips the last row when it grows.
+    readonly property int nestedMenuChromeHeight: menuStack.length > 0 ? 88 : 69
+    readonly property int menuTopInset: root.barPosition === "top" ? 43 : 8
+    readonly property int menuBottomInset: root.barPosition === "bottom" ? 43 : 8
+    readonly property int menuAvailableHeight: Math.max(1, height - menuTopInset - menuBottomInset)
+    readonly property int menuListHeight: Math.min(menuListNaturalHeight,
+        Math.max(menuRowHeight, menuAvailableHeight - (nestedMenu ? nestedMenuChromeHeight : 28)))
     property real reveal: root.menuVisible ? 1 : 0
 
     visible: reveal > 0.001
@@ -55,6 +65,12 @@ PanelWindow {
 
     function rows() {
         return MenuModel.children(activeMenu)
+    }
+
+    function cardY(cardHeight) {
+        var centered = (height - cardHeight) / 2
+        return Math.round(Math.max(menuTopInset,
+            Math.min(height - menuBottomInset - cardHeight, centered)))
     }
 
     function setSelection(index) {
@@ -126,8 +142,9 @@ PanelWindow {
         var before = selectedIndex
         var branch = "unhandled"
         if (event.key === Qt.Key_Escape) {
-            branch = "close"
-            closeMenu()
+            branch = menuStack.length > 0 ? "parentMenu" : "close"
+            if (menuStack.length > 0) goBack()
+            else closeMenu()
             event.accepted = true
         } else if (event.key === Qt.Key_Backspace) {
             branch = "backspace"
@@ -178,7 +195,7 @@ PanelWindow {
             branch = "childMenu"
             resetTypeAhead()
             var rightRow = selectedRow()
-            if (rightRow && rightRow.kind === "menu") activateRow(rightRow)
+            if (rightRow && rightRow.type === "submenu") activateRow(rightRow)
             event.accepted = true
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             branch = "activate"
@@ -197,18 +214,20 @@ PanelWindow {
 
     function activateRow(entry) {
         if (!entry) return
-        if (entry.kind === "menu") {
+        if (entry.type === "submenu") {
+            if (!entry.submenuId || typeof entry.submenuId !== "string") return
             menuStack = menuStack.concat([activeMenu])
-            activeMenu = entry.id
+            activeMenu = entry.submenuId
             resetTypeAhead()
             setSelection(0)
             focusTimer.restart()
             return
         }
 
-        if (!entry.action) return
+        var action = String(entry.actionId || "").trim()
+        if (!action) return
         root.menuVisible = false
-        actionProc.command = ["qs-menu-action", entry.action]
+        actionProc.command = ["qs-menu-action", action]
         actionProc.running = false
         actionProc.running = true
     }
@@ -273,11 +292,10 @@ PanelWindow {
     Rectangle {
         id: card
         width: Math.min(360, parent.width - 24)
-        height: Math.min(parent.height - 48,
-            28 + menuPanel.menuListHeight +
-            (menuPanel.activeMenu === "root" ? 8 : 24 + 1 + 16))
+        height: Math.min(menuPanel.menuAvailableHeight,
+            menuPanel.menuListHeight + (menuPanel.nestedMenu ? menuPanel.nestedMenuChromeHeight : 28))
         x: Math.round((parent.width - width) / 2)
-        y: Math.round((parent.height - height) / 2)
+        y: menuPanel.cardY(height)
         radius: root.pillRadius
         color: root.bg
         border.color: root.pillBorder
@@ -360,13 +378,16 @@ PanelWindow {
                 model: menuPanel.rows()
                 selectedIndex: 0
                 rowHeight: menuPanel.menuRowHeight
-                fontSize: 18
-                fontWeight: Font.DemiBold
+                rowSpacing: menuPanel.menuRowSpacing
+                fontSize: root.menuFontSize
+                fontWeight: root.menuFontWeight
+                rowRadius: root.menuRowRadius
                 textColor: root.ink
                 mutedColor: root.seal
                 accentColor: root.seal
                 selectedColor: root.fillHover
                 borderColor: root.seal
+                showScrollBar: menuPanel.menuListNaturalHeight > menuPanel.menuListHeight
                 onHovered: function(index) { menuPanel.setSelection(index) }
                 onActivated: function(index) {
                     menuPanel.activateRow(menuPanel.rows()[index])
