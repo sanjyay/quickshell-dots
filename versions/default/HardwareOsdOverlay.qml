@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "modules"
+import "IconMap.js" as IconMap
 
 PanelWindow {
     id: overlay
@@ -39,6 +40,10 @@ PanelWindow {
         readonly property real percentage: percentageEvent ? Math.max(0, Math.min(100, Number(root.osdValue))) : 0
         readonly property bool volumeEvent: root.osdKind === "volume"
         readonly property bool brightnessEvent: root.osdKind === "brightness"
+        readonly property bool cameraEvent: root.osdKind === "camera"
+        readonly property bool cameraEnabled: cameraEvent
+            && (root.osdDetail.toLowerCase().indexOf("enabled") >= 0
+                || ["on", "true"].indexOf(root.osdDetail.toLowerCase()) >= 0)
         readonly property bool muted: (volumeEvent || root.osdKind === "microphone") && root.osdDetail === "true"
         readonly property string semanticIcon: {
             if (root.osdIcon) return root.osdIcon
@@ -57,7 +62,8 @@ PanelWindow {
         visible: opacity > 0.001
         opacity: active ? 1 : 0
         scale: active ? 1 : 0.965
-        width: card.brightnessEvent ? overlay.brightnessWidth : Math.min(300, Math.max(190, row.implicitWidth + 30))
+        width: card.brightnessEvent ? overlay.brightnessWidth
+            : (card.cameraEvent ? 60 : Math.min(300, Math.max(190, row.implicitWidth + 30)))
         height: card.brightnessEvent ? overlay.brightnessHeight : 60
         x: Math.round((parent.width - width) / 2)
         y: overlay.osdY + (active ? 0 : -3)
@@ -76,14 +82,25 @@ PanelWindow {
             UiText {
                 id: osdIcon
                 anchors.verticalCenter: parent.verticalCenter
-                visible: !card.brightnessEvent
+                visible: !card.brightnessEvent && !card.cameraEvent
                 text: card.semanticIcon
                 color: card.muted ? root.sumi : root.seal
                 font.family: root.mono; font.pixelSize: 18
                 transformOrigin: Item.Center
             }
+            IconText {
+                id: cameraIcon
+                anchors.verticalCenter: parent.verticalCenter
+                visible: card.cameraEvent
+                text: IconMap.icon(card.cameraEnabled ? "videocam" : "videocam_off")
+                color: card.cameraEnabled ? root.seal : root.sumi
+                font.pixelSize: 27
+                transformOrigin: Item.Center
+                Behavior on color { ColorAnimation { duration: 150 } }
+            }
             Column {
                 anchors.verticalCenter: parent.verticalCenter
+                visible: !card.cameraEvent
                 spacing: 5
                 UiText {
                     visible: !card.percentageEvent
@@ -229,7 +246,7 @@ PanelWindow {
             UiText {
                 id: valueText
                 anchors.verticalCenter: parent.verticalCenter
-                visible: root.osdValue !== "" && !card.brightnessEvent
+                visible: root.osdValue !== "" && !card.brightnessEvent && !card.cameraEvent
                 text: card.percentageEvent ? Math.round(card.percentage) + "%" : root.osdValue
                 color: card.muted ? root.sumi : root.ink
                 font.family: root.mono; font.pixelSize: 12; font.weight: Font.Medium
@@ -248,11 +265,13 @@ PanelWindow {
             id: response
             ParallelAnimation {
                 NumberAnimation { target: osdIcon; property: "scale"; to: 1.08; duration: 75; easing.type: Easing.OutCubic }
+                NumberAnimation { target: cameraIcon; property: "scale"; to: 1.10; duration: 75; easing.type: Easing.OutCubic }
                 NumberAnimation { target: valueText; property: "scale"; to: 1.045; duration: 75; easing.type: Easing.OutCubic }
                 NumberAnimation { target: brightnessValue; property: "scale"; to: 1.045; duration: 75; easing.type: Easing.OutCubic }
             }
             ParallelAnimation {
                 NumberAnimation { target: osdIcon; property: "scale"; to: 1; duration: 130; easing.type: Easing.OutCubic }
+                NumberAnimation { target: cameraIcon; property: "scale"; to: 1; duration: 130; easing.type: Easing.OutCubic }
                 NumberAnimation { target: valueText; property: "scale"; to: 1; duration: 130; easing.type: Easing.OutCubic }
                 NumberAnimation { target: brightnessValue; property: "scale"; to: 1; duration: 130; easing.type: Easing.OutCubic }
             }

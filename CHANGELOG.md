@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Changed edit-mode drag/drop from fixed-position swapping to insertion, so intervening widgets shift aside while the established left, centre, and right bar geometry remains stable.
+- Replaced camera hardware OSD labels with a compact camera/camera-off icon state indicator.
+- Made the installer create `bindings.conf` when needed and taught the uninstaller to remove the repo-managed Hyprland bindings and helper scripts again.
+
 ## 2026-07-17
 
 ### Tailscale Widget

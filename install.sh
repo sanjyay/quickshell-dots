@@ -300,6 +300,7 @@ info "Verified installed bar matches source tree"
 
 # ── 4b. Hyprland Quickshell bindings ───────────────────────────
 if [[ -f "$src_repo/scripts/ensure-hypr-launcher-binding.sh" ]]; then
+  # The helper creates ~/.config/hypr/bindings.conf if it is missing and keeps the managed launcher lines in sync.
   bash "$src_repo/scripts/ensure-hypr-launcher-binding.sh" || warn "Hyprland Quickshell binding setup incomplete."
 fi
 

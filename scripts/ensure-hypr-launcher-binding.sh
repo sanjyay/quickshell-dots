@@ -3,11 +3,12 @@
 set -euo pipefail
 
 keybindings="${HYPR_BINDINGS_CONF:-${HYPR_KEYBINDINGS_CONF:-$HOME/.config/hypr/bindings.conf}}"
+launcher_toggle_line="bindd = SUPER SHIFT, SPACE, Toggle desktop provider, exec, bash -lc 'if [[ \"\$(qs-mode status)\" == quickshell ]]; then qs-mode omarchy; else qs-mode quickshell; fi'"
 managed_lines=(
   "unbind = SUPER, SPACE"
   "bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open"
   "unbind = SUPER SHIFT, SPACE"
-  "bindd = SUPER SHIFT, SPACE, Toggle desktop provider, exec, bash -lc 'if [[ \"$(qs-mode status)\" == quickshell ]]; then qs-mode omarchy; else qs-mode quickshell; fi'"
+  "$launcher_toggle_line"
 )
 legacy_lines=(
   "bindd = SUPER SHIFT, SPACE, Refresh Quickshell bar, exec, bash -lc 'qs -c bar kill; sleep 0.2; qs -n -d -c bar'"

@@ -30,7 +30,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 
 | Area | Highlights |
 |---|---|
-| Bar layout | unlock mode, drag/drop widget groups, persistent order, split groups, magnetic hover, top/bottom position |
+| Bar layout | unlock mode, insert/reorder widget groups by drag/drop, persistent order, split groups, magnetic hover, top/bottom position |
 | Control center | quick actions, widget toggles, notification visibility, workspace modes, bar style, and split controls |
 | Pickers | theme, wallpaper, screenshot, and video pickers with Tanzaku, Hearthstone, and Carousel styles |
 | Core widgets | workspaces, playback-aware volume, System info (CPU/GPU/RAM), battery, power profile, network, optional Tailscale status, Bluetooth, weather, MPRIS, tray, notifications |
@@ -64,7 +64,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Bar style | border, shadow, frost, pill radius, top/bottom position |
 | Split groups | positional pill splits + Stream, Surge, Bolt, Bolt 2 gap animations |
 | Magnetic hover | subtle pointer-only pill scale and neighbor pull animation without layout reflow |
-| Hardware OSD | non-interactive upper-centred volume, brightness, media, lock, radio, profile, camera, and display-state feedback |
+| Hardware OSD | non-interactive upper-centred volume, brightness, media, lock, radio, profile, icon-only camera state, and display-state feedback |
 | Keybind IPC | `qs -c bar ipc call themeSwitcher toggle` plus wallpaper/media picker IPC |
 | Super menu | Quickshell-rendered Omarchy actions, nested sections, type-ahead, keyboard navigation, and no Walker submenu handoff |
 | Per-widget panels | click widget to open its popup |
@@ -175,6 +175,8 @@ bind = SUPER CTRL SHIFT, SPACE, exec, qs -c bar ipc call themeSwitcher toggle
 unbind = SUPER CTRL, SPACE
 bindd = SUPER CTRL, SPACE, Quickshell wallpaper switcher, exec, qs -c bar ipc call -- wallpaperSwitcher toggle
 ```
+
+`install.sh` creates `bindings.conf` if it does not already exist, and `uninstall.sh` removes the Quickshell-managed entries again.
 
 Then run:
 

@@ -123,8 +123,8 @@ PanelWindow {
     property Item dragItem: null           // slot content mirrored by the ghost
     property var  srcModel: null           // source region model + index
     property int  srcIndex: -1
-    property var  dropModel: null          // current drop-target model + index
-    property int  dropIndex: -1
+    property var  dropModel: null          // current insertion region + boundary index
+    property int  dropIndex: -1            // 0..dropModel.count (between widgets)
     property real ghostW: 0
     property real ghostH: 0
     property real ghostHomeX: 0
@@ -136,38 +136,64 @@ PanelWindow {
         ghostX = hx; ghostY = hy; srcModel = sm; srcIndex = si
         dropModel = null; dropIndex = -1; dragActive = true; dragging = true
     }
-    // which slot (model+index) is under a window-point?
-    function slotAt(wx, wy) {
+    // Which insertion boundary is under a window-point? Each widget is split at
+    // its horizontal midpoint: the left half inserts before it, the right half
+    // after it. This makes the space between neighbours a real destination
+    // instead of treating the neighbour as a replacement slot.
+    function insertionAt(wx, wy) {
         var rows = [leftRowItem, centerRowItem, rightRowItem]
         for (var r = 0; r < rows.length; r++) {
             var rep = rows[r].rep
+            var first = null, last = null
             for (var k = 0; k < rep.count; k++) {
                 var it = rep.itemAt(k)
                 if (!it || !it.visible) continue
                 var p = it.mapToItem(null, 0, 0)
-                if (wx >= p.x && wx <= p.x + it.width && wy >= p.y && wy <= p.y + it.height)
+                if (!first) first = { p: p, item: it }
+                last = { p: p, item: it }
+                if (wy >= p.y && wy <= p.y + it.height && wx < p.x + it.width / 2)
                     return { model: rows[r].rmodel, index: k }
             }
+            // Include the inter-widget gaps and the trailing half of the final
+            // widget in the row's last insertion boundary.
+            if (first && wy >= first.p.y && wy <= first.p.y + first.item.height
+                    && wx >= first.p.x && wx <= last.p.x + last.item.width)
+                return { model: rows[r].rmodel, index: rows[r].rmodel.count }
         }
         return null
     }
+    function modelOffset(model) {
+        if (model === centerModel) return leftModel.count
+        if (model === rightModel) return leftModel.count + centerModel.count
+        return 0
+    }
     function moveDrag(wx, wy) {
         ghostX = wx - ghostW / 2; ghostY = wy - ghostH / 2
-        var hit = slotAt(wx, wy)
+        var hit = insertionAt(wx, wy)
         dropModel = hit ? hit.model : null
         dropIndex = hit ? hit.index : -1
     }
     function endDrag() {
         dragActive = false
-        var swapped = false
-        if (dropModel && dropIndex >= 0 && !(dropModel === srcModel && dropIndex === srcIndex)) {
-            var sg = srcModel.get(srcIndex).gid, tg = dropModel.get(dropIndex).gid
-            srcModel.setProperty(srcIndex, "gid", tg)
-            dropModel.setProperty(dropIndex, "gid", sg)
-            swapped = true
+        var inserted = false
+        if (dropModel && dropIndex >= 0) {
+            var sourceIndex = modelOffset(srcModel) + srcIndex
+            var targetIndex = modelOffset(dropModel) + dropIndex
+            // Removing an earlier item shifts every later boundary left once.
+            if (sourceIndex < targetIndex) targetIndex--
+            if (targetIndex !== sourceIndex) {
+                var ordered = gidsOf(leftModel).concat(gidsOf(centerModel), gidsOf(rightModel))
+                var moved = ordered.splice(sourceIndex, 1)[0]
+                ordered.splice(targetIndex, 0, moved)
+                var leftCount = leftModel.count, centerCount = centerModel.count
+                applyTo(leftModel, ordered.slice(0, leftCount))
+                applyTo(centerModel, ordered.slice(leftCount, leftCount + centerCount))
+                applyTo(rightModel, ordered.slice(leftCount + centerCount))
+                inserted = true
+            }
         }
         dropModel = null; dropIndex = -1
-        if (swapped) { if (_orderLoaded) saveOrder(); dragging = false }   // content swapped in place + persist
+        if (inserted) { if (_orderLoaded) saveOrder(); dragging = false }
         else { ghostX = ghostHomeX; ghostY = ghostHomeY; snapTimer.restart() }   // snap back
     }
     Timer { id: snapTimer; interval: 240; onTriggered: barSlot.dragging = false }
@@ -187,8 +213,8 @@ PanelWindow {
         return gidsOf(leftModel).join(",") + "|" + gidsOf(centerModel).join(",") + "|" + gidsOf(rightModel).join(",")
     }
     function applyTo(m, gids) {
-        if (gids.length !== m.count) return                       // stale cache → keep default
-        for (var i = 0; i < m.count; i++) if (registry[gids[i]]) m.setProperty(i, "gid", gids[i])
+        if (gids.length !== m.count) return
+        for (var i = 0; i < gids.length; i++) m.setProperty(i, "gid", gids[i])
     }
     function applyOrder(str) {
         var parts = str.split("|")
@@ -199,11 +225,10 @@ PanelWindow {
         if (l.length === leftModel.count && c.length === centerModel.count
                 && r.length === rightModel.count - 1 && r.indexOf("G15") < 0)
             r.push("G15")
-        // F12: only apply a cache that is a valid permutation of all registry ids (correct region
-        // sizes, every id known, no duplicate, none missing) — a corrupt cache would otherwise
+        // Only apply a cache that is a valid permutation of all registry ids. A corrupt cache would otherwise
         // duplicate one widget and silently drop another. On reject, keep the default order.
-        if (l.length !== leftModel.count || c.length !== centerModel.count || r.length !== rightModel.count) return
         var all = l.concat(c, r), seen = {}
+        if (l.length !== leftModel.count || c.length !== centerModel.count || r.length !== rightModel.count) return
         for (var i = 0; i < all.length; i++) {
             if (!registry[all[i]] || seen[all[i]]) return
             seen[all[i]] = true
@@ -599,17 +624,24 @@ PanelWindow {
                     onReleased: barSlot.endDrag()
                     onCanceled: barSlot.cancelDrag()
                 }
-                // drop-target highlight (the group under the cursor, not the source)
+                // Insertion marker at the selected boundary. Unlike the old full
+                // slot highlight, this communicates that neighbours will shift.
                 Rectangle {
-                    anchors.fill: parent
-                    radius: barSlot.root.pillRadius
-                    color: Qt.rgba(barSlot.accent.r, barSlot.accent.g, barSlot.accent.b, 0.18)
-                    border.color: barSlot.accent
-                    border.width: 2
+                    width: 3
+                    height: parent.height - 6
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: barSlot.dropIndex === slot.index ? -4 : slot.width + 1
+                    radius: 2
+                    color: barSlot.accent
                     z: 26
                     visible: barSlot.dragging
-                        && barSlot.dropModel === rmodel && barSlot.dropIndex === slot.index
-                        && !(barSlot.srcModel === rmodel && barSlot.srcIndex === slot.index)
+                        && barSlot.dropModel === rmodel
+                        && (barSlot.dropIndex === slot.index
+                            || (slot.index === rmodel.count - 1 && barSlot.dropIndex === rmodel.count))
+                        && !(barSlot.srcModel === rmodel
+                            && (barSlot.dropIndex === barSlot.srcIndex
+                                || barSlot.dropIndex === barSlot.srcIndex + 1))
+                    Behavior on opacity { NumberAnimation { duration: 90 } }
                 }
                 // ── split toggle for the gap AFTER this slot (child of slot → tracks it) ──
                 Item {

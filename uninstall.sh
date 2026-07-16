@@ -30,6 +30,7 @@ pkill -f "quickshell -p $DEST" 2>/dev/null && info "Stopped the bar" || true
 # Covers the current OAuth backend and any older split cookie/calc install.
 unitdir="$HOME/.config/systemd/user"
 bindir="$HOME/.local/bin"
+launcher_toggle_binding="bindd = SUPER SHIFT, SPACE, Toggle desktop provider, exec, bash -lc 'if [[ \"\$(qs-mode status)\" == quickshell ]]; then qs-mode omarchy; else qs-mode quickshell; fi'"
 remove_hypr_quickshell_bindings() {
   local keybindings="${HYPR_BINDINGS_CONF:-${HYPR_KEYBINDINGS_CONF:-$HOME/.config/hypr/bindings.conf}}"
   [[ -f "$keybindings" ]] || return 0
@@ -64,6 +65,7 @@ remove_hypr_quickshell_bindings() {
       "unbind = SUPER, SPACE"|\
       "bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open"|\
       "unbind = SUPER SHIFT, SPACE"|\
+      "$launcher_toggle_binding"|\
       "bind = SUPER CTRL SHIFT, SPACE, exec, qs -c bar ipc call themeSwitcher toggle"|\
       "unbind = SUPER CTRL, SPACE"|\
       "bindd = SUPER CTRL, SPACE, Quickshell wallpaper switcher, exec, qs -c bar ipc call -- wallpaperSwitcher toggle"|\
@@ -80,7 +82,11 @@ remove_hypr_quickshell_bindings() {
   done < "$keybindings"
 
   if [[ "$removed" -eq 1 ]]; then
-    mv "$tmp" "$keybindings"
+    if grep -q '[^[:space:]]' "$tmp"; then
+      mv "$tmp" "$keybindings"
+    else
+      rm -f "$tmp" "$keybindings"
+    fi
     info "Removed Hyprland Quickshell bindings"
   else
     rm -f "$tmp"
@@ -142,7 +148,11 @@ if compgen -G "$unitdir/qs-shell-update-check.*" >/dev/null 2>&1 || [[ -e "$qsbi
   systemctl --user disable --now qs-shell-update-check.timer >/dev/null 2>&1 || true
   systemctl --user stop qs-shell-update-check.service >/dev/null 2>&1 || true
   rm -f "$unitdir"/qs-shell-update-check.service "$unitdir"/qs-shell-update-check.timer
-  rm -f "$qsbindir"/qs-shell-check-update.sh "$qsbindir"/qs-shell-apply-update.sh
+  rm -f "$qsbindir"/qs-package-update-state.sh \
+        "$qsbindir"/qs-shell-check-update.sh \
+        "$qsbindir"/qs-shell-apply-update.sh \
+        "$qsbindir"/qs-shell-refresh-local.sh \
+        "$qsbindir"/ensure-hypr-launcher-binding.sh
   rm -rf "$HOME/.cache/qs-shell" "$HOME/.local/share/quickshell-dots" \
          "${XDG_STATE_HOME:-$HOME/.local/state}/qs-shell"
   systemctl --user daemon-reload >/dev/null 2>&1 || true
