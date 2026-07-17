@@ -10,8 +10,17 @@ Item {
     required property var   theme
     required property Item  layout   // island: exposes pillRuns, runRightEdge(), runLeftEdge()
     property bool active: false
-    property int  mode:   1          // 1=stream, 2=surge, 3=bolt, 4=bolt2, 5=stream2, 6=surge2, 7=reactor, 8=quotes
+    property int  mode:   0          // 0=off; current named modes are 20..32
     property string monitor: ""      // this bar's output (for monitor-focus pulses)
+
+    readonly property bool namedMode: mode >= 20 && mode <= 32
+    readonly property bool wantsAudio: (mode === 21 || mode === 32) && theme.mprisPlaying
+    property var audioBands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    property var eventPulses: []
+    property int lastWorkspace: -1
+    property point hoverPoint: Qt.point(-1, -1)
+    property double lastHoverPulseAt: 0
+    property real lastHoverPulseX: -100
 
     opacity: active ? 1.0 : 0.0
     Behavior on opacity { NumberAnimation { duration: 500; easing.type: Easing.InOutCubic } }
@@ -63,6 +72,78 @@ Item {
             canvas.quoteSwarm = null
         }
         canvas.requestPaint()
+    }
+
+    function addNamedPulse(kind, x) {
+        if (!namedMode) return
+        var next = []
+        var now = Date.now()
+        for (var i = 0; i < eventPulses.length; i++)
+            if (now - eventPulses[i].t < 1800) next.push(eventPulses[i])
+        next.push({ t: now, kind: kind, x: x === undefined ? 0.5 : x })
+        if (next.length > 8) next.shift()
+        eventPulses = next
+        canvas.requestPaint()
+    }
+
+    readonly property string namedNetworkMode: theme.networkMode || "none"
+    onNamedNetworkModeChanged: addNamedPulse("network", 0.75)
+    readonly property bool namedMediaPlaying: theme.mprisPlaying === true
+    onNamedMediaPlayingChanged: addNamedPulse("media", 0.62)
+    readonly property string namedNotification: theme.notifLatestSummary || ""
+    onNamedNotificationChanged: if (namedNotification !== "") addNamedPulse("notification", 0.28)
+
+    Connections {
+        target: Hyprland
+        function onFocusedWorkspaceChanged() {
+            var ws = Hyprland.focusedWorkspace
+            var id = ws ? ws.id : -1
+            if (root.lastWorkspace >= 0 && id !== root.lastWorkspace)
+                root.addNamedPulse("workspace", id > root.lastWorkspace ? 0.0 : 1.0)
+            root.lastWorkspace = id
+        }
+    }
+
+    HoverHandler {
+        enabled: root.active && (root.mode === 29 || root.mode === 32)
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onPointChanged: {
+            root.hoverPoint = point.position
+            var now = Date.now()
+            if (now - root.lastHoverPulseAt >= 140 && Math.abs(point.position.x - root.lastHoverPulseX) >= 18) {
+                root.lastHoverPulseAt = now
+                root.lastHoverPulseX = point.position.x
+                root.addNamedPulse("hover", Math.max(0, Math.min(1, point.position.x / Math.max(1, root.width))))
+            }
+        }
+        onHoveredChanged: if (!hovered) root.hoverPoint = Qt.point(-1, -1)
+    }
+
+    Process {
+        id: gapCava
+        running: root.active && root.wantsAudio
+        command: ["bash", "-c",
+            "command -v cava >/dev/null 2>&1 || exit 0; " +
+            "sink=$(pactl get-default-sink 2>/dev/null); src=auto; " +
+            "[ -n \"$sink\" ] && src=\"${sink}.monitor\"; cfg=$(mktemp); " +
+            "printf '%s\\n' '[general]' 'bars = 12' 'framerate = 30' " +
+            "'[input]' 'method = pulse' \"source = $src\" " +
+            "'[output]' 'method = raw' 'raw_target = /dev/stdout' " +
+            "'data_format = ascii' 'ascii_max_range = 100' > \"$cfg\"; " +
+            "trap 'rm -f \"$cfg\"' EXIT; exec cava -p \"$cfg\""
+        ]
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(line) {
+                var raw = line.split(";")
+                var out = []
+                for (var i = 0; i < 12; i++) {
+                    var value = parseInt(raw[i])
+                    out.push(isNaN(value) ? 0 : Math.max(0, Math.min(1, value / 100)))
+                }
+                root.audioBands = out
+            }
+        }
     }
 
     onActiveChanged: {
@@ -674,7 +755,7 @@ Item {
         repeat: true
         running: root.active && ((root.mode === 7 && root.animating7)
                                  || (root.mode === 8 && root.animating8)
-                                 || (root.mode !== 7 && root.mode !== 8))
+                                 || (root.mode !== 7 && root.mode !== 8 && root.mode !== 0))
         onTriggered: canvas.requestPaint()
     }
 
@@ -709,6 +790,122 @@ Item {
             function hash(n) { var s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s) }
 
             var runs = root.layout.pillRuns
+
+            // Current named gap effects share this canvas, timing source, clipping
+            // and event queue. The Recommended mode composes the same primitives
+            // instead of creating parallel renderers.
+            if (root.namedMode) {
+                function linePath(x1, x2, amplitude, speed, phase, alpha, width) {
+                    ctx.beginPath()
+                    for (var x = x1; x <= x2 + 2; x += 3) {
+                        var y = cy + Math.sin(x * 0.055 + now * speed + phase) * amplitude
+                        if (x === x1) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+                    }
+                    ctx.globalAlpha = alpha; ctx.strokeStyle = seal; ctx.lineWidth = width
+                    ctx.lineCap = "round"; ctx.stroke()
+                }
+                function glowLine(x1, x2, alpha) {
+                    var gr = ctx.createLinearGradient(x1, 0, x2, 0)
+                    var drift = (Math.sin(now / 1800) + 1) / 2
+                    gr.addColorStop(0, rgba(0.02)); gr.addColorStop(drift, rgba(alpha)); gr.addColorStop(1, rgba(0.02))
+                    ctx.globalAlpha = 1; ctx.fillStyle = gr; ctx.fillRect(x1, cy - 3, x2 - x1, 6)
+                }
+                for (var ng = 0; ng + 1 < runs.length; ng++) {
+                    var nx1 = root.layout.runRightEdge(runs[ng].e)
+                    var nx2 = root.layout.runLeftEdge(runs[ng + 1].s)
+                    var nw = nx2 - nx1
+                    if (nw < 10 || !isFinite(nx1) || !isFinite(nx2)) continue
+                    ctx.save(); ctx.beginPath(); ctx.rect(nx1, 0, nw, height); ctx.clip()
+
+                    if (root.mode === 20) {
+                        linePath(nx1, nx2, Math.min(5, height * 0.18), 0.0032, ng, 0.72, 1.4)
+                    } else if (root.mode === 21) {
+                        var bands = root.audioBands
+                        ctx.beginPath()
+                        for (var ax = nx1; ax <= nx2; ax += 3) {
+                            var bi = Math.min(11, Math.floor((ax - nx1) / Math.max(1, nw) * 12))
+                            var av = root.wantsAudio ? bands[bi] : 0.08 + 0.05 * Math.sin(now / 400 + bi)
+                            var ay = cy + Math.sin((ax - nx1) * 0.12 + now / 110) * av * height * 0.30
+                            if (ax === nx1) ctx.moveTo(ax, ay); else ctx.lineTo(ax, ay)
+                        }
+                        ctx.globalAlpha = 0.8; ctx.strokeStyle = seal; ctx.lineWidth = 1.5; ctx.stroke()
+                    } else if (root.mode === 22) {
+                        var netRate = Math.max(0, (root.theme.networkDlRate || 0) + (root.theme.networkUlRate || 0))
+                        var netEnergy = Math.min(1, Math.log(1 + netRate / 32768) / 5)
+                        var np = ((now / (1900 - netEnergy * 850)) + ng * 0.27) % 1
+                        var nr = 2 + np * Math.min(20, nw * 0.35)
+                        ctx.globalAlpha = (0.24 + netEnergy * 0.38) * (1 - np); ctx.strokeStyle = seal; ctx.lineWidth = 1.3
+                        ctx.beginPath(); ctx.arc((nx1 + nx2) / 2, cy, nr, 0, Math.PI * 2); ctx.stroke()
+                    } else if (root.mode === 23) {
+                        var breath = 0.12 + 0.22 * (0.5 + 0.5 * Math.sin(now / 950))
+                        ctx.globalAlpha = breath; ctx.fillStyle = seal; ctx.fillRect(nx1, cy - 2.5, nw, 5)
+                    } else if (root.mode === 24) {
+                        for (var pd = 0; pd < Math.min(18, Math.ceil(nw / 22)); pd++) {
+                            var px = nx1 + ((now * 0.045 + pd * 31 + ng * 17) % nw)
+                            var py = cy + Math.sin(pd * 2.1 + now / 500) * 3
+                            ctx.globalAlpha = 0.3 + (pd % 3) * 0.18; ctx.fillStyle = seal
+                            ctx.beginPath(); ctx.arc(px, py, 1 + (pd % 2), 0, Math.PI * 2); ctx.fill()
+                        }
+                    } else if (root.mode === 25) {
+                        var cp = ((now / 2400) + ng * 0.18) % 1
+                        var ch = nx1 + cp * nw
+                        var cg = ctx.createLinearGradient(Math.max(nx1, ch - 36), 0, ch, 0)
+                        cg.addColorStop(0, rgba(0)); cg.addColorStop(1, rgba(0.75))
+                        ctx.globalAlpha = 1; ctx.strokeStyle = cg; ctx.lineWidth = 2
+                        ctx.beginPath(); ctx.moveTo(Math.max(nx1, ch - 36), cy); ctx.lineTo(ch, cy); ctx.stroke()
+                        ctx.fillStyle = "#ffffff"; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.arc(ch, cy, 1.5, 0, Math.PI * 2); ctx.fill()
+                    } else if (root.mode === 26) {
+                        var ep = (now / 2600 + ng * 0.31) % 1
+                        linePath(nx1, nx2, 1.2 + ep * 4, 0.004, ng, 0.25 + ep * 0.35, 1)
+                        if (ep > 0.86) {
+                            ctx.beginPath(); ctx.moveTo(nx1, cy)
+                            for (var ex = nx1 + 7; ex < nx2; ex += 7)
+                                ctx.lineTo(ex, cy + (hash(Math.floor(now / 90) + ex) - 0.5) * 8)
+                            ctx.lineTo(nx2, cy); ctx.globalAlpha = (1 - ep) / 0.14
+                            ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1; ctx.stroke()
+                        }
+                    } else if (root.mode === 27) {
+                        glowLine(nx1, nx2, 0.36)
+                    } else if (root.mode === 28) {
+                        var tp = ((now / 2100) + ng * 0.13) % 1
+                        var tx = nx1 + tp * nw
+                        ctx.globalAlpha = 0.22; ctx.strokeStyle = seal; ctx.lineWidth = 1
+                        ctx.beginPath(); ctx.moveTo(nx1, cy); ctx.lineTo(nx2, cy); ctx.stroke()
+                        ctx.globalAlpha = 0.75; ctx.fillStyle = seal; ctx.beginPath(); ctx.arc(tx, cy, 2.5, 0, Math.PI * 2); ctx.fill()
+                    } else if (root.mode === 29) {
+                        var idle = 0.5 + 0.5 * Math.sin(now / 1200 + ng)
+                        linePath(nx1, nx2, 1.2 + idle * 1.8, 0.0015, ng, 0.22 + idle * 0.18, 1)
+                    } else if (root.mode === 30) {
+                        var sec = new Date(now).getSeconds() + new Date(now).getMilliseconds() / 1000
+                        linePath(nx1, nx2, 3.2, 0, sec / 60 * Math.PI * 2 + ng, 0.62, 1.2)
+                    } else if (root.mode === 31) {
+                        ctx.globalAlpha = 0.14; ctx.strokeStyle = seal; ctx.lineWidth = 1
+                        ctx.beginPath(); ctx.moveTo(nx1, cy); ctx.lineTo(nx2, cy); ctx.stroke()
+                    } else if (root.mode === 32) {
+                        glowLine(nx1, nx2, 0.18)
+                        var comboAmp = root.wantsAudio ? 1.5 + root.audioBands[(ng * 3) % 12] * 2.2 : 1.6
+                        linePath(nx1, nx2, comboAmp, 0.0015, ng, 0.42, 1.1)
+                    }
+
+                    if (root.mode === 28 || root.mode === 31 || root.mode === 32 || root.mode === 22 || root.mode === 29) {
+                        var alive = []
+                        for (var pi = 0; pi < root.eventPulses.length; pi++) {
+                            var pulse = root.eventPulses[pi]
+                            var age = (now - pulse.t) / 1800
+                            if (age >= 1) continue
+                            alive.push(pulse)
+                            var origin = width * pulse.x
+                            var radius = age * 85
+                            ctx.globalAlpha = 0.45 * (1 - age); ctx.strokeStyle = seal; ctx.lineWidth = 1.2
+                            ctx.beginPath(); ctx.arc(origin, cy, radius, 0, Math.PI * 2); ctx.stroke()
+                        }
+                        if (alive.length !== root.eventPulses.length) root.eventPulses = alive
+                    }
+                    ctx.restore()
+                }
+                ctx.globalAlpha = 1
+                return
+            }
 
             if (root.mode === 8) {
                 // Quotes: drifting dots periodically snap into a readable

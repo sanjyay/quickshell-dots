@@ -62,6 +62,8 @@ Item {
     Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
     // mirror the connection type for status text; it must not gate the toggle.
     Binding { target: rootMod.root; property: "networkMode"; value: rootMod.mode }
+    Binding { target: rootMod.root; property: "networkDlRate"; value: rootMod.dlRate }
+    Binding { target: rootMod.root; property: "networkUlRate"; value: rootMod.ulRate }
     implicitHeight: 28
     width: implicitWidth
     height: implicitHeight

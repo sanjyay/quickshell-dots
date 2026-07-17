@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Updated the Codex usage parser and panel mapping so the bar follows the live account state instead of assuming a fixed 5h + weekly layout.
+
+- Added a persistent, single-select Gap Anim section with thirteen themed gap effects, an efficient recommended combination, and a no-animation option.
+
 - Changed edit-mode drag/drop from fixed-position swapping to insertion, so intervening widgets shift aside while the established left, centre, and right bar geometry remains stable.
 - Replaced camera hardware OSD labels with a compact camera/camera-off icon state indicator.
 - Made the installer create `bindings.conf` when needed and taught the uninstaller to remove the repo-managed Hyprland bindings and helper scripts again.

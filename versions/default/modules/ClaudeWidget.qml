@@ -41,6 +41,9 @@ Item {
     // ── Codex ──
     property bool cxActive: false
     readonly property bool   cxFresh:     root.aiCxFresh
+    readonly property string cxState:     root.aiCxState
+    readonly property bool   cxHas5h:     root.aiCxHas5h
+    readonly property bool   cxHasWeekly: root.aiCxHasWeekly
     readonly property int    cxPct5h:     root.aiCxPct5h
     readonly property int    cxPct7d:     root.aiCxPct7d    // weekly
     readonly property string cxPlan:      root.aiCxPlan
@@ -49,6 +52,8 @@ Item {
     readonly property int    cxReset5hTs: root.aiCxReset5hTs
     readonly property int    cxReset7dTs: root.aiCxReset7dTs
     readonly property bool   cxHas:       root.aiCxHas
+    readonly property bool   cxCreditsAvailable: root.aiCxCreditsAvailable
+    readonly property string cxCredits: root.aiCxCredits
 
     // ── OpenCode ──
     property bool ocActive: false
@@ -65,11 +70,11 @@ Item {
 
     // ── per-tool signal (active OR fresh non-zero usage) ──
     readonly property bool clSignal: clActive || (clPct5h > 0 && clFresh)
-    readonly property bool cxSignal: cxActive || (cxPct5h > 0 && cxFresh)
+    readonly property bool cxSignal: cxActive || ((cxHas5h ? cxPct5h : cxPct7d) > 0 && cxFresh)
     readonly property bool ocSignal: ocActive || ((ocPct5h > 0 || ocToday > 0) && ocFresh)
 
     // ── selected-tool display values ──
-    readonly property int  pct5h:   isOpenCode ? ocPct5h : (isCodex ? cxPct5h : clPct5h)
+    readonly property int  pct5h:   isOpenCode ? ocPct5h : (isCodex ? (cxHas5h ? cxPct5h : cxPct7d) : clPct5h)
     readonly property int  pct5hStep: Math.round(pct5h / 5) * 5
     readonly property int  pct5hRemaining: Math.max(0, 100 - pct5h)
     readonly property bool selFresh: isOpenCode ? ocFresh : (isCodex ? cxFresh : clFresh)
@@ -92,8 +97,10 @@ Item {
                 if (cxHas || cxActive) {
                     var cx5 = root.aiFmtReset(cxReset5hTs)
                     var cx7 = root.aiFmtReset(cxReset7dTs)
-                    lines.push("5h remaining: " + (100 - cxPct5h) + "%" + (cx5 ? "  resets in " + cx5 : ""))
-                    lines.push("weekly limit: " + cxPct7d + "%" + (cx7 ? "  resets in " + cx7 : ""))
+                    lines.push("state: " + cxState)
+                    if (cxHasWeekly) lines.push("weekly remaining: " + (100 - cxPct7d) + "%" + (cx7 ? "  resets in " + cx7 : ""))
+                    if (cxHas5h) lines.push("5h remaining: " + (100 - cxPct5h) + "%" + (cx5 ? "  resets in " + cx5 : ""))
+                    if (cxCreditsAvailable) lines.push("credits remaining: " + cxCredits)
                     if (cxTokens) lines.push(cxTokens + " tokens" + (cxRate ? "  · " + cxRate : ""))
             } else {
                 lines.push("no data yet - run codex or install the AI backend")
@@ -113,9 +120,10 @@ Item {
             if (lines.length) lines.push("")
             lines.push("OpenAI Codex" + (cxPlan ? "  (" + cxPlan + ")" : ""))
             var x5 = root.aiFmtReset(cxReset5hTs)
-            lines.push("5h: " + cxPct5h + "%" + (x5 ? "  (reset in " + x5 + ")" : ""))
+            if (cxHas5h) lines.push("5h remaining: " + (100 - cxPct5h) + "%" + (x5 ? "  (reset in " + x5 + ")" : ""))
             var x7 = root.aiFmtReset(cxReset7dTs)
-            lines.push("7d: " + cxPct7d + "%" + (x7 ? "  (reset in " + x7 + ")" : ""))
+            if (cxHasWeekly) lines.push("weekly remaining: " + (100 - cxPct7d) + "%" + (x7 ? "  (reset in " + x7 + ")" : ""))
+            if (cxCreditsAvailable) lines.push("credits remaining: " + cxCredits)
             if (cxTokens) lines.push(cxTokens + " tokens" + (cxRate ? "  · " + cxRate : ""))
         }
         if (ocHas || ocActive) {

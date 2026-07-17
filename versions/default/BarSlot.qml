@@ -847,7 +847,7 @@ PanelWindow {
             }
         }
 
-        // ── gap particle animation (flows in the split gaps when barAnim > 0) ──
+        // ── authoritative decorative renderer for the real split gaps ──
         ParticleStream {
             anchors.fill: parent
             z: 1                          // above the section pills, below the widgets

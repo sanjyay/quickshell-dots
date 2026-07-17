@@ -628,9 +628,14 @@ Item {
 
     property bool   aiCxHas: false
     property bool   aiCxFresh: false
+    property string aiCxState: "stale"
+    property bool   aiCxHas5h: false
+    property bool   aiCxHasWeekly: false
     property int    aiCxPct5h: 0
     property int    aiCxPct7d: 0
     property string aiCxPlan: ""
+    property bool   aiCxCreditsAvailable: false
+    property string aiCxCredits: ""
     property string aiCxTokens: ""
     property string aiCxRate: ""
     property int    aiCxReset5hTs: 0
@@ -663,6 +668,11 @@ Item {
         var h = Math.floor(mins / 60), m = mins % 60
         if (h < 24) return h + "h " + m + "m"
         var d = Math.floor(h / 24); return d + "d " + (h % 24) + "h"
+    }
+
+    function aiFmtResetAt(ts) {
+        if (!(ts > 0)) return ""
+        return new Date(ts * 1000).toLocaleString(Qt.locale(), "MMM d, yyyy h:mm AP")
     }
 
     Process {
@@ -709,13 +719,19 @@ Item {
                 var ageOk = mtime > 0 && (Date.now() / 1000 - mtime) < 900
                 try {
                     var d = JSON.parse((nl > 0 ? raw.substring(nl + 1) : "").trim())
-                    theme.aiCxHas = true
-                    theme.aiCxFresh = ageOk && d._source !== "stale"
+                    theme.aiCxHas5h = d["5h-available"] === true
+                    theme.aiCxHasWeekly = d["7d-available"] === true
+                    theme.aiCxCreditsAvailable = d["credits-available"] === true
+                    theme.aiCxHas = theme.aiCxHas5h || theme.aiCxHasWeekly || theme.aiCxCreditsAvailable
+                    theme.aiCxState = !ageOk || d._source === "stale" ? "stale"
+                        : (d._source === "rpc" ? "live" : "cached")
+                    theme.aiCxFresh = theme.aiCxState === "live"
                     theme.aiCxPct5h = theme.aiPct(d["5h-utilization"])
                     theme.aiCxPct7d = theme.aiPct(d["7d-utilization"])
                     theme.aiCxReset5hTs = parseInt(d["5h-reset"]) || 0
                     theme.aiCxReset7dTs = parseInt(d["7d-reset"]) || 0
                     theme.aiCxPlan = d._plan || ""
+                    theme.aiCxCredits = theme.aiCxCreditsAvailable ? String(d["credits-remaining"]) : ""
                     var cxUsed = (d["_tokens_used"] || 0), cxLim = (d["_window_limit"] || 0)
                     theme.aiCxTokens = cxUsed ? (cxUsed / 1e6).toFixed(2) + "M / " + (cxLim / 1e6).toFixed(1) + "M" : ""
                     var cxRateH = Math.round((d["_rate_per_hour"] || 0) / 1000)
@@ -723,8 +739,10 @@ Item {
                     theme.aiCxToday = parseInt(d._today_tokens) || 0
                 } catch (e) {
                     theme.aiCxHas = false; theme.aiCxFresh = false
+                    theme.aiCxState = "stale"; theme.aiCxHas5h = false; theme.aiCxHasWeekly = false
                     theme.aiCxPct5h = 0; theme.aiCxPct7d = 0
-                    theme.aiCxPlan = ""; theme.aiCxTokens = ""; theme.aiCxRate = ""; theme.aiCxToday = 0
+                    theme.aiCxPlan = ""; theme.aiCxCreditsAvailable = false; theme.aiCxCredits = ""
+                    theme.aiCxTokens = ""; theme.aiCxRate = ""; theme.aiCxToday = 0
                     theme.aiCxReset5hTs = 0; theme.aiCxReset7dTs = 0
                 }
             }
@@ -843,7 +861,9 @@ Item {
     property bool splitMon:    false
     property bool splitNet:    false
     property bool splitMprisL: false
-    property int barAnim: 0   // 0=off, 1=stream, 2=surge, 3=bolt, 4=bolt2, 5=stream2, 6=surge2, 7=reactor, 8=quotes
+    // Gap animation mode. 20..32 are the current named modes; 1..8 remain
+    // readable so older caches can be migrated without corrupting the file.
+    property int barAnim: 0
 
     // ── Bar layout / unlock (drag&drop reorder). barUnlocked is transient. ──
     property bool barUnlocked: false
@@ -903,7 +923,12 @@ Item {
                     theme.splitMon       = parts[1] === "1"
                     theme.splitMprisL    = parts[2] === "1"
                     theme.splitNet       = parts[3] === "1"
-                    var ba = parseInt(parts[4]); theme.barAnim = (ba >= 0 && ba <= 8) ? ba : 0
+                    var ba = parseInt(parts[4])
+                    // Preserve "off" and current named modes. Map the former
+                    // effects to their closest replacement on first load.
+                    var legacyGapModes = [0, 24, 25, 26, 26, 24, 25, 28, 27]
+                    if (ba >= 0 && ba <= 8) theme.barAnim = legacyGapModes[ba]
+                    else theme.barAnim = (ba >= 20 && ba <= 32) ? ba : 0
                     if (parts.length >= 6) {
                         var bc = parts[5]
                         if (bc === "1") theme.barColor = "red"
@@ -932,6 +957,8 @@ Item {
     property bool modVolume:     true
     property bool modNetwork:    true
     property string networkMode: "none"   // mirrored from NetworkWidget: wifi/ethernet/none
+    property real networkDlRate: 0        // existing NetworkWidget sample; reused by gap animation
+    property real networkUlRate: 0
     property bool omarchyUpdateAvail: false   // mirrored from UpdateWidget (6h poll)
     property bool notifSilenced: false        // mirrored from NotificationSilenceWidget (DND)
     property string notifLatestSummary: ""

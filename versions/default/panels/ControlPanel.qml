@@ -444,24 +444,36 @@ PanelWindow {
                 text: "GAP ANIM"
                 color: root.sumiHi; font.family: root.mono; font.pixelSize: 10; font.letterSpacing: 1
             }
-            Row {
+            Grid {
                 id: animRow
                 width: parent.width
+                columns: 1
+                rowSpacing: 4
                 spacing: 4
-                // every tile cycles base → "<label> 2" (alt mode) → off
                 readonly property var opts: [
-                    { label: "Stream", mode: 1, alt: 5 },
-                    { label: "Surge",  mode: 2, alt: 6 },
-                    { label: "Bolt",   mode: 3, alt: 4 }
+                    { label: "No gap animation", mode: 0 },
+                    { label: "Flowing sine wave", mode: 20 },
+                    { label: "Audio-reactive waveform", mode: 21 },
+                    { label: "Network pulse", mode: 22 },
+                    { label: "Breathing glow", mode: 23 },
+                    { label: "Particle stream", mode: 24 },
+                    { label: "Comet sweep", mode: 25 },
+                    { label: "Electric arc", mode: 26 },
+                    { label: "Gradient drift", mode: 27 },
+                    { label: "Widget energy transfer", mode: 28 },
+                    { label: "Idle ripple", mode: 29 },
+                    { label: "Clock-synchronized wave", mode: 30 },
+                    { label: "Workspace transition trail", mode: 31 },
+                    { label: "Recommended combo", mode: 32 }
                 ]
                 Repeater {
                     model: animRow.opts
                     delegate: Rectangle {
                         id: animTile
                         required property var modelData
-                        readonly property bool on:      root.barAnim === modelData.mode || root.barAnim === modelData.alt
+                        readonly property bool on:      root.barAnim === modelData.mode
                         readonly property bool hovered: animMa.containsMouse
-                        width: root.evenW((animRow.width - animRow.spacing * (animRow.opts.length - 1)) / animRow.opts.length)
+                        width: animRow.width
                         height: 25; radius: root.tileRadius
                         color: on ? root.fillActive : hovered ? root.fillHover : root.fillIdle
                         border.color: (on || hovered) ? root.seal : root.sep
@@ -469,10 +481,9 @@ PanelWindow {
                         Behavior on color { ColorAnimation { duration: 120 } }
                         UiText {
                             anchors.centerIn: parent
-                            text: root.barAnim === animTile.modelData.alt ? animTile.modelData.label + " 2"
-                                                                          : animTile.modelData.label
+                            text: animTile.modelData.label
                             color: (animTile.on || animTile.hovered) ? root.seal : root.ink
-                            font.family: root.mono; font.pixelSize: 11
+                            font.family: root.mono; font.pixelSize: 10
                             font.weight: animTile.on ? Font.Medium : Font.Normal
                         }
                         MouseArea {
@@ -480,22 +491,10 @@ PanelWindow {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                var n = root.barAnim                           // base → alt → off
-                                root.barAnim = (n === animTile.modelData.mode ? animTile.modelData.alt
-                                              : n === animTile.modelData.alt  ? 0
-                                              : animTile.modelData.mode)
-                            }
+                            onClicked: root.barAnim = animTile.modelData.mode
                         }
                     }
                 }
-            }
-            Tile {
-                width: parent.width
-                // Separate event-reactor mode; not part of the Surge 1→2 cycle.
-                label: "Reactor"
-                active: root.barAnim === 7
-                onActivated: root.barAnim = root.barAnim === 7 ? 0 : 7
             }
         }
     }

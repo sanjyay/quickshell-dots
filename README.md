@@ -62,8 +62,16 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Control center | quick toggles, power, Bar Functions fly-out |
 | Notification visibility | independent notification bell toggle inside the status group |
 | Bar style | border, shadow, frost, pill radius, top/bottom position |
-| Split groups | positional pill splits + Stream, Surge, Bolt, Bolt 2 gap animations |
+| Split groups | positional pill splits + 13 selectable gap animations and a fully disabled mode |
 | Magnetic hover | subtle pointer-only pill scale and neighbor pull animation without layout reflow |
+
+Gap effects are selected from Control Panel → Splits → Gap Anim. The
+selection is exclusive and persists across bar restarts and theme changes;
+choose **No gap animation** to stop decorative gap rendering completely.
+Available effects are Flowing sine wave, Audio-reactive waveform, Network
+pulse, Breathing glow, Particle stream, Comet sweep, Electric arc, Gradient
+drift, Widget energy transfer, Idle ripple, Clock-synchronized wave, Workspace
+transition trail, and Recommended combo.
 | Hardware OSD | non-interactive upper-centred volume, brightness, media, lock, radio, profile, icon-only camera state, and display-state feedback |
 | Keybind IPC | `qs -c bar ipc call themeSwitcher toggle` plus wallpaper/media picker IPC |
 | Super menu | Quickshell-rendered Omarchy actions, nested sections, type-ahead, keyboard navigation, and no Walker submenu handoff |
@@ -132,7 +140,7 @@ Common actions:
 - The app launcher displays cached applications immediately from `~/.cache/quickshell/app-launcher/apps.json`, silently refreshes the cache in the background, and uses the same visual density and selection styling as the Super menu.
 - Media and volume pills stay out of the bar until a real MPRIS player is playing. If you pause media by clicking the Now Playing widget, that player stays available in the bar and media panel until you resume it or the player disappears.
 - The capture panel supports keyboard navigation, including the screen-recording audio choices, with `Up`, `Down`, `Enter`, and `Esc`.
-- The AI pill shows remaining 5h Codex allowance in the bar when manually enabled or when Codex is active. Click it to open the usage panel, which shows the weekly Codex window and other AI providers.
+- The AI pill follows the live Codex account state: it shows the weekly Codex window when available, skips unavailable short-window data, and opens the usage panel for the full account breakdown and other AI providers.
 
 <details>
 <summary>Click bindings</summary>

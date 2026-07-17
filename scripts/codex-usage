@@ -4,8 +4,8 @@ OpenAI Codex quota for the Quickshell bar widget.
 
 Mirrors ~/.local/bin/claude-usage: queries the authoritative rate limits the
 Codex CLI itself exposes via its local app-server JSON-RPC (account/rateLimits/
-read) — no browser, no scraping, 0 tokens. The primary window is the 5h limit,
-the secondary the weekly (7d) limit, exactly like Claude's 5h/7d model.
+read) — no browser, no scraping, 0 tokens. Windows are identified by their
+reported duration; primary/secondary ordering is not semantically stable.
 
 Writes ~/.cache/codex-usage.json in the format the widget reads. If the RPC is
 unavailable it falls back to the last rate_limits snapshot recorded in the most
@@ -93,8 +93,8 @@ def fetch_rpc() -> dict | None:
         proc.stdin.flush()
         account = (rpc_request(proc, 2, "account/read", timeout=5)
                    .get("result") or {}).get("account") or {}
-        limits = (rpc_request(proc, 3, "account/rateLimits/read", timeout=5)
-                  .get("result") or {}).get("rateLimits") or {}
+        result = rpc_request(proc, 3, "account/rateLimits/read", timeout=5).get("result") or {}
+        limits = result.get("rateLimits") or {}
     except Exception as e:
         sys.stderr.write(f"rpc error: {e}\n")
         return None
@@ -115,6 +115,7 @@ def fetch_rpc() -> dict | None:
         "primary": primary,
         "secondary": secondary,
         "plan": limits.get("planType") or account.get("planType") or account.get("type") or "",
+        "credits": limits.get("credits"),
         "source": "rpc",
     }
 
@@ -169,6 +170,7 @@ def fetch_rollout() -> dict | None:
         "primary": conv(last.get("primary")),
         "secondary": conv(last.get("secondary")),
         "plan": last.get("plan_type") or "",
+        "credits": last.get("credits"),
         "source": "rollout",
     }
 
@@ -235,6 +237,34 @@ def reset_epoch(window) -> int:
         return 0
 
 
+def window_minutes(window) -> int:
+    try:
+        return int(window.get("windowDurationMins") or 0)
+    except Exception:
+        return 0
+
+
+def normalize_windows(data: dict) -> tuple[dict | None, dict | None]:
+    """Return (5-hour, weekly) by duration, never by primary/secondary position."""
+    short = weekly = None
+    for window in (data.get("primary"), data.get("secondary")):
+        if not isinstance(window, dict) or window.get("usedPercent") is None:
+            continue
+        duration = window_minutes(window)
+        if duration == 300:
+            short = window
+        elif duration == 10080:
+            weekly = window
+    return short, weekly
+
+
+def credit_balance(credits) -> tuple[bool, str]:
+    """Preserve an explicitly reported zero; absence remains unavailable."""
+    if not isinstance(credits, dict) or credits.get("balance") is None:
+        return False, ""
+    return True, str(credits.get("balance"))
+
+
 def main():
     data = fetch_rpc() or fetch_rollout()
 
@@ -249,32 +279,39 @@ def main():
                 pass
         return
 
-    primary = data["primary"] or {}
-    secondary = data["secondary"] or {}
-    util5h = (float(primary.get("usedPercent") or 0)) / 100.0
-    util7d = (float(secondary.get("usedPercent") or 0)) / 100.0
+    short, weekly = normalize_windows(data)
+    util5h = (float(short.get("usedPercent") or 0) / 100.0) if short else 0.0
+    util7d = (float(weekly.get("usedPercent") or 0) / 100.0) if weekly else 0.0
 
     # local token breakdown for the 5h window (same approach as claude-usage):
     # count the window's tokens and derive the limit from the server's %.
-    reset5h = reset_epoch(primary)
+    reset5h = reset_epoch(short or {})
     window_start = (reset5h - 5 * 3600) if reset5h else (time.time() - 5 * 3600)
-    win_tok, recent_tok, today_tok = scan_tokens(window_start)
+    win_tok, recent_tok, today_tok = scan_tokens(window_start) if short else (0, 0, 0)
     limit = int(win_tok / util5h) if (util5h > 0 and win_tok) else 0
+    status_util = util5h if short else util7d
 
+    credits_available, credits_remaining = credit_balance(data.get("credits"))
     out = {
+        "schema_version": 2,
         "5h-utilization": f"{util5h:.4f}",
         "5h-reset":       str(reset5h),
         "7d-utilization": f"{util7d:.4f}",
-        "7d-reset":       str(reset_epoch(secondary)),
+        "7d-reset":       str(reset_epoch(weekly or {})),
+        "5h-available":   short is not None,
+        "7d-available":   weekly is not None,
+        "credits-available": credits_available,
+        "credits-remaining": credits_remaining,
         "updated_at":     datetime.now().strftime("%H:%M:%S"),
+        "updated_at_epoch": int(time.time()),
         "_source":        data["source"],
         "_plan":          str(data.get("plan") or ""),
         "_tokens_used":   win_tok,
         "_window_limit":  limit,
         "_rate_per_hour": recent_tok,
         "_today_tokens":  today_tok,
-        "status": "rejected" if util5h >= 1.0
-                  else "allowed_warning" if util5h >= 0.9
+        "status": "rejected" if status_util >= 1.0
+                  else "allowed_warning" if status_util >= 0.9
                   else "allowed",
     }
     write_cache(out)

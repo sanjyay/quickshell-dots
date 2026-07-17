@@ -39,6 +39,11 @@ PanelWindow {
     readonly property int    cxReset5hTs: root.aiCxReset5hTs
     readonly property int    cxReset7dTs: root.aiCxReset7dTs
     readonly property string cxPlan:      root.aiCxPlan
+    readonly property string cxState:     root.aiCxState
+    readonly property bool   cxHas5h:     root.aiCxHas5h
+    readonly property bool   cxHasWeekly: root.aiCxHasWeekly
+    readonly property bool   cxCreditsAvailable: root.aiCxCreditsAvailable
+    readonly property string cxCredits:   root.aiCxCredits
     readonly property string cxTokens:    root.aiCxTokens
     readonly property string cxRate:      root.aiCxRate
     readonly property int    cxToday:     root.aiCxToday
@@ -332,8 +337,8 @@ PanelWindow {
                     }
                     UiText {
                         anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        text: aiPanel.cxFresh ? "live" : "stale"
-                        color: aiPanel.cxFresh ? root.sumi : root.sealRaw
+                        text: aiPanel.cxState
+                        color: aiPanel.cxState === "live" ? root.sumi : root.sealRaw
                         font.family: root.mono; font.pixelSize: 10
                     }
                 }
@@ -343,10 +348,11 @@ PanelWindow {
                     text: "no data — run codex"
                     color: root.sumiHi; font.family: root.mono; font.pixelSize: 11
                 }
-                UsageRow { visible: aiPanel.showCodex && aiPanel.cxHas; label: "weekly"; pct: aiPanel.cxPct7d; dim: !aiPanel.cxFresh }
-                UsageRow { visible: aiPanel.showCodex && aiPanel.cxHas; label: "5h"; pct: aiPanel.cxPct5h; dim: !aiPanel.cxFresh }
-                DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas; k: "weekly resets in"; v: root.aiFmtReset(aiPanel.cxReset7dTs) || "—" }
-                DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas; k: "5h resets in"; v: root.aiFmtReset(aiPanel.cxReset5hTs) || "—" }
+                UsageRow { visible: aiPanel.showCodex && aiPanel.cxHasWeekly; label: "weekly remaining"; pct: 100 - aiPanel.cxPct7d; dim: aiPanel.cxState !== "live" }
+                UsageRow { visible: aiPanel.showCodex && aiPanel.cxHas5h; label: "5h remaining"; pct: 100 - aiPanel.cxPct5h; dim: aiPanel.cxState !== "live" }
+                DetailRow { visible: aiPanel.showCodex && aiPanel.cxHasWeekly; k: "weekly resets"; v: root.aiFmtResetAt(aiPanel.cxReset7dTs) || "—" }
+                DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas5h; k: "5h resets"; v: root.aiFmtResetAt(aiPanel.cxReset5hTs) || "—" }
+                DetailRow { visible: aiPanel.showCodex && aiPanel.cxCreditsAvailable; k: "Credits remaining"; v: aiPanel.cxCredits }
                 DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas && aiPanel.cxTokens !== ""; k: "Tokens"; v: aiPanel.cxTokens }
                 DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas && aiPanel.cxRate !== "";   k: "Rate"; v: aiPanel.cxRate }
                 DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas && aiPanel.cxToday > 0; k: "Today"; v: (aiPanel.cxToday / 1e6).toFixed(2) + "M tok" }
