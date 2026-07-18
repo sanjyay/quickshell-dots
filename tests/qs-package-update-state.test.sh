@@ -15,6 +15,16 @@ run() {
         QS_REBOOT_REQUIRED_FIXTURE="${3:-0}" QS_SNAPPER_TEST_MODE="${4:-unavailable}" \
         bash "$helper"
 }
+run_scheduled() {
+    HOME="$tmp/home" XDG_STATE_HOME="$tmp/state" QS_UPDATE_TEST_MODE=1 \
+        QS_UPDATE_SYSTEM_FIXTURE="$1" QS_UPDATE_AUR_FIXTURE="${2:-}" \
+        QS_REBOOT_REQUIRED_FIXTURE="${3:-0}" QS_SNAPPER_TEST_MODE="${4:-unavailable}" \
+        bash "$helper" --scheduled 2026-07-17
+}
+ack() {
+    HOME="$tmp/home" XDG_STATE_HOME="$tmp/state" QS_UPDATE_TEST_MODE=1 \
+        bash "$helper" --ack-notification "$1"
+}
 
 mkdir -p "$tmp/home" "$tmp/fixtures"
 printf 'linux 6.9 -> 6.10\n' > "$tmp/fixtures/one"
@@ -22,14 +32,19 @@ printf 'linux 6.9 -> 6.10\nmesa 24.1 -> 24.2\n' > "$tmp/fixtures/two"
 : > "$tmp/fixtures/empty"
 printf 'bad;name 1 -> 2\n' > "$tmp/fixtures/injected"
 
-first="$(run "$tmp/fixtures/one")"
+manual="$(run "$tmp/fixtures/one")"
+expect "$manual" '|1|1|0|0||'
+
+first="$(run_scheduled "$tmp/fixtures/one")"
 expect "$first" 'META|pending|'
 expect "$first" '|1|1|0|1|'
 expect "$first" 'U|S|linux|6.9|6.10'
 first_key="$(printf '%s\n' "$first" | sed -n 's/^META|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|\([^|]*\).*/\1/p')"
 [[ -n "$first_key" ]] || fail 'first pending state did not emit a notification key'
 
-duplicate="$(run "$tmp/fixtures/one")"
+ack "$first_key"
+
+duplicate="$(run_scheduled "$tmp/fixtures/one")"
 expect "$duplicate" 'META|pending|'
 duplicate_key="$(printf '%s\n' "$duplicate" | sed -n 's/^META|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|\([^|]*\).*/\1/p')"
 [[ -z "$duplicate_key" ]] || fail 'unchanged package state emitted a duplicate notification key'
@@ -39,13 +54,15 @@ expect "$completed" 'META|completed|'
 second_clean="$(run "$tmp/fixtures/empty")"
 expect "$second_clean" 'META|clean|'
 
-new_updates="$(run "$tmp/fixtures/two")"
+new_updates="$(run_scheduled "$tmp/fixtures/two")"
 expect "$new_updates" 'META|pending|'
 expect "$new_updates" '|2|2|0|1|'
 new_key="$(printf '%s\n' "$new_updates" | sed -n 's/^META|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|[^|]*|\([^|]*\).*/\1/p')"
 [[ -n "$new_key" && "$new_key" != "$first_key" ]] || fail 'new package state did not produce a distinct notification key'
 
-partial="$(run "$tmp/fixtures/one")"
+ack "$new_key"
+
+partial="$(run_scheduled "$tmp/fixtures/one")"
 expect "$partial" 'META|partial|'
 
 reboot="$(run "$tmp/fixtures/empty" '' 1)"
@@ -64,6 +81,22 @@ set -e
 expect "$failed" 'META|failed|'
 injected="$(run "$tmp/fixtures/injected")"
 expect "$injected" 'META|failed|'
+
+# yay/paru use exit 1 for a successful "no foreign updates" query. A clean
+# AUR result must not discard a valid pacman update as a failed collection.
+mkdir -p "$tmp/bin"
+cat > "$tmp/bin/checkupdates" <<'EOF'
+#!/usr/bin/env bash
+printf 'pacman-test 1 -> 2\n'
+EOF
+cat > "$tmp/bin/yay" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+chmod +x "$tmp/bin/checkupdates" "$tmp/bin/yay"
+aur_empty="$(PATH="$tmp/bin:$PATH" HOME="$tmp/home-live" XDG_STATE_HOME="$tmp/state-live" bash "$helper" --scheduled 2026-07-17)"
+expect "$aur_empty" 'META|pending|'
+expect "$aur_empty" '|1|1|0|1|'
 
 if command -v flock >/dev/null 2>&1; then
     state_dir="$tmp/state/quickshell"

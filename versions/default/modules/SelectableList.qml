@@ -10,6 +10,7 @@ Item {
     property int rowHeight: 34
     property int fontSize: 18
     property int fontWeight: Font.DemiBold
+    property string fontFamily: "JetBrainsMono Nerd Font"
     property int rowRadius: 6
     property color textColor: "white"
     property color mutedColor: "gray"
@@ -79,7 +80,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: icon
                     color: index === listRoot.selectedIndex ? listRoot.accentColor : listRoot.mutedColor
-                    font.family: "JetBrainsMono Nerd Font"
+                    font.family: listRoot.fontFamily
                     font.pixelSize: 15
                     horizontalAlignment: Text.AlignHCenter
                 }
@@ -93,7 +94,7 @@ Item {
                         width: parent.width
                         text: label
                         color: index === listRoot.selectedIndex ? listRoot.textColor : listRoot.mutedColor
-                        font.family: "JetBrainsMono Nerd Font"
+                        font.family: listRoot.fontFamily
                         font.pixelSize: listRoot.fontSize
                         font.weight: listRoot.fontWeight
                         elide: Text.ElideRight
@@ -104,7 +105,7 @@ Item {
                         visible: detail.length > 0
                         text: detail
                         color: listRoot.mutedColor
-                        font.family: "JetBrainsMono Nerd Font"
+                        font.family: listRoot.fontFamily
                         font.pixelSize: 9
                         elide: Text.ElideRight
                     }
@@ -128,7 +129,7 @@ Item {
             visible: view.count === 0
             text: listRoot.emptyText
             color: listRoot.mutedColor
-            font.family: "JetBrainsMono Nerd Font"
+            font.family: listRoot.fontFamily
             font.pixelSize: 11
         }
     }

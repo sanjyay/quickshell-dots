@@ -6,6 +6,7 @@ import "../IconMap.js" as IconMap
 Item {
     id: rootMod
     required property var root
+    property bool compact: false
 
     property string mode:   "none"  // "wifi" | "ethernet" | "none"
     property string ssid:   ""
@@ -99,7 +100,7 @@ Item {
         // ── ethernet: dual sparkline ──
         Canvas {
             id: netGraph
-            visible: rootMod.mode === "ethernet"
+            visible: rootMod.mode === "ethernet" && !rootMod.compact
             width: 36; height: 14
             anchors.verticalCenter: parent.verticalCenter
 
@@ -283,7 +284,7 @@ Item {
         onExited:  { tip.hide() }
         onClicked: (e) => {
             tip.hide()
-            if (e.button === Qt.RightButton) { clickRunner.running = false; clickRunner.running = true }
+            if (e.button === Qt.LeftButton) { clickRunner.running = false; clickRunner.running = true }
             else root.networkVisible = !root.networkVisible
         }
     }

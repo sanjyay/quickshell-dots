@@ -92,13 +92,32 @@ lock_action() {
 }
 
 media_action() {
+    local action="$1" before="" metadata="" title="" artist="" detail="Media"
+    before="$(playerctl metadata --format $'{{xesam:title}}\t{{xesam:artist}}' 2>/dev/null | head -n1 || true)"
     case "$1" in
         next) playerctl next ;;
         previous) playerctl previous ;;
         play-pause) playerctl play-pause ;;
         *) exit 2 ;;
     esac
-    show_osd media "" "$1"
+
+    # Track changes are asynchronous for several MPRIS players. Give metadata a
+    # short bounded window to advance so the OSD describes the song that is now
+    # playing instead of the transport command that was pressed.
+    for _ in {1..10}; do
+        metadata="$(playerctl metadata --format $'{{xesam:title}}\t{{xesam:artist}}' 2>/dev/null | head -n1 || true)"
+        [[ -n "$metadata" && ( "$action" == play-pause || "$metadata" != "$before" ) ]] && break
+        sleep 0.05
+    done
+
+    if [[ -n "$metadata" ]]; then
+        IFS=$'\t' read -r title artist <<< "$metadata"
+        if [[ -n "$title" && -n "$artist" ]]; then detail="$title"$'\n'"$artist"
+        elif [[ -n "$title" ]]; then detail="$title"
+        elif [[ -n "$artist" ]]; then detail="$artist"
+        fi
+    fi
+    show_osd media "" "$detail" "󰎈"
 }
 
 audio_output_action() {

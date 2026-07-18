@@ -31,6 +31,8 @@ PanelWindow {
     property bool   scanning: false
     property var    networks: []    // [{conn, ssid, sec, sig}]
     property var    known:   []     // known ssids
+    property var    savedNetworks: [] // known networks, enriched by the active scan
+    property string wifiTab: "available"
 
     // ── wifi radio ──
     property bool   wifiBlocked: false
@@ -88,6 +90,7 @@ PanelWindow {
 
     // ✓ marks show only on a healthy run (in progress or finished ok) — never on error/cancel/offline
     readonly property bool speedRunOk: speedTest.running || speedTest.phase === "success"
+    property bool speedDetailsVisible: false
 
     function toggleWifi() {
         var wasBlocked = netPanel.wifiBlocked
@@ -303,10 +306,30 @@ PanelWindow {
                             enabled: speedTest.running || netPanel.mode !== "none"
                             hoverEnabled: true
                             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: speedTest.running ? speedTest.cancel() : speedTest.start()
+                            onClicked: {
+                                if (speedTest.running) {
+                                    speedTest.cancel()
+                                    netPanel.speedDetailsVisible = false
+                                } else {
+                                    netPanel.speedDetailsVisible = true
+                                    speedTest.start()
+                                }
+                            }
                         }
                     }
                 }
+
+                Item {
+                    id: speedDetailsContainer
+                    width: parent.width
+                    height: netPanel.speedDetailsVisible ? speedDetails.implicitHeight : 0
+                    clip: true
+                    Behavior on height { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+
+                    Column {
+                        id: speedDetails
+                        width: parent.width
+                        spacing: 4
 
                 Row {
                     width: parent.width
@@ -397,6 +420,8 @@ PanelWindow {
                         font.letterSpacing: 1
                     }
                 }
+                    }
+                }
             }
 
             Rectangle { width: parent.width; height: 1; color: root.sep; visible: netPanel.hasWifi }
@@ -435,18 +460,60 @@ PanelWindow {
                 }
             }
 
-            // ── available networks ──
+            // ── Wi-Fi list tabs ──
+            Item {
+                width: parent.width
+                height: 32
+                visible: netPanel.hasWifi && !netPanel.wifiBlocked && !root.useNM
+
+                Rectangle {
+                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width; height: 28; radius: root.tileRadius
+                    color: root.fillIdle; border.color: root.sep; border.width: 1
+
+                    Row {
+                        id: wifiTabs
+                        anchors.fill: parent; anchors.margins: 2; spacing: 2
+                        Repeater {
+                            model: [ { id: "available", label: "Available" }, { id: "saved", label: "Saved" } ]
+                            delegate: Rectangle {
+                                required property var modelData
+                                width: (wifiTabs.width - wifiTabs.spacing) / 2; height: parent.height
+                                radius: root.tileRadius
+                                color: netPanel.wifiTab === modelData.id
+                                    ? root.fillActive : tabMa.containsMouse ? root.fillHover : "transparent"
+                                border.color: netPanel.wifiTab === modelData.id ? root.seal : "transparent"
+                                border.width: 1
+                                UiText {
+                                    anchors.centerIn: parent; text: modelData.label
+                                    color: netPanel.wifiTab === modelData.id ? root.seal : root.sumiHi
+                                    font.family: root.mono; font.pixelSize: 9
+                                }
+                                MouseArea {
+                                    id: tabMa
+                                    anchors.fill: parent; hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: netPanel.wifiTab = modelData.id
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── available/saved network heading ──
             Item {
                 width: parent.width
                 height: 16
                 visible: netPanel.hasWifi && !netPanel.wifiBlocked && !root.useNM
                 UiText {
                     anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                    text: "AVAILABLE NETWORKS"
+                    text: netPanel.wifiTab === "available" ? "AVAILABLE NETWORKS" : "SAVED NETWORKS"
                     color: root.sumiHi; font.family: root.mono; font.pixelSize: 10; font.letterSpacing: 1
                 }
                 UiText {
                     anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    visible: netPanel.wifiTab === "available"
                     text: netPanel.scanning ? "scanning…" : "rescan"
                     color: rescanMa.containsMouse ? root.fillPrimaryHover : root.seal
                     font.family: root.mono; font.pixelSize: 10
@@ -470,7 +537,7 @@ PanelWindow {
                     spacing: 4
 
                     Repeater {
-                        model: netPanel.networks
+                        model: netPanel.wifiTab === "available" ? netPanel.networks : netPanel.savedNetworks
                         delegate: Rectangle {
                             required property var modelData
                             width: netList.width
@@ -508,11 +575,20 @@ PanelWindow {
                                 }
                             }
 
-                            // signal bars
+                            UiText {
+                                anchors.right: parent.right; anchors.rightMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: !modelData.conn && !(modelData.sig > 0)
+                                text: "saved"
+                                color: root.sumiHi; font.family: root.mono; font.pixelSize: 9
+                            }
+
+                            // Signal bars are shown only when the current scan has a signal.
                             Row {
                                 anchors.right: parent.right; anchors.rightMargin: 8
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 2
+                                visible: modelData.sig > 0
                                 Repeater {
                                     model: 4
                                     delegate: Rectangle {
@@ -537,9 +613,10 @@ PanelWindow {
                     }
 
                     UiText {
-                        visible: !netPanel.scanning && netPanel.networks.length === 0
+                        visible: !netPanel.scanning
+                            && (netPanel.wifiTab === "available" ? netPanel.networks.length : netPanel.savedNetworks.length) === 0
                         width: netList.width; horizontalAlignment: Text.AlignHCenter
-                        text: "No networks found"
+                        text: netPanel.wifiTab === "available" ? "No networks found" : "No saved networks"
                         color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.3)
                         font.family: root.mono; font.pixelSize: 11
                     }
@@ -683,8 +760,23 @@ PanelWindow {
                 }
                 // connected first, then by signal
                 nets.sort(function(a, b) { return (b.conn - a.conn) || (b.sig - a.sig) })
+                var saved = []
+                for (var j = 0; j < kn.length; ++j) {
+                    var match = null
+                    for (var k = 0; k < nets.length; ++k) {
+                        if (nets[k].ssid === kn[j]) { match = nets[k]; break }
+                    }
+                    saved.push({
+                        ssid: kn[j],
+                        conn: !!(match && match.conn) || (netPanel.mode === "wifi" && netPanel.ssid === kn[j]),
+                        sec: match ? match.sec : "known",
+                        sig: match ? match.sig : 0
+                    })
+                }
+                saved.sort(function(a, b) { return (b.conn - a.conn) || a.ssid.localeCompare(b.ssid) })
                 netPanel.networks = nets
                 netPanel.known = kn
+                netPanel.savedNetworks = saved
                 netPanel.scanning = false
                 scanWatchdog.stop()
             }

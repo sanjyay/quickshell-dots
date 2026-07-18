@@ -41,6 +41,10 @@ PanelWindow {
         readonly property bool volumeEvent: root.osdKind === "volume"
         readonly property bool brightnessEvent: root.osdKind === "brightness"
         readonly property bool cameraEvent: root.osdKind === "camera"
+        readonly property bool mediaEvent: root.osdKind === "media"
+        readonly property var mediaLines: root.osdDetail.split("\n")
+        readonly property string mediaTitle: mediaLines.length > 0 ? mediaLines[0] : "Media"
+        readonly property string mediaArtist: mediaLines.length > 1 ? mediaLines.slice(1).join(" ") : ""
         readonly property bool cameraEnabled: cameraEvent
             && (root.osdDetail.toLowerCase().indexOf("enabled") >= 0
                 || ["on", "true"].indexOf(root.osdDetail.toLowerCase()) >= 0)
@@ -63,7 +67,7 @@ PanelWindow {
         opacity: active ? 1 : 0
         scale: active ? 1 : 0.965
         width: card.brightnessEvent ? overlay.brightnessWidth
-            : (card.cameraEvent ? 60 : Math.min(300, Math.max(190, row.implicitWidth + 30)))
+            : (card.cameraEvent ? 60 : (card.mediaEvent ? 300 : Math.min(300, Math.max(190, row.implicitWidth + 30))))
         height: card.brightnessEvent ? overlay.brightnessHeight : 60
         x: Math.round((parent.width - width) / 2)
         y: overlay.osdY + (active ? 0 : -3)
@@ -103,9 +107,39 @@ PanelWindow {
                 visible: !card.cameraEvent
                 spacing: 5
                 UiText {
-                    visible: !card.percentageEvent
+                    visible: !card.percentageEvent && !card.mediaEvent
                     text: root.osdDetail || root.osdKind
                     color: root.ink; font.family: root.mono; font.pixelSize: 11
+                }
+                Item {
+                    visible: card.mediaEvent
+                    width: 230
+                    height: card.mediaArtist !== "" ? 34 : 18
+                    clip: true
+
+                    Column {
+                        anchors.fill: parent
+                        spacing: 1
+                        UiText {
+                            width: parent.width
+                            text: card.mediaTitle
+                            color: root.ink
+                            font.family: root.mono
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
+                            elide: Text.ElideRight
+                        }
+                        UiText {
+                            width: parent.width
+                            visible: card.mediaArtist !== ""
+                            text: card.mediaArtist
+                            color: root.sumiHi
+                            font.family: root.mono
+                            font.pixelSize: 12
+                            font.weight: Font.DemiBold
+                            elide: Text.ElideRight
+                        }
+                    }
                 }
                 Item {
                     id: meter

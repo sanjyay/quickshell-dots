@@ -5,9 +5,23 @@ set -euo pipefail
 # deliberately a closed action registry: it invokes Omarchy's backend helpers,
 # never an upstream Walker menu UI.
 action="${1:-}"
+value="${2:-}"
 
 present() {
   exec omarchy-launch-floating-terminal-with-presentation "$1"
+}
+
+apply_font() {
+  local font_name="$1"
+
+  # Retain Quickshell ownership while reusing Omarchy's authoritative font
+  # mutations and font-set hooks.
+  omarchy-restart-waybar() { :; }
+  omarchy-restart-swayosd() { :; }
+  export -f omarchy-restart-waybar omarchy-restart-swayosd
+
+  omarchy-font-set "$font_name"
+  qs -c bar ipc call -- theme setFont "$font_name" >/dev/null 2>&1 || true
 }
 
 case "$action" in
@@ -44,13 +58,41 @@ case "$action" in
 
   style-hyprland) exec omarchy-launch-editor "$HOME/.config/hypr/looknfeel.conf" ;;
   style-background) exec qs -c bar ipc call -- wallpaperSwitcher open ;;
-  style-screensaver-edit-text|style-screensaver-set-from-image|style-screensaver-restore-default)
-    printf 'Screensaver customization is handled by the installed Omarchy helper.\n' >&2
-    exit 64
+  style-font-set)
+    omarchy-font-list | grep -Fx -- "$value" >/dev/null || exit 64
+    apply_font "$value"
     ;;
-  style-about-edit-text|style-about-set-from-image|style-about-restore-default)
-    printf 'About customization is handled by the installed Omarchy helper.\n' >&2
-    exit 64
+  style-unlock-default) present omarchy-plymouth-reset ;;
+  style-unlock-theme)
+    [[ "$value" =~ ^[A-Za-z0-9._-]+$ ]] || exit 64
+    { [[ -f "$HOME/.config/omarchy/themes/$value/preview-unlock.png" ]] || [[ -f "${OMARCHY_PATH:-$HOME/.local/share/omarchy}/themes/$value/preview-unlock.png" ]]; } || exit 64
+    printf -v quoted '%q' "$value"; present "omarchy-plymouth-set-by-theme $quoted"
+    ;;
+  style-screensaver-edit-text) exec omarchy-branding-screensaver text ;;
+  style-screensaver-set-from-image) exec omarchy-branding-screensaver image ;;
+  style-screensaver-restore-default) exec omarchy-branding-screensaver reset ;;
+  style-about-edit-text) exec omarchy-branding-about text ;;
+  style-about-set-from-image) exec omarchy-branding-about image ;;
+  style-about-restore-default) exec omarchy-branding-about reset ;;
+
+  trigger-toggle-screensaver) exec omarchy-toggle-screensaver ;;
+  trigger-toggle-nightlight) exec omarchy-toggle-nightlight ;;
+  trigger-toggle-idle) exec omarchy-toggle-idle ;;
+  trigger-toggle-notifications) exec omarchy-toggle-notification-silencing ;;
+  trigger-toggle-bar) exec omarchy-toggle-waybar ;;
+  trigger-toggle-workspace-layout) exec omarchy-hyprland-workspace-layout-toggle ;;
+  trigger-toggle-window-gaps) exec omarchy-hyprland-window-gaps-toggle ;;
+  trigger-toggle-window-ratio) exec omarchy-hyprland-window-single-square-aspect-toggle ;;
+  trigger-toggle-monitor-scaling) exec omarchy-hyprland-monitor-scaling-cycle ;;
+  trigger-toggle-direct-boot) present omarchy-config-direct-boot ;;
+  hardware-laptop-display) exec omarchy-hyprland-monitor-internal toggle ;;
+  hardware-mirror-display) exec omarchy-hyprland-monitor-internal-mirror toggle ;;
+  hardware-hybrid-gpu) present omarchy-toggle-hybrid-gpu ;;
+  hardware-touchpad) exec omarchy-toggle-touchpad ;;
+  hardware-touchscreen) exec omarchy-toggle-touchscreen ;;
+  hardware-haptics)
+    [[ "$value" == low || "$value" == mid || "$value" == high ]] || exit 64
+    exec dell-xps-touchpad-haptics set "$value"
     ;;
 
   setup-config-hyprland) exec omarchy-launch-editor "$HOME/.config/hypr/hyprland.conf" ;;
@@ -149,7 +191,10 @@ case "$action" in
   remove-tui) present omarchy-tui-remove ;;
   remove-windows) present 'omarchy-windows-vm remove' ;;
   remove-preinstalls) present omarchy-remove-preinstalls ;;
+  remove-theme) present omarchy-theme-remove ;;
   remove-dictation) present omarchy-voxtype-remove ;;
+  remove-security-fingerprint) present omarchy-remove-security-fingerprint ;;
+  remove-security-fido2) present omarchy-remove-security-fido2 ;;
   remove-browser-*) present "omarchy-remove-browser ${action#remove-browser-}" ;;
   remove-gaming-steam) present omarchy-remove-gaming-steam ;;
   remove-gaming-retroarch) present omarchy-remove-gaming-retroarch ;;

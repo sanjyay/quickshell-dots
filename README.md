@@ -32,7 +32,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 |---|---|
 | Bar layout | unlock mode, insert/reorder widget groups by drag/drop, persistent order, split groups, magnetic hover, top/bottom position |
 | Control center | quick actions, widget toggles, notification visibility, workspace modes, bar style, and split controls |
-| Pickers | theme, wallpaper, screenshot, and video pickers with Tanzaku, Hearthstone, and Carousel styles |
+| Pickers | native emoji, theme, wallpaper, screenshot, and video pickers with Tanzaku, Hearthstone, and Carousel styles |
 | Core widgets | workspaces, playback-aware volume, System info (CPU/GPU/RAM), battery, power profile, network, optional Tailscale status, Bluetooth, weather, MPRIS, tray, notifications |
 | Privacy tools | microphone mute indicator/toggle and Lenovo LOQ camera kill-switch status |
 | Updates | shell update badge, weekly scheduled package update badge, Arch/AUR counter, known-infected AUR safety check |
@@ -153,7 +153,7 @@ Common actions:
 | Clock | calendar | - | timezone picker | toggle 24h / 12h |
 | System info | CPU/GPU/RAM panel | - | - | - |
 | Power Profile | panel | - | cycle profile | - |
-| Network | panel | - | open system manager | - |
+| Network | open system manager | - | panel | - |
 | Bluetooth | panel with up to 3 paired devices | - | open Bluetooth manager | - |
 | Microphone | mute toggle | - | - | - |
 | Camera | - | - | - | - |
@@ -168,14 +168,15 @@ Common actions:
 </details>
 
 <details>
-<summary>Theme / wallpaper keybinds</summary>
+<summary>Theme / wallpaper / emoji keybinds</summary>
 
-The installed Quickshell bindings provide native theme and wallpaper switchers:
+The installed Quickshell bindings provide native theme, wallpaper, and emoji switchers:
 
 | Action | Key | Omarchy default |
 |---|---|---|
 | Theme | `Super` + `Ctrl` + `Shift` + `Space` | Quickshell theme switcher |
 | Wallpaper | `Super` + `Ctrl` + `Space` | Quickshell wallpaper picker |
+| Emoji | `Super` + `Ctrl` + `E` | Search and paste emoji or symbols |
 
 To route those keys to this bar's pickers, add this to `~/.config/hypr/bindings.conf`:
 
@@ -184,6 +185,8 @@ unbind = SUPER CTRL SHIFT, SPACE
 bind = SUPER CTRL SHIFT, SPACE, exec, qs -c bar ipc call themeSwitcher toggle
 unbind = SUPER CTRL, SPACE
 bindd = SUPER CTRL, SPACE, Quickshell wallpaper switcher, exec, qs -c bar ipc call -- wallpaperSwitcher toggle
+unbind = SUPER CTRL, E
+bindd = SUPER CTRL, E, Quickshell emoji picker, exec, qs -c bar ipc call -- emoji open
 ```
 
 `install.sh` creates `bindings.conf` if it does not already exist, and `uninstall.sh` removes the Quickshell-managed entries again.

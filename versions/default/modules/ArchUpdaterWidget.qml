@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../IconMap.js" as IconMap
 
 Item {
     id: rootMod
@@ -23,11 +24,27 @@ Item {
         return n
     }
     readonly property bool hasThemeUpdates: rootMod.cleanThemeCount > 0
-    visible: false
-    implicitWidth: 0
+    readonly property bool badgePrefsLoaded: root._widgetsLoaded
+    readonly property int packageBadgeCount: (rootMod.badgePrefsLoaded && root.archBadgePackages)
+        ? Math.max(0, rootMod.updateCount) : 0
+    readonly property int themeBadgeCount: (rootMod.badgePrefsLoaded && root.archBadgeThemes)
+        ? Math.max(0, rootMod.cleanThemeCount) : 0
+    readonly property int badgeCount: rootMod.packageBadgeCount + rootMod.themeBadgeCount
+    readonly property bool hasBadge: rootMod.badgeCount > 0
+    readonly property bool hasNotice: rootMod.hasUpdates || rootMod.hasThemeUpdates || root.themeUpdLocalEdits > 0
+    // A scheduled result remains an affordance across a reload even before the
+    // package list is repopulated. It is cleared only by a clean recheck.
+    readonly property bool showToday: root.isArchUpdateScheduleDay
+        || rootMod.hasNotice || root.archUpdateScheduleActive || root.archVisible
+
+    visible: rootMod.showToday || implicitWidth > 0.5
+    implicitWidth: rootMod.showToday ? 26 : 0
     implicitHeight: 28
     width: implicitWidth
     height: implicitHeight
+    opacity: rootMod.showToday ? 1 : 0
+    Behavior on implicitWidth { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+    Behavior on opacity { NumberAnimation { duration: 120 } }
 
     Process {
         id: checkProc
@@ -68,7 +85,10 @@ Item {
     }
 
     Timer {
-        interval: 1800000; running: (root.modStatus && (root.isArchUpdateScheduleDay || root.archUpdateScheduleActive)) || root.archVisible; repeat: true; triggeredOnStart: true
+        // Scheduling is independent of the Status group. The provider lives in
+        // the bar even while its compact badge is hidden, so a configured day
+        // cannot be skipped just because tray/notification widgets are off.
+        interval: 1800000; running: root.isArchUpdateScheduleDay || root.archUpdateScheduleActive || root.archVisible; repeat: true; triggeredOnStart: true
         onTriggered: root.archRefreshTick++
     }
 
@@ -82,8 +102,23 @@ Item {
         rootMod.refreshing = true
         refreshWatchdog.restart()
         checkProc.command = [Quickshell.env("HOME") + "/.config/quickshell/bin/qs-package-update-state.sh"]
+        if (root.archUpdateDue)
+            checkProc.command.push("--scheduled", root.currentDateKey)
         checkProc.running = false
         checkProc.running = true
+    }
+
+    Process {
+        id: notificationAckProc
+        running: false
+    }
+
+    function acknowledgeNotification(key) {
+        if (!key || !/^[A-Za-z0-9-]{1,128}$/.test(key)) return
+        notificationAckProc.command = [Quickshell.env("HOME") + "/.config/quickshell/bin/qs-package-update-state.sh",
+                                       "--ack-notification", key]
+        notificationAckProc.running = false
+        notificationAckProc.running = true
     }
 
     function parseOutput(text) {
@@ -124,7 +159,7 @@ Item {
             root.archUpdateStatus = meta.status
             root.archUpdateRebootRequired = meta.rebootRequired
             root.archUpdateSnapperStatus = meta.snapperStatus
-            root.archUpdateScheduleActive = true
+            root.archUpdateScheduleActive = meta.active
             return false
         }
         rootMod.systemCount = sysCount
@@ -138,6 +173,10 @@ Item {
         root.archUpdateRebootRequired = meta.rebootRequired
         root.archUpdateSnapperStatus = meta.snapperStatus
         root.setPackageUpdateCount(rootMod.updateCount, meta.notificationKey)
+        // The helper deliberately leaves a new fingerprint pending until the
+        // in-process notification has been accepted. This prevents a reload or
+        // startup race from permanently suppressing the first alert.
+        if (meta.notificationKey) rootMod.acknowledgeNotification(meta.notificationKey)
         root.archUpdateScheduleActive = meta.active
         if (meta.status !== "failed" && meta.status !== "partial" && !root.archUpdateDue) {
             rootMod.retryCount = 0
@@ -153,6 +192,71 @@ Item {
         if (rootMod.retryCount >= 5) return
         rootMod.retryCount++
         retryTimer.restart()
+    }
+
+    Item {
+        anchors.centerIn: parent
+        width: 20
+        height: 20
+
+        IconText {
+            id: ic
+            anchors.centerIn: parent
+            text: rootMod.refreshing ? "\uE5D5" : IconMap.icon("package_2")
+            color: rootMod.refreshing
+                ? Qt.rgba(root.sumi.r, root.sumi.g, root.sumi.b, 1)
+                : (rootMod.hasNotice ? root.seal : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.4))
+            font.pixelSize: 14
+        }
+
+        Rectangle {
+            visible: rootMod.hasBadge && !rootMod.refreshing
+            anchors.verticalCenter: ic.verticalCenter
+            anchors.verticalCenterOffset: -6
+            anchors.horizontalCenter: ic.horizontalCenter
+            anchors.horizontalCenterOffset: 7
+            width: Math.max(12, badgeText.implicitWidth + 6)
+            height: 12
+            radius: 6
+            color: root.seal
+
+            Text {
+                id: badgeText
+                anchors.centerIn: parent
+                text: rootMod.badgeCount > 99 ? "99+" : String(rootMod.badgeCount)
+                color: root.paper
+                font.family: root.mono
+                font.pixelSize: 7
+                font.weight: Font.Bold
+            }
+        }
+    }
+
+    readonly property string tooltipText: {
+        if (rootMod.refreshing) return ""
+        var parts = []
+        if (rootMod.systemCount) parts.push(rootMod.systemCount + " system")
+        if (rootMod.aurCount) parts.push(rootMod.aurCount + " AUR")
+        if (rootMod.cleanThemeCount > 0) parts.push(rootMod.cleanThemeCount + " themes")
+        if (root.themeUpdLocalEdits > 0) parts.push(root.themeUpdLocalEdits + " review")
+        if (parts.length === 0) return "Up to date"
+        return parts.join(" \u00B7 ") + "\nClick to view details"
+    }
+
+    TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
+
+    MouseArea {
+        anchors.fill: parent
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onEntered: tip.show()
+        onExited: tip.hide()
+        onClicked: (event) => {
+            tip.hide()
+            if (event.button === Qt.RightButton) root.archRefreshTick++
+            else root.archVisible = true
+        }
     }
 
 }

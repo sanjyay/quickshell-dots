@@ -61,6 +61,8 @@ put "$repo/scripts/qs-shell-check-update.sh" "$qsbin/qs-shell-check-update.sh" 7
 put "$repo/scripts/qs-shell-apply-update.sh" "$qsbin/qs-shell-apply-update.sh" 755 || rc=1
 put "$repo/scripts/qs-shell-refresh-local.sh" "$qsbin/qs-shell-refresh-local.sh" 755 || rc=1
 put "$repo/scripts/qs-package-update-state.sh" "$qsbin/qs-package-update-state.sh" 755 || rc=1
+put "$repo/scripts/qs-topgrade-update.sh" "$qsbin/qs-topgrade-update.sh" 755 || rc=1
+put "$repo/scripts/qs-menu-data.sh" "$bin/qs-menu-data" 755 || rc=1
 put "$repo/scripts/ensure-hypr-launcher-binding.sh" "$qsbin/ensure-hypr-launcher-binding.sh" 755 || rc=1
 put "$repo/systemd/qs-shell-update-check.service" "$units/qs-shell-update-check.service" 644 || rc=1
 put "$repo/systemd/qs-shell-update-check.timer"   "$units/qs-shell-update-check.timer"   644 || rc=1

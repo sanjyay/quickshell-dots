@@ -17,7 +17,28 @@ write_mode() {
 }
 
 stop_quickshell() {
-    qs -c bar kill >/dev/null 2>&1 || true
+    # `qs -c bar kill` can block when several instances share a config.
+    # Terminate only the PIDs registered to this exact config.
+    local listed
+    listed="$(qs list -c bar -j 2>/dev/null || true)"
+    bar_pids=()
+    if jq -e 'type == "array"' >/dev/null 2>&1 <<< "$listed"; then
+        mapfile -t bar_pids < <(jq -r --arg config "$DEST/shell.qml" \
+            '.[] | select(.config_path == $config) | .pid' <<< "$listed")
+    fi
+    for pid in "${bar_pids[@]}"; do
+        [[ "$pid" =~ ^[0-9]+$ ]] || continue
+        pkill -TERM -P "$pid" >/dev/null 2>&1 || true
+        kill -TERM "$pid" >/dev/null 2>&1 || true
+    done
+    for _ in {1..20}; do
+        alive=false
+        for pid in "${bar_pids[@]}"; do
+            if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then alive=true; break; fi
+        done
+        [[ "$alive" == true ]] || break
+        sleep 0.1
+    done
     pkill -f "quickshell -p $DEST" >/dev/null 2>&1 || true
 }
 
@@ -90,6 +111,7 @@ unbind = SUPER SHIFT, code:201
 unbind = SUPER, ESCAPE
 unbind = , XF86PowerOff
 unbind = SUPER CTRL, V
+unbind = SUPER CTRL, E
 unbind = SUPER CTRL, C
 unbind = , PRINT
 unbind = ALT, PRINT
@@ -108,6 +130,7 @@ bindd = SUPER SHIFT, code:201, Quickshell menu, exec, qs -c bar ipc call -- menu
 bindd = SUPER, ESCAPE, Quickshell power menu, exec, qs -c bar ipc call -- menu open system
 bindd = , XF86PowerOff, Quickshell power menu, exec, qs -c bar ipc call -- menu open system
 bindd = SUPER CTRL, V, Quickshell clipboard, exec, qs -c bar ipc call -- clipboard open
+bindd = SUPER CTRL, E, Quickshell emoji picker, exec, qs -c bar ipc call -- emoji open
 bindd = SUPER CTRL, C, Quickshell capture menu, exec, qs -c bar ipc call -- capture open
 bindd = , PRINT, Quickshell screenshot, exec, qs-capture screenshot
 bindd = ALT, PRINT, Quickshell screenrecording options, exec, qs -c bar ipc call -- capture recording
@@ -135,6 +158,7 @@ unbind = SUPER SHIFT, code:201
 unbind = SUPER, ESCAPE
 unbind = , XF86PowerOff
 unbind = SUPER CTRL, V
+unbind = SUPER CTRL, E
 unbind = SUPER CTRL, C
 unbind = , PRINT
 unbind = ALT, PRINT
@@ -147,6 +171,7 @@ bindd = SUPER SHIFT, code:201, Omarchy menu, exec, omarchy-menu
 bindd = SUPER, ESCAPE, System menu, exec, omarchy-menu system
 bindd = , XF86PowerOff, Power menu, exec, omarchy-menu system
 bindd = SUPER CTRL, V, Clipboard manager, exec, omarchy-launch-walker -m clipboard
+bindd = SUPER CTRL, E, Emoji picker, exec, omarchy-launch-walker -m symbols
 bindd = SUPER CTRL, C, Capture menu, exec, omarchy-menu capture
 bindd = , PRINT, Screenshot, exec, omarchy-capture-screenshot
 bindd = ALT, PRINT, Screenrecording, exec, omarchy-menu screenrecord
@@ -266,7 +291,7 @@ start_quickshell() {
     for _ in {1..10}; do
         sleep 0.5
         if qs list --all 2>/dev/null | grep -Fq "$DEST/shell.qml" \
-            && qs -c bar ipc call health ping >/dev/null 2>&1; then
+            && timeout 3 qs -n -c bar ipc call health ping >/dev/null 2>&1; then
             return 0
         fi
     done

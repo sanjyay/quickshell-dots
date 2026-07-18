@@ -6,6 +6,7 @@ import Quickshell.Services.Mpris
 Item {
     id: rootMod
     required property var root
+    property bool compact: false
 
     // shared player selection (ghost-filtering) — see MprisSelect.qml
     MprisSelect { id: sel; pausedPlayers: root.mprisPausedPlayers }
@@ -14,7 +15,7 @@ Item {
     readonly property bool playing: sel.playing
     // Inline transport controls were removed; give their former width to the
     // existing metadata marquee without changing the pill's overall footprint.
-    readonly property int titleWidth: 119
+    readonly property int titleWidth: compact ? 80 : 119
 
     onActiveChanged: {
         root.mprisActive = active

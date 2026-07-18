@@ -85,6 +85,17 @@ ShellRoot {
     }
 
     IpcHandler {
+        target: "emoji"
+        function open(): void { theme.openEmojiPicker() }
+        function close(): void { theme.emojiPickerVisible = false }
+        function toggle(): void {
+            if (theme.emojiPickerVisible) theme.emojiPickerVisible = false
+            else theme.openEmojiPicker()
+        }
+        function ping(): void { }
+    }
+
+    IpcHandler {
         target: "themeSwitcher"
         function open(): void { theme.openThemeSwitcher() }
         function close(): void { theme.themeSwitcherVisible = false }
@@ -353,6 +364,7 @@ ShellRoot {
     ThemeSwitcherPanel { root: theme }
     WallpaperSwitcherPanel { root: theme }
     ClipboardHistoryPanel { root: theme }
+    EmojiPickerPanel { root: theme }
     CapturePanel { root: theme }
     AppLauncherPanel { root: theme }
     CalendarPopup { root: theme }

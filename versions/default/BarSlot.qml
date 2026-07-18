@@ -15,6 +15,10 @@ PanelWindow {
     required property var root
     readonly property string screenName: barSlot.screen ? barSlot.screen.name : ""
     readonly property bool debugLayout: Quickshell.env("QS_BAR_LAYOUT_DEBUG") === "1"
+    // Preserve breathing room on 1080p-class displays when every optional group
+    // is visible. Compact mode trims decorative/detail width; it never hides a
+    // widget or changes its interaction contract.
+    readonly property bool compactLayout: width < 2048
 
     color: "transparent"
     // ALWAYS screen-tall → window never resizes → NO compositor resize animation.
@@ -472,7 +476,15 @@ PanelWindow {
         }
     }
 
-    Component { id: compMpris; MprisWidget { root: barSlot.root } }
+    Component {
+        id: compMpris
+        MprisWidget {
+            root: barSlot.root
+            // Reclaim the battery slot when it is genuinely absent. On compact
+            // displays the shorter marquee is needed only while that slot is shown.
+            compact: barSlot.compactLayout && barSlot.root.hasBattery && barSlot.root.modBattery
+        }
+    }
     Component {
         id: compQuick                                    // G10: idle-inhib · media · theme
         Item { implicitWidth: 0; implicitHeight: 28 }
@@ -486,7 +498,7 @@ PanelWindow {
                 id: networkPrivacyRow
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 4
-                NetworkWidget       { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
+                NetworkWidget       { root: barSlot.root; compact: barSlot.compactLayout; anchors.verticalCenter: parent.verticalCenter }
                 BluetoothWidget     { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
                 PrivacyMicWidget    { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
                 PrivacyCameraWidget { root: barSlot.root; cameraSwitch: barSlot.root.cameraSwitch; anchors.verticalCenter: parent.verticalCenter }
@@ -723,10 +735,18 @@ PanelWindow {
         // free span between the side rows; reads ONLY left/right geometry so the
         // center can be clamped from measured bounds without feeding back into the
         // side rows.
-        readonly property int centerGap: 28
+        readonly property int preferredCenterGap: 28
+        readonly property int minimumCenterGap: 6
         readonly property int rowMargin: 4    // single source for the side-row edge margins + budget math
         readonly property real leftEdgeX: leftRowItem.x + leftRowItem.width
         readonly property real rightEdgeX: rightRowItem.x
+        // Keep the generous normal spacing, but spend only the space that is
+        // actually available when optional widgets make both side rows wide.
+        // This avoids entering the overlap fallback merely because the two fixed
+        // 28px reserves do not fit on an otherwise usable bar.
+        readonly property real freeCenterSpace: rightEdgeX - leftEdgeX - centerRowItem.width
+        readonly property int centerGap: Math.max(minimumCenterGap,
+            Math.min(preferredCenterGap, Math.floor(freeCenterSpace / 2)))
         readonly property real minCenterX: Math.round(leftEdgeX + centerGap)
         readonly property real maxCenterX: Math.round(rightEdgeX - centerGap - centerRowItem.width)
         readonly property real preferredCenterX: Math.round((width - centerRowItem.width) / 2)

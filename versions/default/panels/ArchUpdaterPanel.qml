@@ -132,7 +132,7 @@ PanelWindow {
             if (r[i].repo === "aur" && r[i].verdict === "WARN") n++
         return n
     }
-    readonly property int btnCount: aurReviewPackages > 0 ? 3 : 2
+    readonly property int btnCount: aurReviewPackages > 0 ? 4 : 3
     function shellQuote(value) {
         return "'" + String(value).replace(/'/g, "'\"'\"'") + "'"
     }
@@ -162,6 +162,17 @@ PanelWindow {
     function launchThemeTerminal(inner) {
         panelUpdateRunner.command = ["bash", "-c",
             "omarchy-launch-floating-terminal-with-presentation " + shellQuote(inner)]
+        root.archVisible = false
+        panelUpdateRunner.running = false
+        panelUpdateRunner.running = true
+    }
+
+    function runTopgrade() {
+        // The helper runs Topgrade in the visible terminal and, regardless of
+        // success or failure, immediately asks the collector/bar to refresh.
+        panelUpdateRunner.command = ["bash", "-c",
+            "omarchy-launch-floating-terminal-with-presentation "
+            + shellQuote(Quickshell.env("HOME") + "/.config/quickshell/bin/qs-topgrade-update.sh")]
         root.archVisible = false
         panelUpdateRunner.running = false
         panelUpdateRunner.running = true
@@ -720,6 +731,29 @@ PanelWindow {
                         onClicked: {
                             root.archRefreshTick++
                         }
+                    }
+                }
+
+                // Topgrade is the explicit install path. It owns its own
+                // interactive confirmation and privileges in a visible terminal.
+                Rectangle {
+                    width: (parent.width - 8 * (archPanel.btnCount - 1)) / archPanel.btnCount
+                    height: 28; radius: root.tileRadius
+                    color: topgradeMa.containsMouse ? root.fillPrimaryHover : root.seal
+                    border.color: "transparent"
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                    UiText {
+                        anchors.centerIn: parent
+                        text: "Topgrade"
+                        color: root.paper
+                        font.family: root.mono; font.pixelSize: 11
+                    }
+                    MouseArea {
+                        id: topgradeMa
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: archPanel.runTopgrade()
                     }
                 }
 

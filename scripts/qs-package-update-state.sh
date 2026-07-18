@@ -28,6 +28,9 @@ previous_count=0
 completed_fingerprint=""
 notified_fingerprint=""
 settled_schedule_key=""
+notification_delivery_version=""
+schedule_active=0
+active_schedule_key=""
 
 load_state() {
     [[ -f "$state_file" && ! -L "$state_file" && -O "$state_file" ]] || return 0
@@ -40,6 +43,9 @@ load_state() {
             completed_fingerprint) completed_fingerprint="$value" ;;
             notified_fingerprint) notified_fingerprint="$value" ;;
             settled_schedule_key) settled_schedule_key="$value" ;;
+            notification_delivery_version) notification_delivery_version="$value" ;;
+            schedule_active) [[ "$value" == "1" ]] && schedule_active=1 ;;
+            active_schedule_key) [[ "$value" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && active_schedule_key="$value" ;;
         esac
     done < "$state_file"
 }
@@ -61,6 +67,9 @@ save_state() {
         printf 'completed_fingerprint=%s\n' "$completed_fingerprint"
         printf 'notified_fingerprint=%s\n' "$notified_fingerprint"
         printf 'settled_schedule_key=%s\n' "$settled"
+        printf 'schedule_active=%s\n' "$schedule_active"
+        printf 'active_schedule_key=%s\n' "$active_schedule_key"
+        printf 'notification_delivery_version=2\n'
     } > "$tmp" && mv -f -- "$tmp" "$state_file" || { rm -f -- "$tmp"; return 1; }
 }
 
@@ -76,6 +85,33 @@ exec 9>"$lock_file"
 if ! flock -n 9; then
     emit_meta busy "$previous_fingerprint" "$completed_fingerprint" "$previous_count" 0 0 1 "" 0 unavailable
     exit 0
+fi
+
+# A notification is suppressed only after Quickshell has accepted it. Older
+# state files marked a fingerprint as notified while merely *emitting* it; the
+# version marker deliberately retries that one notification after upgrading.
+if [[ "$notification_delivery_version" != "2" ]]; then
+    notified_fingerprint=""
+fi
+
+scheduled_key=""
+if [[ "${1:-}" == "--ack-notification" ]]; then
+    fingerprint_to_ack="${2:-}"
+    if [[ $# -ne 2 || ! "$fingerprint_to_ack" =~ ^[A-Za-z0-9-]{1,128}$ ]]; then
+        exit 64
+    fi
+    if [[ "$previous_fingerprint" == "$fingerprint_to_ack" && "$previous_count" -gt 0 ]]; then
+        notified_fingerprint="$fingerprint_to_ack"
+        save_state "$previous_status" "$previous_fingerprint" "$previous_count" "$settled_schedule_key" || exit 1
+    fi
+    exit 0
+elif [[ "${1:-}" == "--scheduled" ]]; then
+    if [[ $# -ne 2 || ! "${2:-}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+        exit 64
+    fi
+    scheduled_key="$2"
+elif [[ $# -ne 0 ]]; then
+    exit 64
 fi
 
 valid_package() { [[ "$1" =~ ^[A-Za-z0-9@._+:-]+$ ]]; }
@@ -139,10 +175,12 @@ run_collector() {
         fi
     elif command -v paru >/dev/null 2>&1; then
         output="$(LC_ALL=C run_bounded 30 paru -Qum 2>&1)"; rc=$?
-        [[ $rc -eq 0 ]] || collector_failed=1
+        # paru/yay use 1 for the normal "no foreign packages are pending"
+        # result. Only other exits mean the collector was unable to check.
+        [[ $rc -eq 0 || $rc -eq 1 ]] || collector_failed=1
     elif command -v yay >/dev/null 2>&1; then
         output="$(LC_ALL=C run_bounded 30 yay -Qum 2>&1)"; rc=$?
-        [[ $rc -eq 0 ]] || collector_failed=1
+        [[ $rc -eq 0 || $rc -eq 1 ]] || collector_failed=1
     else
         output=""
     fi
@@ -188,7 +226,7 @@ snapper_probe() {
 snapper_probe
 
 if [[ $collector_failed -ne 0 ]]; then
-    emit_meta failed "$previous_fingerprint" "$completed_fingerprint" "$previous_count" "$system_count" "$aur_count" 1 "" "$reboot_required" "$snapper_status"
+    emit_meta failed "$previous_fingerprint" "$completed_fingerprint" "$previous_count" "$system_count" "$aur_count" "$schedule_active" "" "$reboot_required" "$snapper_status"
     save_state failed "$previous_fingerprint" "$previous_count" "$settled_schedule_key" || true
     exit 0
 fi
@@ -207,12 +245,11 @@ if (( count > 0 )); then
 fi
 
 if [[ $collector_failed -ne 0 || -z "$fingerprint" && $count -gt 0 ]]; then
-    emit_meta failed "$previous_fingerprint" "$completed_fingerprint" "$previous_count" "$system_count" "$aur_count" 1 "" "$reboot_required" "$snapper_status"
+    emit_meta failed "$previous_fingerprint" "$completed_fingerprint" "$previous_count" "$system_count" "$aur_count" "$schedule_active" "" "$reboot_required" "$snapper_status"
     save_state failed "$previous_fingerprint" "$previous_count" "$settled_schedule_key" || true
     exit 0
 fi
 
-schedule_key="$(date +%F)"
 status="clean"
 active=0
 notification_key=""
@@ -221,22 +258,37 @@ if (( count > 0 )); then
     if [[ -n "$previous_fingerprint" && "$previous_fingerprint" != "$fingerprint" && "$count" -lt "$previous_count" ]]; then
         status="partial"
     fi
-    active=1
-    if [[ "$fingerprint" != "$notified_fingerprint" ]]; then
+    # Only a scheduled run starts a package-reminder cycle. A manual panel
+    # refresh must never make the compact widget reappear on an unrelated day.
+    if [[ -n "$scheduled_key" ]]; then
+        schedule_active=1
+        active_schedule_key="$scheduled_key"
+    fi
+    active="$schedule_active"
+    if [[ "$active" == 1 && "$fingerprint" != "$notified_fingerprint" ]]; then
         notification_key="$fingerprint"
-        notified_fingerprint="$fingerprint"
     fi
     settled_schedule_key=""
 elif (( reboot_required )); then
     status="reboot-required"
-    active=1
+    if [[ -n "$scheduled_key" ]]; then
+        schedule_active=1
+        active_schedule_key="$scheduled_key"
+    fi
+    active="$schedule_active"
     settled_schedule_key=""
 else
     if [[ -n "$previous_fingerprint" ]]; then
         status="completed"
         completed_fingerprint="$previous_fingerprint"
     fi
-    settled_schedule_key="$schedule_key"
+    # A successful post-update check completes the active cycle immediately;
+    # it does not wait for the next bar polling interval or a Quickshell reload.
+    if [[ "$schedule_active" == 1 || -n "$scheduled_key" ]]; then
+        schedule_active=0
+        active_schedule_key=""
+        settled_schedule_key="${scheduled_key:-$(date +%F)}"
+    fi
 fi
 
 save_state "$status" "$fingerprint" "$count" "$settled_schedule_key" || true

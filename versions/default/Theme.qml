@@ -100,7 +100,7 @@ Item {
             if (barColorOptions[i].id === id) return barColorOptions[i].label
         return "Red"
     }
-    readonly property string mono:  "JetBrainsMono Nerd Font"
+    property string mono: "JetBrainsMono Nerd Font"
     readonly property int menuRowHeight: 42
     readonly property int menuRowSpacing: 3
     readonly property int menuFontSize: 18
@@ -150,12 +150,12 @@ Item {
     property var barLayoutControllers: ({})
     property bool _barLayoutSyncing: false
 
-    readonly property bool anyPopupVisible: menuVisible || themeSwitcherVisible || wallpaperSwitcherVisible || clipboardVisible || captureVisible || appLauncherVisible || calendarVisible || cpuVisible || aiUsageVisible
+    readonly property bool anyPopupVisible: menuVisible || themeSwitcherVisible || wallpaperSwitcherVisible || clipboardVisible || emojiPickerVisible || captureVisible || appLauncherVisible || calendarVisible || cpuVisible || aiUsageVisible
         || memVisible || volVisible || controlVisible || networkVisible || bluetoothVisible
         || batteryVisible || mprisVisible || tailscaleVisible
         || workspaceVisible || imagePickerVisible || mediaBrowserVisible || notifVisible
         || powerProfileVisible || archVisible || shellUpdateVisible || trayVisible || trayMenuVisible
-    readonly property bool keyboardPopupVisible: menuVisible || themeSwitcherVisible || wallpaperSwitcherVisible || clipboardVisible || captureVisible || appLauncherVisible || imagePickerVisible || mediaBrowserVisible
+    readonly property bool keyboardPopupVisible: menuVisible || themeSwitcherVisible || wallpaperSwitcherVisible || clipboardVisible || emojiPickerVisible || captureVisible || appLauncherVisible || imagePickerVisible || mediaBrowserVisible
 
     function registerBarLayoutController(screenName, controller) {
         if (!screenName || !controller) return
@@ -371,6 +371,7 @@ Item {
         if (except !== "themeSwitcherVisible") themeSwitcherVisible = false
         if (except !== "wallpaperSwitcherVisible") wallpaperSwitcherVisible = false
         if (except !== "clipboardVisible") clipboardVisible = false
+        if (except !== "emojiPickerVisible") emojiPickerVisible = false
         if (except !== "captureVisible") captureVisible = false
         if (except !== "appLauncherVisible") appLauncherVisible = false
         if (except !== "calendarVisible") calendarVisible = false
@@ -443,6 +444,11 @@ Item {
         paletteReader.running = true
     }
 
+    function setMonoFont(fontName) {
+        var next = String(fontName || "").trim()
+        if (next.length > 0) mono = next
+    }
+
     // ── Native Omarchy menu state ──
     property bool menuVisible: false
     property string menuRoute: "root"
@@ -457,6 +463,10 @@ Item {
     property bool clipboardVisible: false
     onClipboardVisibleChanged: popupOpened("clipboardVisible")
     function openClipboard() { activateFocusedPopupScreen(); clipboardVisible = true }
+
+    property bool emojiPickerVisible: false
+    onEmojiPickerVisibleChanged: popupOpened("emojiPickerVisible")
+    function openEmojiPicker() { activateFocusedPopupScreen(); emojiPickerVisible = true }
 
     property bool captureVisible: false
     property string captureAction: ""
@@ -1805,6 +1815,15 @@ Item {
         }
     }
 
+    Process {
+        id: fontReader
+        command: ["omarchy-font-current"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: theme.setMonoFont(this.text)
+        }
+    }
+
     IpcHandler {
         target: "theme"
         function apply(payload: string): void {
@@ -1823,6 +1842,9 @@ Item {
         }
         function reload(): void {
             theme.reloadThemePalette()
+        }
+        function setFont(fontName: string): void {
+            theme.setMonoFont(fontName)
         }
     }
 

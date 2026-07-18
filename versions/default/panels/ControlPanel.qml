@@ -447,33 +447,46 @@ PanelWindow {
             Grid {
                 id: animRow
                 width: parent.width
-                columns: 1
+                columns: 2
                 rowSpacing: 4
-                spacing: 4
-                readonly property var opts: [
-                    { label: "No gap animation", mode: 0 },
-                    { label: "Flowing sine wave", mode: 20 },
-                    { label: "Audio-reactive waveform", mode: 21 },
-                    { label: "Network pulse", mode: 22 },
-                    { label: "Breathing glow", mode: 23 },
-                    { label: "Particle stream", mode: 24 },
-                    { label: "Comet sweep", mode: 25 },
-                    { label: "Electric arc", mode: 26 },
-                    { label: "Gradient drift", mode: 27 },
-                    { label: "Widget energy transfer", mode: 28 },
-                    { label: "Idle ripple", mode: 29 },
-                    { label: "Clock-synchronized wave", mode: 30 },
-                    { label: "Workspace transition trail", mode: 31 },
-                    { label: "Recommended combo", mode: 32 }
+                columnSpacing: 4
+                readonly property var groups: [
+                    { label: "Waves", options: [
+                        { label: "Sine wave", mode: 20 },
+                        { label: "Audio wave", mode: 21 },
+                        { label: "Network pulse", mode: 22 },
+                        { label: "Clock wave", mode: 30 }
+                    ] },
+                    { label: "Energy", options: [
+                        { label: "Breathing glow", mode: 23 },
+                        { label: "Electric arc", mode: 26 },
+                        { label: "Gradient drift", mode: 27 },
+                        { label: "Energy transfer", mode: 28 }
+                    ] },
+                    { label: "Particles", options: [
+                        { label: "Particle stream", mode: 24 },
+                        { label: "Comet sweep", mode: 25 },
+                        { label: "Workspace trail", mode: 31 }
+                    ] },
+                    { label: "Ambient", options: [
+                        { label: "Idle ripple", mode: 29 },
+                        { label: "Recommended", mode: 32 },
+                        { label: "Off", mode: 0 }
+                    ] }
                 ]
                 Repeater {
-                    model: animRow.opts
+                    model: animRow.groups
                     delegate: Rectangle {
                         id: animTile
                         required property var modelData
-                        readonly property bool on:      root.barAnim === modelData.mode
+                        readonly property int selectedIndex: {
+                            for (var i = 0; i < modelData.options.length; ++i)
+                                if (modelData.options[i].mode === root.barAnim) return i
+                            return -1
+                        }
+                        readonly property bool on: selectedIndex >= 0
                         readonly property bool hovered: animMa.containsMouse
-                        width: animRow.width
+                        width: (animRow.width - animRow.columnSpacing) / 2
                         height: 25; radius: root.tileRadius
                         color: on ? root.fillActive : hovered ? root.fillHover : root.fillIdle
                         border.color: (on || hovered) ? root.seal : root.sep
@@ -481,17 +494,24 @@ PanelWindow {
                         Behavior on color { ColorAnimation { duration: 120 } }
                         UiText {
                             anchors.centerIn: parent
-                            text: animTile.modelData.label
+                            text: animTile.on ? animTile.modelData.options[animTile.selectedIndex].label
+                                              : animTile.modelData.label
                             color: (animTile.on || animTile.hovered) ? root.seal : root.ink
-                            font.family: root.mono; font.pixelSize: 10
+                            font.family: root.mono; font.pixelSize: 9
                             font.weight: animTile.on ? Font.Medium : Font.Normal
+                            width: parent.width - 8
+                            horizontalAlignment: Text.AlignHCenter
+                            elide: Text.ElideRight
                         }
                         MouseArea {
                             id: animMa
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: root.barAnim = animTile.modelData.mode
+                            onClicked: {
+                                var next = (animTile.selectedIndex + 1) % animTile.modelData.options.length
+                                root.barAnim = animTile.modelData.options[next].mode
+                            }
                         }
                     }
                 }

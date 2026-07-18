@@ -24,8 +24,13 @@ PanelWindow {
     property int selectedIndex: 0
     property string statusText: ""
     property string pendingAction: ""
+    property var dynamicRows: ({})
+    property string pendingDynamicSource: ""
+    property bool dynamicResultReceived: false
     readonly property bool inputDebug: Quickshell.env("QS_MENU_INPUT_DEBUG") === "1"
     readonly property bool nestedMenu: activeMenu !== "root"
+    readonly property bool unlockMenu: activeMenu === "style.unlocks"
+    readonly property int unlockPreviewHeight: unlockMenu ? 184 : 0
     readonly property int menuRowHeight: nestedMenu ? 36 : root.menuRowHeight
     readonly property int menuRowSpacing: nestedMenu ? 2 : root.menuRowSpacing
     readonly property int menuListNaturalHeight: Math.max(menuRowHeight,
@@ -37,7 +42,7 @@ PanelWindow {
     readonly property int menuBottomInset: root.barPosition === "bottom" ? 43 : 8
     readonly property int menuAvailableHeight: Math.max(1, height - menuTopInset - menuBottomInset)
     readonly property int menuListHeight: Math.min(menuListNaturalHeight,
-        Math.max(menuRowHeight, menuAvailableHeight - (nestedMenu ? nestedMenuChromeHeight : 28)))
+        Math.max(menuRowHeight, menuAvailableHeight - (nestedMenu ? nestedMenuChromeHeight : 28) - unlockPreviewHeight))
     property real reveal: root.menuVisible ? 1 : 0
 
     visible: reveal > 0.001
@@ -52,6 +57,7 @@ PanelWindow {
         resetTypeAhead()
         setSelection(0)
         statusText = ""
+        loadDynamicMenu(MenuModel.dynamicSource(activeMenu))
         root.activateFocusedPopupScreen()
         root.menuVisible = true
         focusTimer.restart()
@@ -64,7 +70,29 @@ PanelWindow {
     }
 
     function rows() {
+        var source = MenuModel.dynamicSource(activeMenu)
+        if (source) {
+            if (dynamicRows[source] !== undefined) return dynamicRows[source]
+            return [{ icon: "•", label: "Loading…", detail: "Retrieving current system options", enabledRow: false }]
+        }
         return MenuModel.children(activeMenu)
+    }
+
+    function setDynamicRows(source, values) {
+        var next = {}
+        for (var key in dynamicRows) next[key] = dynamicRows[key]
+        next[source] = values
+        dynamicRows = next
+        if (MenuModel.dynamicSource(activeMenu) === source) setSelection(0)
+    }
+
+    function loadDynamicMenu(source) {
+        if (!source || dataProc.running || dynamicRows[source] !== undefined) return
+        pendingDynamicSource = source
+        dynamicResultReceived = false
+        dataProc.command = [Quickshell.env("HOME") + "/.local/bin/qs-menu-data", source]
+        dataProc.running = false
+        dataProc.running = true
     }
 
     function cardY(cardHeight) {
@@ -135,6 +163,10 @@ PanelWindow {
     function selectedRow() {
         var current = rows()
         return current.length > 0 ? current[Math.min(selectedIndex, current.length - 1)] : null
+    }
+
+    function localFileUrl(path) {
+        return path ? encodeURI("file://" + path) : ""
     }
 
     function handleKey(event) {
@@ -220,6 +252,7 @@ PanelWindow {
             activeMenu = entry.submenuId
             resetTypeAhead()
             setSelection(0)
+            loadDynamicMenu(MenuModel.dynamicSource(activeMenu))
             focusTimer.restart()
             return
         }
@@ -235,7 +268,8 @@ PanelWindow {
             return
         }
         root.menuVisible = false
-        actionProc.command = ["qs-menu-action", action]
+        var value = String(entry.dynamicValue || "")
+        actionProc.command = value ? ["qs-menu-action", action, value] : ["qs-menu-action", action]
         actionProc.running = false
         actionProc.running = true
     }
@@ -299,9 +333,10 @@ PanelWindow {
 
     Rectangle {
         id: card
-        width: Math.min(360, parent.width - 24)
+        width: Math.min(menuPanel.unlockMenu ? 640 : 360, parent.width - 24)
         height: Math.min(menuPanel.menuAvailableHeight,
-            menuPanel.menuListHeight + (menuPanel.nestedMenu ? menuPanel.nestedMenuChromeHeight : 28))
+            menuPanel.menuListHeight + (menuPanel.nestedMenu ? menuPanel.nestedMenuChromeHeight : 28)
+                + menuPanel.unlockPreviewHeight)
         x: Math.round((parent.width - width) / 2)
         y: menuPanel.cardY(height)
         radius: root.pillRadius
@@ -369,6 +404,41 @@ PanelWindow {
 
             Rectangle { width: parent.width; height: 1; color: root.sep; visible: menuPanel.activeMenu !== "root" }
 
+            Rectangle {
+                width: parent.width
+                height: menuPanel.unlockPreviewHeight
+                visible: menuPanel.unlockMenu
+                radius: root.menuRowRadius
+                color: root.frameWeak
+                border.color: root.pillBorder
+                border.width: root.pillBorderW
+                clip: true
+
+                Image {
+                    id: unlockPreview
+                    anchors.fill: parent
+                    anchors.margins: 4
+                    source: {
+                        var row = menuPanel.selectedRow()
+                        return menuPanel.localFileUrl(row && row.previewPath || "")
+                    }
+                    asynchronous: true
+                    cache: false
+                    fillMode: Image.PreserveAspectFit
+                    sourceSize.width: 624
+                    sourceSize.height: 176
+                }
+
+                Text {
+                    anchors.centerIn: parent
+                    visible: unlockPreview.source === "" || unlockPreview.status === Image.Error
+                    text: unlockPreview.status === Image.Error ? "Preview unavailable" : "Default Omarchy unlock screen"
+                    color: root.sumi
+                    font.family: root.mono
+                    font.pixelSize: 11
+                }
+            }
+
             Text {
                 width: parent.width
                 visible: menuPanel.menuStack.length > 0
@@ -389,6 +459,7 @@ PanelWindow {
                 rowSpacing: menuPanel.menuRowSpacing
                 fontSize: root.menuFontSize
                 fontWeight: root.menuFontWeight
+                fontFamily: root.mono
                 rowRadius: root.menuRowRadius
                 textColor: root.ink
                 mutedColor: root.seal
@@ -428,6 +499,35 @@ PanelWindow {
         }
         function onMenuRouteChanged() {
             if (root.menuVisible) menuPanel.openMenu(root.menuRoute)
+        }
+    }
+
+    Process {
+        id: dataProc
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var source = menuPanel.pendingDynamicSource
+                var values = []
+                var lines = this.text.split("\n")
+                for (var i = 0; i < lines.length; i++) {
+                    var parts = lines[i].split("\t")
+                    if (parts.length < 4 || !parts[1] || !parts[3]) continue
+                    values.push({ icon: parts[0] || "•", label: parts[1], detail: parts[2] || "",
+                                  type: "action", actionId: parts[3], dynamicValue: parts[4] || "",
+                                  previewPath: parts[5] || "" })
+                }
+                if (values.length === 0)
+                    values = [{ icon: "•", label: "No entries available", detail: "The system returned no selectable items", enabledRow: false }]
+                menuPanel.dynamicResultReceived = true
+                menuPanel.setDynamicRows(source, values)
+            }
+        }
+        onExited: function(code) {
+            if (code !== 0 && !menuPanel.dynamicResultReceived) {
+                menuPanel.setDynamicRows(menuPanel.pendingDynamicSource,
+                    [{ icon: "•", label: "Unable to retrieve options", detail: "Try opening this menu again", enabledRow: false }])
+            }
         }
     }
 

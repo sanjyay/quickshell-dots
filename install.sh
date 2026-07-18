@@ -126,6 +126,7 @@ install_shell_updater() {
   mkdir -p "$bindst" "$unitdst"
   # This read-only helper does not depend on the persistent updater clone.
   install -m 755 "$src/scripts/qs-package-update-state.sh" "$bindst/qs-package-update-state.sh"
+  install -m 755 "$src/scripts/qs-topgrade-update.sh" "$bindst/qs-topgrade-update.sh"
 
   if [[ -d "$repodir/.git" ]]; then
     git -C "$repodir" fetch --quiet origin || true
@@ -317,10 +318,20 @@ if [[ -f "$src_repo/scripts/qs-mode.sh" ]]; then
   install -m 755 "$src_repo/scripts/swayosd-client" "$bridge"
   cmp -s "$src_repo/scripts/swayosd-client" "$bridge" || { err "Installed SwayOSD bridge does not match source"; exit 1; }
   install -m 755 "$src_repo/scripts/qs-menu-action.sh" "$HOME/.local/bin/qs-menu-action"
+  install -m 755 "$src_repo/scripts/qs-menu-data.sh" "$HOME/.local/bin/qs-menu-data"
   install -m 755 "$src_repo/scripts/qs-theme-switcher" "$HOME/.local/bin/qs-theme-switcher"
   install -m 755 "$src_repo/scripts/qs-wallpaper-switcher" "$HOME/.local/bin/qs-wallpaper-switcher"
   cmp -s "$src_repo/scripts/qs-wallpaper-switcher" "$HOME/.local/bin/qs-wallpaper-switcher" || { err "Installed qs-wallpaper-switcher does not match source"; exit 1; }
   install -m 755 "$src_repo/scripts/qs-clipboard.sh" "$HOME/.local/bin/qs-clipboard"
+  install -m 755 "$src_repo/scripts/qs-emoji.sh" "$HOME/.local/bin/qs-emoji"
+  privacy_lib="$HOME/.local/lib/qs-rise"
+  privacy_dropin="$HOME/.config/systemd/user/elephant.service.d"
+  mkdir -p "$privacy_lib/elephant-bin" "$privacy_dropin"
+  install -m 755 "$src_repo/scripts/qs-clipboard-filter.py" "$privacy_lib/qs-clipboard-filter.py"
+  install -m 755 "$src_repo/scripts/qs-elephant-wl-paste.sh" "$privacy_lib/elephant-bin/wl-paste"
+  install -m 644 "$src_repo/systemd/elephant-clipboard-privacy.conf" "$privacy_dropin/50-qs-rise-clipboard-privacy.conf"
+  systemctl --user daemon-reload
+  systemctl --user try-restart elephant.service >/dev/null 2>&1 || warn "Elephant must be restarted before clipboard privacy filtering becomes active."
   install -m 755 "$src_repo/scripts/qs-capture.sh" "$HOME/.local/bin/qs-capture"
   if [[ ! -e "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode" ]]; then
     printf 'quickshell\n' > "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode"

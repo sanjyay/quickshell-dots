@@ -144,11 +144,12 @@ fi
 
 # 1c. remove the shell self-updater, if installed (idempotent).
 qsbindir="$HOME/.config/quickshell/bin"
-if compgen -G "$unitdir/qs-shell-update-check.*" >/dev/null 2>&1 || [[ -e "$qsbindir/qs-shell-check-update.sh" ]]; then
+if compgen -G "$unitdir/qs-shell-update-check.*" >/dev/null 2>&1 || [[ -e "$qsbindir/qs-shell-check-update.sh" || -e "$qsbindir/qs-topgrade-update.sh" ]]; then
   systemctl --user disable --now qs-shell-update-check.timer >/dev/null 2>&1 || true
   systemctl --user stop qs-shell-update-check.service >/dev/null 2>&1 || true
   rm -f "$unitdir"/qs-shell-update-check.service "$unitdir"/qs-shell-update-check.timer
   rm -f "$qsbindir"/qs-package-update-state.sh \
+        "$qsbindir"/qs-topgrade-update.sh \
         "$qsbindir"/qs-shell-check-update.sh \
         "$qsbindir"/qs-shell-apply-update.sh \
         "$qsbindir"/qs-shell-refresh-local.sh \
@@ -173,7 +174,13 @@ if [[ -e "$HOME/.local/bin/qs-mode" || -e "${XDG_STATE_HOME:-$HOME/.local/state}
   rm -f "$HOME/.local/bin/qs-mode" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode"
   info "Removed reversible UI mode switcher"
 fi
-rm -f "$HOME/.local/bin/qs-rise-input" "$HOME/.local/bin/qs-menu-action" "$HOME/.local/bin/qs-theme-switcher" "$HOME/.local/bin/qs-wallpaper-switcher" "$HOME/.local/bin/qs-clipboard" "$HOME/.local/bin/qs-capture" "$HOME/.local/bin/qs-notification-silence" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/notifications-silenced"
+rm -f "$HOME/.local/bin/qs-rise-input" "$HOME/.local/bin/qs-menu-action" "$HOME/.local/bin/qs-menu-data" "$HOME/.local/bin/qs-theme-switcher" "$HOME/.local/bin/qs-wallpaper-switcher" "$HOME/.local/bin/qs-clipboard" "$HOME/.local/bin/qs-emoji" "$HOME/.local/bin/qs-capture" "$HOME/.local/bin/qs-notification-silence" "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/notifications-silenced"
+rm -f "$HOME/.config/systemd/user/elephant.service.d/50-qs-rise-clipboard-privacy.conf" \
+      "$HOME/.local/lib/qs-rise/elephant-bin/wl-paste" \
+      "$HOME/.local/lib/qs-rise/qs-clipboard-filter.py"
+rmdir "$HOME/.config/systemd/user/elephant.service.d" "$HOME/.local/lib/qs-rise/elephant-bin" "$HOME/.local/lib/qs-rise" 2>/dev/null || true
+systemctl --user daemon-reload >/dev/null 2>&1 || true
+systemctl --user try-restart elephant.service >/dev/null 2>&1 || true
 if [[ -f "$HOME/.local/bin/swayosd-client" ]] && grep -q 'quickshell-rise-owned-swayosd-client' "$HOME/.local/bin/swayosd-client"; then rm -f "$HOME/.local/bin/swayosd-client"; fi
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-theme-switcher"
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-wallpaper-switcher"

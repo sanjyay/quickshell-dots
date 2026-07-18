@@ -7,13 +7,20 @@ panel="$repo/versions/default/panels/ControlPanel.qml"
 stream="$repo/versions/default/modules/ParticleStream.qml"
 bar="$repo/versions/default/BarSlot.qml"
 
-for label in \
-  "No gap animation" "Flowing sine wave" "Audio-reactive waveform" \
-  "Network pulse" "Breathing glow" "Particle stream" "Comet sweep" \
-  "Electric arc" "Gradient drift" "Widget energy transfer" "Idle ripple" \
-  "Clock-synchronized wave" "Workspace transition trail" "Recommended combo"; do
-  grep -Fq "label: \"$label\"" "$panel"
+for mode in 0 20 21 22 23 24 25 26 27 28 29 30 31 32; do
+  grep -Fq "mode: $mode" "$panel"
 done
+
+# The selector stays compact: four buttons each cycle through an assigned group,
+# immediately updating both the active label and the rendered bar animation.
+grep -Fq 'columns: 2' "$panel"
+grep -Fq 'model: animRow.groups' "$panel"
+for group in Waves Energy Particles Ambient; do
+  grep -Fq "label: \"$group\", options:" "$panel"
+done
+! grep -Fq 'Try look' "$panel"
+grep -Fq 'var next = (animTile.selectedIndex + 1) % animTile.modelData.options.length' "$panel"
+grep -Fq 'root.barAnim = animTile.modelData.options[next].mode' "$panel"
 
 # One persisted selector controls the one existing renderer; off stops its timer.
 grep -Fq 'property int barAnim: 0' "$theme"
