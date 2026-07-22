@@ -35,11 +35,6 @@ ShellRoot {
     }
 
     IpcHandler {
-        target: "omarchy.system-update"
-        function refresh(): void { theme.archRefreshTick++ }
-    }
-
-    IpcHandler {
         target: "osd"
         function show(kind: string, value: string, detail: string, icon: string, screen: string): void {
             theme.showHardwareOsd(kind, value, detail, icon, screen)
@@ -47,10 +42,6 @@ ShellRoot {
     }
 
     NotificationManager { id: notificationManager; root: theme }
-    Connections {
-        target: theme
-        function onPackageUpdatesAnnounced(count) { notificationManager.announcePackageUpdates(count) }
-    }
     Connections {
         target: cameraSwitchMonitor
         function onCameraEnabledChanged() {
@@ -368,7 +359,6 @@ ShellRoot {
     CapturePanel { root: theme }
     AppLauncherPanel { root: theme }
     CalendarPopup { root: theme }
-    ArchUpdaterPanel { root: theme }
     ShellUpdatePanel { root: theme }
     PowerProfilePanel { root: theme }
     MemoryPanel { root: theme }

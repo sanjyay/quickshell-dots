@@ -36,4 +36,20 @@ require_line 'bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open' "$lau
 HOME="$tmp/home2" bash "$repo/uninstall.sh" >/dev/null
 [[ ! -e "$launcher_created_file" ]] || fail "expected $launcher_created_file to be removed"
 
+looknfeel_file="$tmp/home3/.config/hypr/looknfeel.conf"
+mkdir -p "$(dirname "$looknfeel_file")"
+printf '%s\n' 'decoration { rounding = 8 }' > "$looknfeel_file"
+HOME="$tmp/home3" bash "$repo/scripts/ensure-hypr-switcher-blur-rules.sh" >/dev/null
+require_line 'decoration { rounding = 8 }' "$looknfeel_file"
+require_line '# >>> quickshell-rise managed switcher blur rules >>>' "$looknfeel_file"
+require_line 'layerrule = blur on, match:namespace quickshell-theme-switcher' "$looknfeel_file"
+require_line 'layerrule = ignore_alpha 0, match:namespace quickshell-theme-switcher' "$looknfeel_file"
+require_line 'layerrule = blur on, match:namespace quickshell-wallpaper-switcher' "$looknfeel_file"
+require_line 'layerrule = ignore_alpha 0, match:namespace quickshell-wallpaper-switcher' "$looknfeel_file"
+HOME="$tmp/home3" bash "$repo/scripts/ensure-hypr-switcher-blur-rules.sh" >/dev/null
+[[ "$(grep -Fc '# >>> quickshell-rise managed switcher blur rules >>>' "$looknfeel_file")" == 1 ]] || fail "switcher blur block duplicated"
+HOME="$tmp/home3" bash "$repo/uninstall.sh" >/dev/null
+require_line 'decoration { rounding = 8 }' "$looknfeel_file"
+forbid_line 'layerrule = blur on, match:namespace quickshell-theme-switcher' "$looknfeel_file"
+
 printf 'ok (bindings install/uninstall)\n'

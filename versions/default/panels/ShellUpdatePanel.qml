@@ -4,7 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 
-// Confirmation panel for the shell-update badge. Mirrors ArchUpdaterPanel.
+// Confirmation panel for the shell-update badge.
 // Lists the incoming commits and runs the apply script on confirm. The apply
 // script restarts the bar, so it is launched DETACHED (setsid) — see
 // ~/.config/quickshell/bin/qs-shell-apply-update.sh.

@@ -24,7 +24,7 @@ Item {
         text: "\uF0F4"   // coffee (Nerd Font / JetBrainsMono)
         color: root.seal
         font.family: root.mono
-        font.pixelSize: 13
+        font.pixelSize: 24
     }
 
     Process {

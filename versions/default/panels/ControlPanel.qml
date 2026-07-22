@@ -22,7 +22,6 @@ PanelWindow {
 
     // power sub-menu starts CLOSED — no destructive tile is ever pre-shown
     property bool powerOpen: false
-    property bool scheduleOpen: false
     property bool wsOpen: false   // Workspaces collapsible inside the WW fly-out
     property bool privacyOpen: false
 
@@ -34,7 +33,7 @@ PanelWindow {
         }
     }
     visible: reveal > 0.001
-    onRevealChanged: if (reveal < 0.01) { powerOpen = false; scheduleOpen = false; wsOpen = false; privacyOpen = false; root.splitsSubVisible = false; root.wwSubVisible = false }  // reset when closed
+    onRevealChanged: if (reveal < 0.01) { powerOpen = false; wsOpen = false; privacyOpen = false; root.splitsSubVisible = false; root.wwSubVisible = false }  // reset when closed
     WlrLayershell.keyboardFocus: root.controlVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     Process {
@@ -199,118 +198,6 @@ PanelWindow {
                     omarchyModeProc.running = true
                 }
             }
-            Tile {
-                width: parent.width
-                label: ctrlPanel.scheduleOpen ? "Schedule Update  ▾" : "Schedule Update  ▸"
-                active: root.archUpdateScheduleActive
-                accent: root.seal
-                onActivated: ctrlPanel.scheduleOpen = !ctrlPanel.scheduleOpen
-            }
-            Rectangle {
-                width: parent.width
-                height: updateInfoCol.implicitHeight + 14
-                visible: root.updatesAvailable
-                radius: root.tileRadius
-                color: root.fillIdle
-                border.color: root.sep
-                border.width: 1
-
-                Column {
-                    id: updateInfoCol
-                    anchors.left: parent.left
-                    anchors.right: updateAction.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.leftMargin: 10
-                    anchors.rightMargin: 8
-                    spacing: 2
-                    UiText {
-                        text: "Updates"
-                        color: root.ink
-                        font.family: root.mono
-                        font.pixelSize: 11
-                        font.weight: Font.Medium
-                    }
-                    UiText {
-                        width: parent.width
-                        text: root.updateCount + (root.updateCount === 1 ? " package available" : " packages available")
-                        color: root.sumi
-                        font.family: root.mono
-                        font.pixelSize: 10
-                        elide: Text.ElideRight
-                    }
-                }
-
-                Rectangle {
-                    id: updateAction
-                    anchors.right: parent.right
-                    anchors.rightMargin: 7
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 58
-                    height: 24
-                    radius: root.tileRadius
-                    color: updateActionMa.containsMouse ? root.fillPrimaryHover : root.seal
-                    UiText {
-                        anchors.centerIn: parent
-                        text: "Update"
-                        color: root.paper
-                        font.family: root.mono
-                        font.pixelSize: 10
-                    }
-                    MouseArea {
-                        id: updateActionMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            root.activeUpdateTab = "packages"
-                            root.controlVisible = false
-                            root.archVisible = true
-                        }
-                    }
-                }
-            }
-            Grid {
-                width: parent.width
-                columns: 4
-                columnSpacing: 4
-                rowSpacing: 4
-                visible: ctrlPanel.scheduleOpen
-                Repeater {
-                    model: root.archUpdateDayOptions
-                    delegate: Rectangle {
-                        id: actionDayTile
-                        required property var modelData
-                        readonly property bool on: root.archUpdateDay === modelData.id
-                        readonly property bool hovered: actionDayMa.containsMouse
-                        width: root.evenW((col.width - 12) / 4)
-                        height: 25
-                        radius: root.tileRadius
-                        color: on ? root.fillActive : hovered ? root.fillHover : root.fillIdle
-                        border.color: (on || hovered) ? root.seal : root.sep
-                        border.width: 1
-                        Behavior on color { ColorAnimation { duration: 120 } }
-                        UiText {
-                            anchors.centerIn: parent
-                            text: actionDayTile.modelData.label
-                            color: (actionDayTile.on || actionDayTile.hovered) ? root.seal : root.ink
-                            font.family: root.mono
-                            font.pixelSize: 10
-                            font.weight: actionDayTile.on ? Font.Medium : Font.Normal
-                        }
-                        MouseArea {
-                            id: actionDayMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                root.archUpdateDay = actionDayTile.modelData.id
-                                root.archUpdateScheduleActive = false
-                            }
-                        }
-                    }
-                }
-            }
-
             // ── POWER (collapsed sub-menu; nothing destructive pre-shown) ──
             Tile {
                 width: parent.width

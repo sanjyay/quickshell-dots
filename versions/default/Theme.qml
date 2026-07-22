@@ -154,7 +154,7 @@ Item {
         || memVisible || volVisible || controlVisible || networkVisible || bluetoothVisible
         || batteryVisible || mprisVisible || tailscaleVisible
         || workspaceVisible || imagePickerVisible || mediaBrowserVisible || notifVisible
-        || powerProfileVisible || archVisible || shellUpdateVisible || trayVisible || trayMenuVisible
+        || powerProfileVisible || shellUpdateVisible || trayVisible || trayMenuVisible
     readonly property bool keyboardPopupVisible: menuVisible || themeSwitcherVisible || wallpaperSwitcherVisible || clipboardVisible || emojiPickerVisible || captureVisible || appLauncherVisible || imagePickerVisible || mediaBrowserVisible
 
     function registerBarLayoutController(screenName, controller) {
@@ -320,7 +320,6 @@ Item {
         else if (name === "cpu") cpuBarX = x
         else if (name === "ai") aiBarX = x
         else if (name === "workspace") workspaceBarX = x
-        else if (name === "arch") archBarX = x
         else if (name === "bluetooth") bluetoothBarX = x
         else if (name === "power") powerBarX = x
         else if (name === "mpris") mprisBarX = x
@@ -389,7 +388,6 @@ Item {
         if (except !== "mediaBrowserVisible") mediaBrowserVisible = false
         if (except !== "notifVisible") notifVisible = false
         if (except !== "powerProfileVisible") powerProfileVisible = false
-        if (except !== "archVisible") archVisible = false
         if (except !== "shellUpdateVisible") shellUpdateVisible = false
         if (except !== "trayVisible") trayVisible = false
         if (except !== "trayMenuVisible") trayMenuVisible = false
@@ -1151,19 +1149,6 @@ Item {
     property string launcherLogoText: "omarchy"  // "omarchy", "hyprland", "arch", or "omacom"
     property string launcherLogoIcon: "omarchy"  // see launcherLogoIconGlyph()
     property bool   clock12h:        false   // false = 24h, true = 12h (AM/PM)
-    property string archUpdateDay:   "friday" // weekday when the package update pill is shown
-    property bool   archUpdateScheduleActive: false // keep the pill visible after scheduled updates are found
-    // Update completion is determined by a durable package fingerprint, not the date.
-    property string archUpdateStatus: "unknown"
-    property string archUpdateFingerprint: ""
-    property string archUpdateCompletedFingerprint: ""
-    property string archUpdateSettledScheduleKey: ""
-    property bool archUpdateRebootRequired: false
-    property string archUpdateSnapperStatus: "unavailable"
-    property bool   updatesAvailable: false
-    property int    updateCount: 0
-    property int    previousUpdateCount: 0
-    signal packageUpdatesAnnounced(int count)
 
     // ── widget/workspace state persistence ──
     readonly property string widgetsCachePath: Quickshell.env("HOME") + "/.cache/quickshell_widgets"
@@ -1206,84 +1191,12 @@ Item {
     onLauncherLogoTextChanged: if (_widgetsLoaded) saveWidgets()
     onLauncherLogoIconChanged: if (_widgetsLoaded) saveWidgets()
     onClock12hChanged:        if (_widgetsLoaded) saveWidgets()
-    onArchBadgePackagesChanged: if (_widgetsLoaded) saveWidgets()
-    onArchBadgeThemesChanged:   if (_widgetsLoaded) saveWidgets()
     onStyleBorderChanged:      if (_widgetsLoaded) saveWidgets()
     onStyleShadowChanged:      if (_widgetsLoaded) saveWidgets()
     onStyleFrostChanged:       if (_widgetsLoaded) saveWidgets()
     onStyleRadiusSmallChanged: if (_widgetsLoaded) saveWidgets()
     onWorkspaceStyleChanged:   if (_widgetsLoaded) saveWidgets()
     onBarPositionChanged:      if (_widgetsLoaded) saveWidgets()
-    onArchUpdateDayChanged: if (_widgetsLoaded) saveWidgets()
-    onArchUpdateScheduleActiveChanged: if (_widgetsLoaded) saveWidgets()
-
-    readonly property var archUpdateDayOptions: [
-        { id: "monday",    label: "Mon", index: 1 },
-        { id: "tuesday",   label: "Tue", index: 2 },
-        { id: "wednesday", label: "Wed", index: 3 },
-        { id: "thursday",  label: "Thu", index: 4 },
-        { id: "friday",    label: "Fri", index: 5 },
-        { id: "saturday",  label: "Sat", index: 6 },
-        { id: "sunday",    label: "Sun", index: 0 }
-    ]
-    property int currentWeekday: new Date().getDay()
-    property string currentDateKey: dateKey(new Date())
-    readonly property bool isArchUpdateScheduleDay: currentWeekday === archUpdateDayIndex(archUpdateDay)
-    // The date is only a scheduling cadence. Suppression is keyed by package state
-    // in qs-package-update-state.sh, so new packages later that day are not hidden.
-    readonly property bool archUpdateDue: isArchUpdateScheduleDay
-        && archUpdateSettledScheduleKey !== currentDateKey
-
-    Timer {
-        interval: 3600000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            var now = new Date()
-            theme.currentWeekday = now.getDay()
-            theme.currentDateKey = theme.dateKey(now)
-        }
-    }
-
-    function dateKey(d) {
-        function pad2(n) { return n < 10 ? "0" + n : String(n) }
-        return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate())
-    }
-    function archUpdateDayIndex(id) {
-        for (var i = 0; i < archUpdateDayOptions.length; i++)
-            if (archUpdateDayOptions[i].id === id) return archUpdateDayOptions[i].index
-        return 5
-    }
-    function archUpdateDayValid(id) {
-        for (var i = 0; i < archUpdateDayOptions.length; i++)
-            if (archUpdateDayOptions[i].id === id) return true
-        return false
-    }
-    function archUpdateDayLabel(id) {
-        for (var i = 0; i < archUpdateDayOptions.length; i++)
-            if (archUpdateDayOptions[i].id === id) return archUpdateDayOptions[i].label
-        return "Fri"
-    }
-
-    function setPackageUpdateCount(count, notificationKey) {
-        var nextCount = Math.max(0, count || 0)
-        if (nextCount === 0) {
-            updatesAvailable = false
-            updateCount = 0
-            previousUpdateCount = 0
-            return
-        }
-
-        updatesAvailable = true
-        updateCount = nextCount
-        if (nextCount === previousUpdateCount && !notificationKey) return
-
-        previousUpdateCount = nextCount
-        if (!notificationKey) return
-        packageUpdatesAnnounced(nextCount)
-    }
-
     function saveWidgets() {
         var line = (modMemory    ? "1" : "0") + " "
                  + "0 "                                  // legacy brightness field; module removed
@@ -1311,10 +1224,7 @@ Item {
                  + launcherLogoMode + " "                 // +18 launcher logo mode (text/icon)
                  + launcherLogoText + " "                 // +19 text logo id
                  + launcherLogoIcon + " "                 // +20 icon logo id
-                 + (archBadgePackages ? "1" : "0") + " "  // +21 updater package badge
-                 + (archBadgeThemes   ? "1" : "0") + " "  // +22 updater clean-theme badge
-                 + archUpdateDay + " "                    // +23 package updater weekday
-                 + (archUpdateScheduleActive ? "1" : "0") + " " // +24 scheduled updater is active until no packages remain
+                 + "0 0 friday 0 "                        // +21..+24 retired package-updater fields
                  + (modPrivacy ? "1" : "0") + " "         // +25 microphone/camera privacy pills
                  + (modBattery ? "1" : "0") + " "         // +26 battery pill
                  + (modPrivacyMic ? "1" : "0") + " "      // +27 microphone privacy pill
@@ -1517,11 +1427,6 @@ Item {
                             theme.launcherLogoText = lm
                         }
                     }
-                    if (parts.length > wsField + 21) theme.archBadgePackages = parts[wsField + 21] !== "0"
-                    if (parts.length > wsField + 22) theme.archBadgeThemes   = parts[wsField + 22] !== "0"
-                    if (parts.length > wsField + 23 && theme.archUpdateDayValid(parts[wsField + 23]))
-                        theme.archUpdateDay = parts[wsField + 23]
-                    if (parts.length > wsField + 24) theme.archUpdateScheduleActive = parts[wsField + 24] === "1"
                     if (parts.length > wsField + 25) theme.modPrivacy = parts[wsField + 25] !== "0"
                     if (parts.length > wsField + 26) theme.modBattery = parts[wsField + 26] !== "0"
                     if (parts.length > wsField + 27) theme.modPrivacyMic = parts[wsField + 27] !== "0"
@@ -1615,117 +1520,6 @@ Item {
             Hyprland.dispatch("workspace " + id)
     }
 
-    // ── Arch Updater state ──
-    property bool archVisible: false
-    onArchVisibleChanged: popupOpened("archVisible")
-    property var archUpdates: []
-    property int archRefreshTick: 0
-
-    // ── Arch security gate (pre-install verdict per package) ──
-    // idle | scanning | clean | warn | blocked | degraded
-    property string archGateState: "idle"
-    property var    archGateResults: []   // [{pkg,repo,old,new,verdict,reason}]
-    property int    archGateOk: 0
-    property int    archGateWarn: 0
-    property int    archGateFail: 0
-    property int    archGateBlacklist: 0
-    property bool   archGateDegraded: false
-    property string archGateListDate: ""   // freshest blacklist date (meta updated_at, else mtime)
-    property bool   archGateStale: false          // protection list older than the gate's stale window
-    property bool   archGateMirrorsAgree: false   // both feed mirrors produced an identical list
-    property bool   archGateMirrorMismatch: false // feeds diverged → using their union, flagged
-
-    // Manual retry, e.g. on panel open: a degraded verdict can be a transient
-    // (blacklist file mid-update at scan time) and must not stick until the
-    // next refresh.
-    function archGateRescan() { archGate.rerun() }
-
-    Process {
-        id: archGate
-        // Hang on the DATA, not the refresh trigger: archRefreshTick fires the
-        // refresh, but archUpdates is only filled when the refresh finishes — so
-        // watching the tick would scan the PREVIOUS list. Watch archUpdates.
-        property var watched: theme.archUpdates
-        onWatchedChanged: rerun()
-        // A rerun restarts even a live scan (running=false→true). That kill makes
-        // onExited see a nonzero (terminated) exit; flag it so onExited does NOT
-        // mistake the deliberate kill for a crash and force degraded — that false
-        // degraded could land AFTER a clean scan and stick ("protection limited" +
-        // no "mirrors ✓" despite a healthy feed).
-        property bool killing: false
-        function rerun() {
-            if (running) killing = true
-            running = false   // restart even if a previous scan is still running
-            theme.archGateResults = []
-            theme.archGateOk = 0; theme.archGateWarn = 0; theme.archGateFail = 0
-            theme.archGateBlacklist = 0; theme.archGateDegraded = false
-            theme.archGateStale = false; theme.archGateMirrorsAgree = false; theme.archGateMirrorMismatch = false
-            // Run the gate even with 0 updates — it still emits the meta line, so the
-            // panel can always show the blacklist size / protection status.
-            theme.archGateState = (theme.archUpdates && theme.archUpdates.length > 0)
-                ? "scanning" : "clean"
-            stdinEnabled = true   // re-arm stdin each run — onStarted sets it false to send EOF; without this the 2nd+ run reads disabled stdin and hangs in 'scanning'
-            running = true
-        }
-        command: ["bash", Quickshell.env("HOME") + "/.local/bin/qs-arch-security-gate.sh"]
-        stdinEnabled: true
-        onStarted: {
-            // Feed "pkg|repo|old|new" — exactly the gate's stdin format.
-            var ups = theme.archUpdates || []
-            for (var i = 0; i < ups.length; i++) {
-                var u = ups[i]
-                var repo = (u.source === "aur") ? "aur" : "system"
-                write(u.name + "|" + repo + "|" + (u.oldVer || "") + "|" + (u.newVer || "") + "\n")
-            }
-            stdinEnabled = false   // EOF → gate finishes
-        }
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var results = [], ok = 0, warn = 0, fail = 0, sawMeta = false
-                var lines = this.text.trim().split("\n")
-                for (var i = 0; i < lines.length; i++) {
-                    var s = lines[i].trim(); if (!s) continue
-                    var o; try { o = JSON.parse(s) } catch (e) { continue }
-                    if (o.meta === "gate") {
-                        sawMeta = true
-                        theme.archGateBlacklist = o.blacklist || 0
-                        if (o.degraded) theme.archGateDegraded = true
-                        if (o.list_date) theme.archGateListDate = o.list_date
-                        if (o.stale) theme.archGateStale = true
-                        theme.archGateMirrorsAgree = (o.mirrors_agree === true)
-                        theme.archGateMirrorMismatch = (o.mirror_mismatch === true)
-                        continue
-                    }
-                    results.push(o)
-                    if (o.verdict === "FAIL") fail++
-                    else if (o.verdict === "WARN") warn++
-                    else ok++
-                }
-                theme.archGateResults = results
-                theme.archGateOk = ok; theme.archGateWarn = warn; theme.archGateFail = fail
-                // Fail-CLOSED: if the gate didn't fully respond (no meta line, or a
-                // package has no verdict — gate missing/crashed/partial), do NOT
-                // claim "clean". An empty/short answer means "unverified", not "safe".
-                if (!sawMeta || results.length !== (theme.archUpdates || []).length)
-                    theme.archGateDegraded = true
-                theme.archGateState =
-                    fail > 0 ? "blocked"
-                    : theme.archGateDegraded ? "degraded"
-                    : warn > 0 ? "warn" : "clean"
-            }
-        }
-        onExited: (exitCode) => {
-            if (killing) { killing = false; return }   // we restarted it on purpose, not a crash
-            // Gate exited nonzero (missing script, crash) => force degraded so the
-            // panel never shows a false all-clear.
-            if (exitCode !== 0) {
-                theme.archGateDegraded = true
-                if (theme.archGateFail === 0 && theme.archGateWarn === 0)
-                    theme.archGateState = "degraded"
-            }
-        }
-    }
-
     // ── Shell Updater state (badge ⇄ panel; fed by ShellUpdateWidget's FileView) ──
     property bool shellUpdateVisible: false
     onShellUpdateVisibleChanged: popupOpened("shellUpdateVisible")
@@ -1733,25 +1527,6 @@ Item {
     property var  shellUpdateSummary: []
     property string shellUpdateVersion: ""
     property real shellUpdateBarX: 0
-
-    // ── Theme Updater state (fed by ArchUpdaterPanel's FileView over
-    //    ~/.cache/qs-theme-updates.json; the panel owns the check Process so it
-    //    runs ONCE, not per-monitor). The bar/tooltip only read these counts;
-    //    the panel renders themeUpdList. Display-only: actual updates are
-    //    delegated to visible Omarchy terminal commands. ──
-    property int    themeUpdOutdated: 0
-    property int    themeUpdLocalEdits: 0
-    property int    themeUpdTotal: 0
-    property int    themeUpdReachable: 0
-    property bool   themeUpdDegraded: false
-    property bool   themeUpdCurrentStale: false
-    property string themeUpdChecked: ""      // ISO timestamp of the last check, "" = never
-    property var    themeUpdList: []          // outdated/unreachable entries shown in the panel
-    property bool   themeUpdChecking: false   // a check is in flight (button disabled)
-    property int    themeCheckTick: 0         // ++ from the panel button to trigger a check
-    property string activeUpdateTab: "packages"   // which ArchUpdaterPanel tab is shown
-    property bool   archBadgePackages: true   // package count badge on the bar updater icon
-    property bool   archBadgeThemes: true     // clean-theme count badge on the bar updater icon
 
     // ── Tray state ──
     property bool trayVisible: false

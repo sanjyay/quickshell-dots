@@ -66,19 +66,6 @@ Scope {
         schedule(entry)
     }
 
-    function announcePackageUpdates(count) {
-        var entry = {
-            key: "internal:package-updates", id: -1, notification: null,
-            appName: "Quickshell Rise", summary: "Updates Available",
-            body: count + (count === 1 ? " package ready" : " packages ready"), image: "",
-            screenName: targetScreenName(), transient: false, urgency: NotificationUrgency.Normal,
-            expireTimeout: 7000, internalAction: "packages",
-            actions: [{ identifier: "packages", text: "Open updates" }]
-        }
-        replaceOrPrepend(entry, true)
-        schedule(entry)
-    }
-
     function replaceOrPrepend(entry, persist) {
         var nextToasts = [], replaced = false
         for (var i = 0; i < toasts.length; i++) {
@@ -129,12 +116,6 @@ Scope {
     }
 
     function invoke(entry, identifier) {
-        if (entry.internalAction === "packages") {
-            root.activateFocusedPopupScreen()
-            root.archVisible = true
-            close(entry.key, false)
-            return
-        }
         if (!entry.notification) return
         var actions = entry.notification.actions || []
         var fallback = null
@@ -170,8 +151,16 @@ Scope {
         id: cacheFile
         path: manager.cachePath
         onLoaded: {
-            try { manager.recent = JSON.parse(cacheFile.text()).recent || []; manager.lastSaved = cacheFile.text() }
-            catch (e) { manager.recent = [] }
+            try {
+                var stored = JSON.parse(cacheFile.text()).recent || []
+                var retained = []
+                for (var i = 0; i < stored.length; i++)
+                    if (stored[i].key !== "internal:package-updates") retained.push(stored[i])
+                manager.recent = retained
+                manager.lastSaved = cacheFile.text()
+                manager.cacheLoaded = true
+                if (retained.length !== stored.length) manager.saveCache()
+            } catch (e) { manager.recent = [] }
             manager.cacheLoaded = true
         }
         onLoadFailed: manager.cacheLoaded = true

@@ -49,5 +49,8 @@ rm -rf "$backup" 2>/dev/null || true
 if [ -f "$SRC/scripts/ensure-hypr-launcher-binding.sh" ]; then
   bash "$SRC/scripts/ensure-hypr-launcher-binding.sh" || true
 fi
+if [ -f "$SRC/scripts/ensure-hypr-switcher-blur-rules.sh" ]; then
+  bash "$SRC/scripts/ensure-hypr-switcher-blur-rules.sh" || true
+fi
 setsid qs -n -d -c bar >/dev/null 2>&1 < /dev/null &
 note "Shell refreshed" "Reloaded from $SRC."

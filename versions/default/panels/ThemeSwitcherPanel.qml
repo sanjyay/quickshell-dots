@@ -16,6 +16,7 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-theme-switcher"
     WlrLayershell.keyboardFocus: panel.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    mask: Region { item: card }
 
     property real reveal: root.themeSwitcherVisible ? 1 : 0
     Behavior on reveal { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
@@ -26,8 +27,10 @@ PanelWindow {
     property string lastSuccessfulId: ""
     property int selectedIndex: -1
     property string applyingId: ""
+    property string sessionStartId: ""
     property bool applyInFlight: false
     property bool rollbackInFlight: false
+    property bool cancelInFlight: false
     property bool suppressApply: true
     property bool refreshComplete: false
     property string typeAheadQuery: ""
@@ -38,18 +41,14 @@ PanelWindow {
 
     readonly property int topInset: root.barPosition === "top" ? 43 : 8
     readonly property int bottomInset: root.barPosition === "bottom" ? 43 : 8
-    // The overlay already spans the monitor; use its usable width so the
-    // carousel consumes the side space without changing the overlay itself.
-    readonly property int cardWidth: Math.max(1, width - 48)
-    readonly property int cardHeight: Math.max(1, Math.min(height - topInset - bottomInset,
-        Math.max(380, Math.round(height * 0.57))))
-    // Keep the focused preview large, but leave enough proportional room for
-    // two complete neighbours on each side at common monitor widths.
-    readonly property int previewWidth: Math.max(1, Math.min(500,
-        Math.max(320, Math.round(cardWidth * 0.42))))
+    readonly property int panelWidth: Math.max(1, width - 48)
+    readonly property int usableHeight: Math.max(1, height - topInset - bottomInset)
+    readonly property int previewWidth: Math.max(1, Math.min(680, panelWidth, Math.floor((usableHeight - 86) * 16 / 9)))
     readonly property int previewHeight: Math.round(previewWidth * 9 / 16)
-    readonly property int step: Math.round(Math.max(150, Math.min(400,
-        cardWidth / 4 - previewWidth * 0.13)))
+    readonly property int sideSpan: Math.max(0, (panelWidth - previewWidth) / 2 - 12)
+    readonly property int sideCapacity: Math.max(0, Math.floor(sideSpan / (144 + 12)))
+    readonly property int neighbourCount: Math.min(Math.max(0, themes.length - 1), sideCapacity * 2)
+    readonly property int panelHeight: Math.min(usableHeight, previewHeight + 70)
 
     function refresh() {
         // Keep the last valid model visible while the asynchronous discovery
@@ -59,6 +58,12 @@ PanelWindow {
         listProcFinished = false
         currentProc.running = true
         listProc.running = true
+    }
+
+    function beginSession() {
+        sessionStartId = currentId || cacheCurrentText || lastSuccessfulId
+        focusItem.focus = true
+        focusItem.forceActiveFocus()
     }
 
     function themeIds(list) {
@@ -113,7 +118,7 @@ PanelWindow {
 
     function cardY() {
         return Math.round(Math.max(topInset,
-            Math.min(height - bottomInset - cardHeight, (height - cardHeight) / 2)))
+            Math.min(height - bottomInset - panelHeight, (height - panelHeight) / 2)))
     }
 
     function select(index) {
@@ -160,6 +165,48 @@ PanelWindow {
         applyProc.command = ["omarchy-theme-set", item.id]
         applyProc.running = false
         applyProc.running = true
+    }
+
+    function confirmAndClose() {
+        if (!panel.visible) return
+        applyTimer.stop()
+        panel.applyLatest()
+        root.themeSwitcherVisible = false
+    }
+
+    function cancelAndClose() {
+        if (!panel.visible) return
+        applyTimer.stop()
+        typeAheadTimer.stop()
+        if (ThemeModel.validId(sessionStartId)) {
+            cancelInFlight = true
+            cancelProc.command = ["omarchy-theme-set", sessionStartId]
+            cancelProc.running = false
+            cancelProc.running = true
+        }
+        restoreSelection(sessionStartId)
+        root.themeSwitcherVisible = false
+    }
+
+    function handleKey(event) {
+        if (event.key === Qt.Key_Escape) {
+            panel.cancelAndClose()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            panel.confirmAndClose()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
+            panel.move(-1); event.accepted = true
+        } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) {
+            panel.move(1); event.accepted = true
+        } else if (event.key === Qt.Key_Home) {
+            panel.select(0); event.accepted = true
+        } else if (event.key === Qt.Key_End) {
+            panel.select(panel.themes.length - 1); event.accepted = true
+        } else if (event.text && event.text.length === 1
+                   && event.text.charCodeAt(0) >= 32) {
+            panel.selectTypeAhead(event.text); event.accepted = true
+        }
     }
 
     function notifyFailure() {
@@ -280,6 +327,7 @@ PanelWindow {
         running: false
         onExited: function(code) {
             panel.applyInFlight = false
+            if (panel.cancelInFlight) return
             if (code === 0) {
                 panel.lastSuccessfulId = panel.applyingId
                 panel.currentId = panel.applyingId
@@ -312,66 +360,43 @@ PanelWindow {
         }
     }
 
-    Rectangle {
-        anchors.fill: parent
-        color: Qt.rgba(root.paper.r, root.paper.g, root.paper.b, 0.74)
-        opacity: panel.reveal
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: root.themeSwitcherVisible = false
-            onWheel: function(event) {
-                panel.move(event.angleDelta.y < 0 ? 1 : -1)
-                event.accepted = true
+    Process {
+        id: cancelProc
+        command: []
+        running: false
+        onExited: function(code) {
+            panel.cancelInFlight = false
+            if (code === 0) {
+                panel.lastSuccessfulId = panel.sessionStartId
+                panel.currentId = panel.sessionStartId
+                panel.root.reloadThemePalette()
+            } else {
+                console.warn("ThemeSwitcher: cancel restore failed with code " + code)
             }
         }
+    }
+
+    Rectangle {
+        id: blurSurface
+        anchors.fill: parent
+        color: Qt.rgba(root.paper.r, root.paper.g, root.paper.b, 0.10)
+        opacity: panel.reveal
     }
 
     Item {
         id: focusItem
         anchors.fill: parent
         focus: panel.visible
-        Keys.onPressed: function(event) {
-            if (event.key === Qt.Key_Escape) {
-                root.themeSwitcherVisible = false
-                event.accepted = true
-            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
-                panel.move(-1); event.accepted = true
-            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) {
-                panel.move(1); event.accepted = true
-            } else if (event.key === Qt.Key_Home) {
-                panel.select(0); event.accepted = true
-            } else if (event.key === Qt.Key_End) {
-                panel.select(panel.themes.length - 1); event.accepted = true
-            } else if (event.text && event.text.length === 1
-                       && event.text.charCodeAt(0) >= 32) {
-                panel.selectTypeAhead(event.text); event.accepted = true
-            }
-        }
+        Keys.priority: Keys.BeforeItem
+        Keys.onPressed: function(event) { panel.handleKey(event) }
     }
 
-    Rectangle {
+    Item {
         id: card
         x: Math.round((parent.width - width) / 2)
         y: panel.cardY()
-        width: panel.cardWidth
-        height: panel.cardHeight
-        radius: root.pillRadius
-        color: Qt.rgba(root.paper.r, root.paper.g, root.paper.b, 1)
-        border.color: root.pillBorder
-        border.width: root.pillBorderW
-        clip: true
-        PillShadow { theme: root }
-
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-            onClicked: {}
-            onWheel: function(event) {
-                panel.move(event.angleDelta.y < 0 ? 1 : -1)
-                event.accepted = true
-            }
-        }
+        width: panel.panelWidth
+        height: panel.panelHeight
 
         Repeater {
             model: panel.themes
@@ -379,26 +404,31 @@ PanelWindow {
                 required property var modelData
                 required property int index
                 readonly property int distance: index - panel.selectedIndex
-                readonly property bool shown: Math.abs(distance) <= 2
+                readonly property int rank: Math.abs(distance)
+                readonly property bool shown: distance === 0 || (rank <= panel.sideCapacity
+                    && rank <= panel.neighbourCount)
+                readonly property real sideWidth: panel.sideCapacity > 0 ? panel.sideSpan / panel.sideCapacity : 0
                 width: panel.previewWidth
-                height: panel.previewHeight + 42
-                x: Math.round(card.width / 2 + distance * panel.step - width / 2)
+                height: panel.previewHeight + 38
+                x: Math.round(card.width / 2 - width / 2 + (distance === 0 ? 0 : (distance < 0 ? -1 : 1) * (panel.previewWidth / 2 + 12 + sideWidth * (rank - 0.5))))
                 y: Math.round((card.height - height) / 2)
-                z: 100 - Math.abs(distance)
+                z: 100 - rank
                 visible: shown
-                opacity: shown ? Math.max(0.18, 1 - Math.abs(distance) * 0.22) : 0
-                scale: distance === 0 ? 1
-                       : (Math.abs(distance) === 1 ? 0.76 : 0.52)
-                Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                Behavior on opacity { NumberAnimation { duration: 220 } }
-                Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                opacity: shown ? Math.max(0.28, 1 - rank * 0.18) : 0
+                scale: distance === 0 ? 1 : Math.max(144 / panel.previewWidth, 0.78 - (rank - 1) * 0.12)
+                Behavior on x { enabled: panel.root.themeSwitcherVisible; NumberAnimation { duration: 210; easing.type: Easing.OutCubic } }
+                Behavior on opacity { enabled: panel.root.themeSwitcherVisible; NumberAnimation { duration: 210 } }
+                Behavior on scale { enabled: panel.root.themeSwitcherVisible; NumberAnimation { duration: 210; easing.type: Easing.OutCubic } }
 
                 transform: Rotation {
                     origin.x: width / 2
                     origin.y: panel.previewHeight / 2
                     axis { x: 0; y: 1; z: 0 }
-                    angle: Math.max(-16, Math.min(16, distance * -8))
-                    Behavior on angle { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                    angle: distance === 0 ? 0 : (distance < 0 ? 13 : -13)
+                    Behavior on angle {
+                        enabled: panel.root.themeSwitcherVisible
+                        NumberAnimation { duration: 210 }
+                    }
                 }
 
                 Rectangle {
@@ -421,12 +451,14 @@ PanelWindow {
 
                 Text {
                     anchors.top: parent.top
-                    anchors.topMargin: panel.previewHeight + 12
+                    anchors.topMargin: panel.previewHeight + 10
                     width: parent.width
                     text: modelData.label
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
                     color: index === panel.selectedIndex ? root.ink : root.sumi
+                    style: Text.Outline
+                    styleColor: root.paper
                     font.family: root.mono
                     font.pixelSize: root.menuFontSize
                     font.weight: index === panel.selectedIndex ? Font.DemiBold : Font.Normal
@@ -437,6 +469,10 @@ PanelWindow {
                     hoverEnabled: true
                     onClicked: {
                         panel.select(index)
+                    }
+                    onDoubleClicked: {
+                        panel.select(index)
+                        panel.confirmAndClose()
                     }
                     onWheel: function(event) {
                         panel.move(event.angleDelta.y < 0 ? 1 : -1)
@@ -450,6 +486,7 @@ PanelWindow {
     onSelectedIndexChanged: panel.requestApply()
     onVisibleChanged: {
         if (visible) {
+            panel.beginSession()
             panel.refresh()
             scanTimer.start()
             focusItem.forceActiveFocus()
@@ -458,6 +495,7 @@ PanelWindow {
             typeAheadTimer.stop()
             scanTimer.stop()
             watchListProc.running = false
+            focusItem.focus = false
         }
     }
 

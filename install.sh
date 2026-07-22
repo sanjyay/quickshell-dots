@@ -124,10 +124,6 @@ install_shell_updater() {
   local repodir="$HOME/.local/share/quickshell-dots"
 
   mkdir -p "$bindst" "$unitdst"
-  # This read-only helper does not depend on the persistent updater clone.
-  install -m 755 "$src/scripts/qs-package-update-state.sh" "$bindst/qs-package-update-state.sh"
-  install -m 755 "$src/scripts/qs-topgrade-update.sh" "$bindst/qs-topgrade-update.sh"
-
   if [[ -d "$repodir/.git" ]]; then
     git -C "$repodir" fetch --quiet origin || true
   else
@@ -140,6 +136,7 @@ install_shell_updater() {
   install -m 755 "$src/scripts/qs-shell-apply-update.sh" "$bindst/qs-shell-apply-update.sh"
   install -m 755 "$src/scripts/qs-shell-refresh-local.sh" "$bindst/qs-shell-refresh-local.sh"
   install -m 755 "$src/scripts/ensure-hypr-launcher-binding.sh" "$bindst/ensure-hypr-launcher-binding.sh"
+  install -m 755 "$src/scripts/ensure-hypr-switcher-blur-rules.sh" "$bindst/ensure-hypr-switcher-blur-rules.sh"
   install -m 644 "$src/systemd/qs-shell-update-check.service" "$unitdst/qs-shell-update-check.service"
   install -m 644 "$src/systemd/qs-shell-update-check.timer"   "$unitdst/qs-shell-update-check.timer"
 
@@ -150,28 +147,24 @@ install_shell_updater() {
   info "Shell self-updater installed (badge appears when this repo has updates)"
 }
 
-# ── theme update checker (read-only badge/panel signal) ─────────
-# Installs the helper the ArchUpdaterPanel runs on demand. It only checks theme
-# remotes and writes ~/.cache/qs-theme-updates.json; actual updates stay delegated
-# to Omarchy's visible terminal commands.
-install_theme_updater() {
-  local src="$1"
-  local bindst="$HOME/.config/quickshell/bin"
-  local state="$HOME/.cache/qs-theme-updates.json"
-  local t
+cleanup_retired_package_updater() {
+  local qsbindir="$HOME/.config/quickshell/bin"
+  local bindir="$HOME/.local/bin"
+  local unitdir="$HOME/.config/systemd/user"
 
-  [[ -f "$src/scripts/qs-theme-update-check.sh" ]] || return 0
-
-  mkdir -p "$bindst"
-  install -m 755 "$src/scripts/qs-theme-update-check.sh" "$bindst/qs-theme-update-check.sh"
-  if [[ ! -e "$state" ]]; then
-    mkdir -p "$(dirname "$state")"
-    t="$(mktemp -p "$(dirname "$state")" .qs-theme-updates.XXXXXX)"
-    printf '{"checked":"","total":0,"reachable":0,"outdated":0,"localEdits":0,"degraded":false,"currentStale":false,"themes":[]}\n' > "$t"
-    mv "$t" "$state"
-  fi
-
-  info "Theme update checker installed (panel check uses Omarchy theme repos)"
+  systemctl --user disable --now qs-aur-blacklist-fetch.timer >/dev/null 2>&1 || true
+  systemctl --user stop qs-aur-blacklist-fetch.service >/dev/null 2>&1 || true
+  rm -f "$unitdir/qs-aur-blacklist-fetch.service" "$unitdir/qs-aur-blacklist-fetch.timer"
+  rm -f "$qsbindir/qs-package-update-state.sh" "$qsbindir/qs-topgrade-update.sh" \
+        "$qsbindir/qs-theme-update-check.sh"
+  rm -f "$bindir/qs-arch-security-gate.sh" "$bindir/qs-aur-blacklist-fetch.sh"
+  rm -f "$HOME/.cache/qs-theme-updates.json" "$HOME/.cache/qs-theme-update.lock"
+  rm -f "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/package-update-state" \
+        "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/package-update-state.lock"
+  rm -f "$HOME/.local/share/qs-aur-blacklist.txt" \
+        "$HOME/.local/share/qs-aur-blacklist.txt.meta.json" \
+        "$HOME/.local/share/qs-aur-blacklist.txt.pending"
+  systemctl --user daemon-reload >/dev/null 2>&1 || true
 }
 
 # ── 1. dependencies ─────────────────────────────────────────────
@@ -304,6 +297,10 @@ if [[ -f "$src_repo/scripts/ensure-hypr-launcher-binding.sh" ]]; then
   # The helper creates ~/.config/hypr/bindings.conf if it is missing and keeps the managed launcher lines in sync.
   bash "$src_repo/scripts/ensure-hypr-launcher-binding.sh" || warn "Hyprland Quickshell binding setup incomplete."
 fi
+if [[ -f "$src_repo/scripts/ensure-hypr-switcher-blur-rules.sh" ]]; then
+  # The helper keeps the switcher blur layer rules in the user override config so theme changes cannot drop them.
+  bash "$src_repo/scripts/ensure-hypr-switcher-blur-rules.sh" || warn "Hyprland Quickshell switcher blur setup incomplete."
+fi
 
 # ── 4b1. reversible UI mode switcher ───────────────────────────
 if [[ -f "$src_repo/scripts/qs-mode.sh" ]]; then
@@ -343,27 +340,8 @@ if [[ -f "$src_repo/scripts/qs-notification-silence.sh" ]]; then
   install -m 755 "$src_repo/scripts/qs-notification-silence.sh" "$HOME/.local/bin/qs-notification-silence"
 fi
 
-# ── 4a. ArchUpdater security gate (pre-install package verdicts) ─
-# Pure bash, no extra deps. The weekly fetch timer keeps the known-infected
-# list current; without any list the updater panel fail-closes to
-# "protection limited" instead of claiming packages are clean.
-if [[ -f "$src_repo/scripts/qs-arch-security-gate.sh" ]]; then
-  mkdir -p "$HOME/.local/bin"
-  install -m 755 "$src_repo/scripts/qs-arch-security-gate.sh" "$HOME/.local/bin/qs-arch-security-gate.sh"
-  if [[ -f "$src_repo/scripts/qs-aur-blacklist-fetch.sh" ]]; then
-    install -m 755 "$src_repo/scripts/qs-aur-blacklist-fetch.sh" "$HOME/.local/bin/qs-aur-blacklist-fetch.sh"
-    mkdir -p "$HOME/.config/systemd/user"
-    install -m 644 "$src_repo/systemd/qs-aur-blacklist-fetch.service" "$HOME/.config/systemd/user/qs-aur-blacklist-fetch.service"
-    install -m 644 "$src_repo/systemd/qs-aur-blacklist-fetch.timer"   "$HOME/.config/systemd/user/qs-aur-blacklist-fetch.timer"
-    systemctl --user daemon-reload
-    systemctl --user enable --now qs-aur-blacklist-fetch.timer >/dev/null 2>&1 || true
-    "$HOME/.local/bin/qs-aur-blacklist-fetch.sh" >/dev/null 2>&1 || true   # prime the list now
-  fi
-  info "ArchUpdater security gate installed (weekly blacklist refresh)"
-fi
-
-# ── 4c. Theme update checker (panel "Check themes" helper) ─────
-install_theme_updater "$src_repo" || warn "Theme update checker setup incomplete — the bar is fine; the themes tab just cannot scan yet."
+# ── 4a. remove files left by the retired package-updater feature ──
+cleanup_retired_package_updater
 
 # ── 5. theme hook (live color updates on Omarchy theme switch) ──
 hookdst="$HOME/.config/omarchy/hooks/theme-set.d"

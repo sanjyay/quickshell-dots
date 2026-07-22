@@ -334,7 +334,9 @@ PanelWindow {
     // ─────────────────────────── group registry ───────────────────────────
     Component { id: compLauncher;  LauncherWidget  { root: barSlot.root } }
     Component { id: compWorkspace; WorkspaceWidget { root: barSlot.root } }
-    Component { id: compArch;      ArchUpdaterWidget { root: barSlot.root } }
+    // Retain the legacy G13 registry entry so existing saved layouts remain
+    // valid after removal of the package-updater widget.
+    Component { id: compLegacyUpdater; Item { implicitWidth: 0; implicitHeight: 28 } }
     Component {
         id: compStatus                                   // G3: tray · notif
         Item {
@@ -510,7 +512,7 @@ PanelWindow {
     Component { id: compTailscale;  TailscaleWidget    { root: barSlot.root } }
 
     readonly property var registry: ({
-        "G1": compLauncher, "G2": compWorkspace, "G13": compArch, "G3": compStatus,
+        "G1": compLauncher, "G2": compWorkspace, "G13": compLegacyUpdater, "G3": compStatus,
         "G4": compMem, "G5": compCpu, "G6": compVol, "G7": compClaude,
         "G8": compCenter,
         "G9": compMpris, "G10": compQuick, "G11": compNetwork,
@@ -974,7 +976,6 @@ PanelWindow {
                 cpu:          island.groupX("G5",  0.5),
                 ai:           island.groupX("G7",  0.5),
                 workspace:    island.groupX("G2",  0.5),
-                arch:         island.groupX("G13", 0.5),
                 bluetooth:    island.groupX("G11", 0.5),
                 power:        island.groupX("G14", 0.5),
                 mpris:        island.groupX("G9",  0.5),

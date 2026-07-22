@@ -35,7 +35,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Pickers | native emoji, theme, wallpaper, screenshot, and video pickers with Tanzaku, Hearthstone, and Carousel styles |
 | Core widgets | workspaces, playback-aware volume, System info (CPU/GPU/RAM), battery, power profile, network, optional Tailscale status, Bluetooth, weather, MPRIS, tray, notifications |
 | Privacy tools | microphone mute indicator/toggle and Lenovo LOQ camera kill-switch status |
-| Updates | shell update badge, weekly scheduled package update badge, Arch/AUR counter, known-infected AUR safety check |
+| Updates | shell update badge and one-click shell refresh |
 | AI usage | Claude, Codex, and OpenCode usage pill with provider switcher, detail panel, and automatic Codex activity visibility |
 | Super menu | native Quickshell Omarchy menu with nested navigation, empty states, backend action dispatch, and no Walker submenu fallback |
 | Native surfaces | top-right notification stack, visual clipboard-history gallery, and compact upper-centred hardware OSD, all per monitor and visible in fullscreen |
@@ -48,7 +48,6 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Unlock &amp; reorder | unlock the bar, drag widget-groups to swap positions, persistent |
 | Image pickers | theme, wallpaper, screenshots, videos, 3 selectable styles, cached thumbnails |
 | Self-update | in-bar badge only after a newer shell version is confirmed, one-click update and restart |
-| Package updates | system + AUR counter shown after confirmed updates, scheduled weekday display, pre-install security check |
 | AI usage | combined Claude, Codex, and OpenCode usage pill |
 | Workspaces | switch, overview, 10 / 5 / active-only modes, dots / numbers / magic styles |
 | Weather | current conditions, metric / imperial toggle |
@@ -133,7 +132,6 @@ Common actions:
 - Press `Esc` or click the dimmed backdrop to lock again.
 - Open the launcher/control widget to change bar style, widgets, privacy module visibility, workspaces, logo, and splits.
 - Use the widget controls to hide the notification bell independently from the status/tray group.
-- Use `Control > Actions > Schedule Update` to choose the weekday for the package-update badge. Friday is the default.
 - Use the self-update badge when it appears to update this shell from inside the bar.
 - Use the System info widget for quick CPU/GPU temperatures; click it for CPU, GPU, VRAM, and RAM details. The GPU probe supports NVIDIA and DRM/sysfs GPU data for temperature, utilization, and VRAM where the driver exposes it.
 - Use the network cluster for network, Bluetooth, microphone, and camera privacy controls.
@@ -233,11 +231,9 @@ rm -f ~/.config/omarchy/hooks/post-boot.d/quickshell-rise
 The bar checks for shell updates and shows an update badge only after this repo is confirmed to have a newer version. Refreshes clear stale update state first, so the badge stays hidden while checks are running and when no update is available.
 
 <details>
-<summary>Shell updates and Arch/AUR safety checks</summary>
+<summary>Shell updates</summary>
 
 Click the shell update badge to review changes and apply the update.
-
-Package updates run through the ArchUpdater panel. It checks packages against the known-infected AUR list and blocks known-bad packages from the update command.
 
 </details>
 

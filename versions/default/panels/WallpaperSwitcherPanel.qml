@@ -15,6 +15,7 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-wallpaper-switcher"
     WlrLayershell.keyboardFocus: visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    mask: Region { item: body }
 
     property real reveal: root.wallpaperSwitcherVisible ? 1 : 0
     visible: reveal > 0.001
@@ -25,8 +26,10 @@ PanelWindow {
     property string lastSuccessfulPath: ""
     property string applyingPath: ""
     property string queuedPath: ""
+    property string sessionStartPath: ""
     property bool suppressApply: true
     property bool applyInFlight: false
+    property bool cancelInFlight: false
     property bool listFinished: false
     property bool currentFinished: false
     property string listText: ""
@@ -47,6 +50,11 @@ PanelWindow {
         listFinished = false; currentFinished = false
         listProc.running = false; currentProc.running = false
         listProc.running = true; currentProc.running = true
+    }
+    function beginSession() {
+        sessionStartPath = currentPath || lastSuccessfulPath
+        focusItem.focus = true
+        focusItem.forceActiveFocus()
     }
     function finishRefresh() {
         if (!listFinished || !currentFinished) return
@@ -78,6 +86,40 @@ PanelWindow {
         suppressApply = false
         Quickshell.execDetached(["notify-send", "Wallpaper switch failed", "Kept the previous wallpaper"])
     }
+    function confirmAndClose() {
+        if (!panel.visible) return
+        applyTimer.stop()
+        if (selectedIndex >= 0 && selectedIndex < wallpapers.length)
+            queuedPath = wallpapers[selectedIndex].path
+        applyLatest()
+        root.wallpaperSwitcherVisible = false
+    }
+    function cancelAndClose() {
+        if (!panel.visible) return
+        applyTimer.stop()
+        queuedPath = ""
+        if (sessionStartPath) {
+            cancelInFlight = true
+            cancelProc.command = ["omarchy-theme-bg-set", sessionStartPath]
+            cancelProc.running = false
+            cancelProc.running = true
+        }
+        suppressApply = true
+        selectedIndex = WallpaperModel.indexForPath(wallpapers, sessionStartPath)
+        suppressApply = false
+        root.wallpaperSwitcherVisible = false
+    }
+    function handleKey(e) {
+        if (e.key === Qt.Key_Escape) {
+            panel.cancelAndClose(); e.accepted = true
+        } else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
+            panel.confirmAndClose(); e.accepted = true
+        } else if (e.key === Qt.Key_Left || e.key === Qt.Key_Up) {
+            panel.move(-1); e.accepted = true
+        } else if (e.key === Qt.Key_Right || e.key === Qt.Key_Down) {
+            panel.move(1); e.accepted = true
+        }
+    }
     function signedDistance(index) {
         var n = wallpapers.length
         if (n < 2) return 0
@@ -92,6 +134,10 @@ PanelWindow {
     Process {
         id: verifyProc; command: ["qs-wallpaper-switcher", "current"]
         stdout: StdioCollector { onStreamFinished: {
+            if (panel.cancelInFlight) {
+                panel.applyInFlight = false
+                return
+            }
             var actual = String(text || "").trim()
             if (actual === panel.applyingPath) { panel.lastSuccessfulPath = actual; panel.currentPath = actual }
             else panel.restoreLast()
@@ -102,43 +148,41 @@ PanelWindow {
     Process {
         id: applyProc
         onExited: function(code) {
+            if (panel.cancelInFlight) { panel.applyInFlight = false; return }
             if (code === 0) { verifyProc.running = false; verifyProc.running = true }
             else { panel.applyInFlight = false; panel.restoreLast(); if (panel.queuedPath !== panel.lastSuccessfulPath) panel.applyTimer.restart() }
         }
     }
-
-    Rectangle {
-        anchors.fill: parent
-        color: Qt.rgba(root.paper.r, root.paper.g, root.paper.b, 0.74)
-        opacity: panel.reveal
-        MouseArea { anchors.fill: parent; onClicked: root.wallpaperSwitcherVisible = false; onWheel: function(e) { panel.move(e.angleDelta.y < 0 ? 1 : -1); e.accepted = true } }
-    }
-    Item {
-        id: focusItem; anchors.fill: parent; focus: panel.visible
-        Keys.onPressed: function(e) {
-            if (e.key === Qt.Key_Escape) { root.wallpaperSwitcherVisible = false; e.accepted = true }
-            else if (e.key === Qt.Key_Left || e.key === Qt.Key_Up) { panel.move(-1); e.accepted = true }
-            else if (e.key === Qt.Key_Right || e.key === Qt.Key_Down) { panel.move(1); e.accepted = true }
+    Process {
+        id: cancelProc
+        onExited: function(code) {
+            panel.cancelInFlight = false
+            if (code === 0) {
+                panel.lastSuccessfulPath = panel.sessionStartPath
+                panel.currentPath = panel.sessionStartPath
+            } else {
+                console.warn("WallpaperSwitcher: cancel restore failed with code " + code)
+            }
         }
     }
+
     Rectangle {
+        id: blurSurface
+        anchors.fill: parent
+        color: Qt.rgba(root.paper.r, root.paper.g, root.paper.b, 0.10)
+        opacity: panel.reveal
+    }
+
+    Item {
+        id: focusItem; anchors.fill: parent; focus: panel.visible
+        Keys.priority: Keys.BeforeItem
+        Keys.onPressed: function(e) { panel.handleKey(e) }
+    }
+    Item {
         id: body
         x: 24
         y: Math.round(Math.max(panel.topInset, Math.min(panel.height - panel.bottomInset - height, (panel.height - height) / 2)))
         width: panel.panelWidth; height: panel.panelHeight
-        radius: root.pillRadius
-        color: Qt.rgba(root.paper.r, root.paper.g, root.paper.b, 1)
-        border.color: root.pillBorder; border.width: root.pillBorderW
-        clip: true
-        PillShadow { theme: root }
-        MouseArea {
-            anchors.fill: parent
-            onClicked: {}
-            onWheel: function(e) {
-                panel.move(e.angleDelta.y < 0 ? 1 : -1)
-                e.accepted = true
-            }
-        }
         Repeater {
             model: panel.wallpapers
             delegate: Item {
@@ -175,11 +219,19 @@ PanelWindow {
                     border.width: index === panel.selectedIndex ? 2 : root.pillBorderW
                     Image { anchors.fill: parent; source: parent.parent.shown ? "file://" + modelData.path : ""; fillMode: Image.PreserveAspectCrop; asynchronous: true; cache: true; smooth: true }
                 }
-                Text { anchors.top: parent.top; anchors.topMargin: panel.previewHeight + 10; width: parent.width; visible: index === panel.selectedIndex; text: modelData.label; elide: Text.ElideRight; horizontalAlignment: Text.AlignHCenter; color: root.ink; font.family: root.mono; font.pixelSize: root.menuFontSize }
-                MouseArea { anchors.fill: parent; onClicked: panel.selectedIndex = index; onWheel: function(e) { panel.move(e.angleDelta.y < 0 ? 1 : -1); e.accepted = true } }
+                Text { anchors.top: parent.top; anchors.topMargin: panel.previewHeight + 10; width: parent.width; visible: index === panel.selectedIndex; text: modelData.label; elide: Text.ElideRight; horizontalAlignment: Text.AlignHCenter; color: root.ink; style: Text.Outline; styleColor: root.paper; font.family: root.mono; font.pixelSize: root.menuFontSize }
+                MouseArea { anchors.fill: parent; onClicked: panel.selectedIndex = index; onDoubleClicked: { panel.selectedIndex = index; panel.confirmAndClose() } onWheel: function(e) { panel.move(e.angleDelta.y < 0 ? 1 : -1); e.accepted = true } }
             }
         }
     }
     onSelectedIndexChanged: requestApply()
-    onVisibleChanged: { if (visible) refresh(); else applyTimer.stop() }
+    onVisibleChanged: {
+        if (visible) {
+            panel.beginSession()
+            refresh()
+        } else {
+            applyTimer.stop()
+            focusItem.focus = false
+        }
+    }
 }

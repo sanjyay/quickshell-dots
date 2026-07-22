@@ -25,64 +25,46 @@ put() { # src dst mode
   cp "$src" "$t" && chmod "$mode" "$t" && mv -f "$t" "$dst" || { rm -f "$t"; return 1; }
 }
 
-seed_theme_state() {
-  local state="$HOME/.cache/qs-theme-updates.json"
-  local t
-  [ -e "$state" ] && return 0
-  mkdir -p "$(dirname "$state")" || return 1
-  t="$(mktemp -p "$(dirname "$state")" .qs-theme-updates.XXXXXX)" || return 1
-  if printf '{"checked":"","total":0,"reachable":0,"outdated":0,"localEdits":0,"degraded":false,"currentStale":false,"themes":[]}\n' > "$t" \
-      && mv "$t" "$state"; then
-    return 0
-  fi
-  rm -f "$t"
-  return 1
-}
-
 rc=0
 mkdir -p "$bin" "$qsbin" "$units"
 
-# ── ArchUpdater security gate + weekly blacklist refresh ───────
-put "$repo/scripts/qs-arch-security-gate.sh" "$bin/qs-arch-security-gate.sh" 755 || rc=1
-if put "$repo/scripts/qs-aur-blacklist-fetch.sh" "$bin/qs-aur-blacklist-fetch.sh" 755; then
-  put "$repo/systemd/qs-aur-blacklist-fetch.service" "$units/qs-aur-blacklist-fetch.service" 644 || rc=1
-  put "$repo/systemd/qs-aur-blacklist-fetch.timer"   "$units/qs-aur-blacklist-fetch.timer"   644 || rc=1
-  systemctl --user daemon-reload >/dev/null 2>&1 || true
-  systemctl --user enable --now qs-aur-blacklist-fetch.timer >/dev/null 2>&1 || true
-  # prime the list once so the gate is armed right away (keep an existing list)
-  [ -s "$HOME/.local/share/qs-aur-blacklist.txt" ] || \
-    "$bin/qs-aur-blacklist-fetch.sh" >/dev/null 2>&1 || true
-else
-  rc=1
-fi
+# Remove runtime artifacts from the retired package-updater feature.
+systemctl --user disable --now qs-aur-blacklist-fetch.timer >/dev/null 2>&1 || true
+systemctl --user stop qs-aur-blacklist-fetch.service >/dev/null 2>&1 || true
+rm -f "$units/qs-aur-blacklist-fetch.service" "$units/qs-aur-blacklist-fetch.timer"
+rm -f "$qsbin/qs-package-update-state.sh" "$qsbin/qs-topgrade-update.sh" \
+      "$qsbin/qs-theme-update-check.sh"
+rm -f "$bin/qs-arch-security-gate.sh" "$bin/qs-aur-blacklist-fetch.sh"
+rm -f "$HOME/.cache/qs-theme-updates.json" "$HOME/.cache/qs-theme-update.lock"
+rm -f "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/package-update-state" \
+      "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/package-update-state.lock"
+rm -f "$HOME/.local/share/qs-aur-blacklist.txt" \
+      "$HOME/.local/share/qs-aur-blacklist.txt.meta.json" \
+      "$HOME/.local/share/qs-aur-blacklist.txt.pending"
 
 # ── keep the updater itself current (check + apply + this hook) ─
 put "$repo/scripts/qs-shell-check-update.sh" "$qsbin/qs-shell-check-update.sh" 755 || rc=1
 put "$repo/scripts/qs-shell-apply-update.sh" "$qsbin/qs-shell-apply-update.sh" 755 || rc=1
 put "$repo/scripts/qs-shell-refresh-local.sh" "$qsbin/qs-shell-refresh-local.sh" 755 || rc=1
-put "$repo/scripts/qs-package-update-state.sh" "$qsbin/qs-package-update-state.sh" 755 || rc=1
-put "$repo/scripts/qs-topgrade-update.sh" "$qsbin/qs-topgrade-update.sh" 755 || rc=1
 put "$repo/scripts/qs-menu-data.sh" "$bin/qs-menu-data" 755 || rc=1
 put "$repo/scripts/ensure-hypr-launcher-binding.sh" "$qsbin/ensure-hypr-launcher-binding.sh" 755 || rc=1
+put "$repo/scripts/ensure-hypr-switcher-blur-rules.sh" "$qsbin/ensure-hypr-switcher-blur-rules.sh" 755 || rc=1
 put "$repo/systemd/qs-shell-update-check.service" "$units/qs-shell-update-check.service" 644 || rc=1
 put "$repo/systemd/qs-shell-update-check.timer"   "$units/qs-shell-update-check.timer"   644 || rc=1
 
 if [ -f "$repo/scripts/ensure-hypr-launcher-binding.sh" ]; then
   bash "$repo/scripts/ensure-hypr-launcher-binding.sh" || rc=1
 fi
-
-# ── theme-update checker used by ArchUpdaterPanel ───────────────
-if [ -f "$repo/scripts/qs-theme-update-check.sh" ]; then
-  put "$repo/scripts/qs-theme-update-check.sh" "$qsbin/qs-theme-update-check.sh" 755 || rc=1
-  seed_theme_state || rc=1
+if [ -f "$repo/scripts/ensure-hypr-switcher-blur-rules.sh" ]; then
+  bash "$repo/scripts/ensure-hypr-switcher-blur-rules.sh" || rc=1
 fi
 
-# Re-arm both timers so refreshed unit files take effect now. Plain
+# Re-arm the timer so refreshed unit files take effect now. Plain
 # enable --now is a no-op on an already-active timer, and a daemon-reload
 # alone can leave a monotonic timer "elapsed" with no next trigger.
 systemctl --user daemon-reload >/dev/null 2>&1 || true
 systemctl --user enable --now qs-shell-update-check.timer >/dev/null 2>&1 || true
-systemctl --user try-restart qs-shell-update-check.timer qs-aur-blacklist-fetch.timer >/dev/null 2>&1 || true
+systemctl --user try-restart qs-shell-update-check.timer >/dev/null 2>&1 || true
 
 # ── opt-in components: refresh only if the user installed them ──
 if [ -x "$bin/claude-usage" ]; then

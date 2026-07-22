@@ -93,7 +93,40 @@ remove_hypr_quickshell_bindings() {
   fi
 }
 
+remove_hypr_switcher_blur_rules() {
+  local looknfeel="${HYPR_LOOKNFEEL_CONF:-$HOME/.config/hypr/looknfeel.conf}"
+  [[ -f "$looknfeel" ]] || return 0
+
+  local tmp removed=0 in_block=0
+  tmp="$(mktemp)"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == "# >>> quickshell-rise managed switcher blur rules >>>" ]]; then
+      in_block=1
+      removed=1
+      continue
+    fi
+    if [[ "$line" == "# <<< quickshell-rise managed switcher blur rules <<<" ]]; then
+      in_block=0
+      continue
+    fi
+    [[ "$in_block" -eq 1 ]] && continue
+    printf '%s\n' "$line" >> "$tmp"
+  done < "$looknfeel"
+
+  if [[ "$removed" -eq 1 ]]; then
+    if grep -q '[^[:space:]]' "$tmp"; then
+      mv "$tmp" "$looknfeel"
+    else
+      rm -f "$tmp" "$looknfeel"
+    fi
+    info "Removed Hyprland Quickshell switcher blur rules"
+  else
+    rm -f "$tmp"
+  fi
+}
+
 remove_hypr_quickshell_bindings
+remove_hypr_switcher_blur_rules
 
 if compgen -G "$unitdir/claude-usage*" >/dev/null 2>&1 || compgen -G "$bindir/claude-usage*" >/dev/null 2>&1; then
   # stop + disable timers AND services (covers a oneshot run that's mid-flight)
@@ -144,16 +177,15 @@ fi
 
 # 1c. remove the shell self-updater, if installed (idempotent).
 qsbindir="$HOME/.config/quickshell/bin"
-if compgen -G "$unitdir/qs-shell-update-check.*" >/dev/null 2>&1 || [[ -e "$qsbindir/qs-shell-check-update.sh" || -e "$qsbindir/qs-topgrade-update.sh" ]]; then
+if compgen -G "$unitdir/qs-shell-update-check.*" >/dev/null 2>&1 || [[ -e "$qsbindir/qs-shell-check-update.sh" ]]; then
   systemctl --user disable --now qs-shell-update-check.timer >/dev/null 2>&1 || true
   systemctl --user stop qs-shell-update-check.service >/dev/null 2>&1 || true
   rm -f "$unitdir"/qs-shell-update-check.service "$unitdir"/qs-shell-update-check.timer
-  rm -f "$qsbindir"/qs-package-update-state.sh \
-        "$qsbindir"/qs-topgrade-update.sh \
-        "$qsbindir"/qs-shell-check-update.sh \
+  rm -f "$qsbindir"/qs-shell-check-update.sh \
         "$qsbindir"/qs-shell-apply-update.sh \
         "$qsbindir"/qs-shell-refresh-local.sh \
-        "$qsbindir"/ensure-hypr-launcher-binding.sh
+        "$qsbindir"/ensure-hypr-launcher-binding.sh \
+        "$qsbindir"/ensure-hypr-switcher-blur-rules.sh
   rm -rf "$HOME/.cache/qs-shell" "$HOME/.local/share/quickshell-dots" \
          "${XDG_STATE_HOME:-$HOME/.local/state}/qs-shell"
   systemctl --user daemon-reload >/dev/null 2>&1 || true
@@ -161,13 +193,14 @@ if compgen -G "$unitdir/qs-shell-update-check.*" >/dev/null 2>&1 || [[ -e "$qsbi
   info "Removed shell self-updater (scripts, timer, cache, updater clone)"
 fi
 
-# 1c.1 remove the theme update checker, if installed (idempotent).
-if [[ -e "$qsbindir/qs-theme-update-check.sh" || -e "$HOME/.cache/qs-theme-updates.json" ]]; then
-  rm -f "$qsbindir"/qs-theme-update-check.sh \
-        "$HOME/.cache/qs-theme-updates.json" \
-        "$HOME/.cache/qs-theme-update.lock"
-  info "Removed theme update checker (script, cache, lock)"
-fi
+# 1c.1 remove files from the retired package-updater feature (idempotent).
+rm -f "$qsbindir"/qs-package-update-state.sh \
+      "$qsbindir"/qs-topgrade-update.sh \
+      "$qsbindir"/qs-theme-update-check.sh \
+      "$HOME/.cache/qs-theme-updates.json" \
+      "$HOME/.cache/qs-theme-update.lock" \
+      "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/package-update-state" \
+      "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/package-update-state.lock"
 
 # 1c.2 remove the reversible UI mode switcher and its project-owned state.
 if [[ -e "$HOME/.local/bin/qs-mode" || -e "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode" ]]; then
@@ -192,7 +225,8 @@ if command -v mako >/dev/null 2>&1 && ! pgrep -x mako >/dev/null 2>&1; then sets
 rmdir "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise" 2>/dev/null || true
 
 # 1d. remove the ArchUpdater security gate (script, fetch timer, list)
-if [[ -f "$bindir/qs-arch-security-gate.sh" || -f "$bindir/qs-aur-blacklist-fetch.sh" ]]; then
+if [[ -f "$bindir/qs-arch-security-gate.sh" || -f "$bindir/qs-aur-blacklist-fetch.sh" \
+      || -f "$unitdir/qs-aur-blacklist-fetch.service" || -f "$unitdir/qs-aur-blacklist-fetch.timer" ]]; then
   systemctl --user disable --now qs-aur-blacklist-fetch.timer >/dev/null 2>&1 || true
   systemctl --user stop qs-aur-blacklist-fetch.service >/dev/null 2>&1 || true
   rm -f "$unitdir"/qs-aur-blacklist-fetch.service "$unitdir"/qs-aur-blacklist-fetch.timer
