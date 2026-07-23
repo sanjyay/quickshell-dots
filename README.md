@@ -38,7 +38,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Updates | shell update badge and one-click shell refresh |
 | AI usage | Claude, Codex, and OpenCode usage pill with provider switcher, detail panel, and automatic Codex activity visibility |
 | Super menu | native Quickshell Omarchy menu with nested navigation, empty states, backend action dispatch, and no Walker submenu fallback |
-| Native surfaces | top-right notification stack, visual clipboard-history gallery, and compact upper-centred hardware OSD, all per monitor and visible in fullscreen |
+| Native surfaces | top-right notification stack, fullscreen blurred History card fan, and compact upper-centred hardware OSD, all per monitor and visible in fullscreen |
 
 <details>
 <summary>Full feature list</summary>
@@ -55,7 +55,7 @@ The installer backs up an existing config to `~/.config/quickshell/bar.bak.<time
 | Tailscale | optional, reorderable status; left-click toggles `tailscale up` / `tailscale down`, right-click opens connection details, and hover stays silent |
 | MPRIS | media controls |
 | Notifications | native `org.freedesktop.Notifications` service, four-card top-right stack, actions, DND, history, unread count, and clear |
-| Clipboard history | Elephant-backed mixed gallery for text, copied images, and screenshots, with thumbnails, full preview, filters, restore, delete, and image editing through the screenshot editor |
+| History | fullscreen curved card fan mixing Elephant text and images with recent screen recordings; includes invisible filtering, restore/copy, delete, recording thumbnails, and a separate Omakut action |
 | System monitors | compact System info widget with CPU/GPU temperatures, CPU/GPU usage, VRAM, and RAM usage |
 | Privacy tools | microphone mute state, active microphone clients, Lenovo LOQ camera hardware switch status |
 | Speed test | manual Cloudflare speed test in the network panel |
@@ -137,7 +137,7 @@ Common actions:
 - Use the network cluster for network, Bluetooth, microphone, and camera privacy controls.
 - The Super menu is rendered and navigated by Quickshell. It keeps nested Omarchy action pages, empty submenu states, type-ahead, back navigation, and keyboard focus inside the custom themed menu while still running Omarchy's backend commands for final actions.
 - The app launcher displays cached applications immediately from `~/.cache/quickshell/app-launcher/apps.json`, silently refreshes the cache in the background, and uses the same visual density and selection styling as the Super menu.
-- The clipboard history opens as a gallery. Browse with arrows, mouse hover, wheel, `Home` / `End`, or page keys; search and filter by all, text, or images; press `Enter` to restore the selected entry, `Delete` to remove it, and use `Edit` on image entries to open the same screenshot editor flow used by screenshot notifications.
+- `Super + Ctrl + V` opens the native fullscreen History switcher: clipboard text, copied images, and recent screen recordings appear as a curved card fan over the blurred desktop. Browse with arrows, clicks, or the wheel; type to filter without opening extra chrome; press `Enter` or double-click to restore/copy the focused card, use the selected recording card's scissors action to open it in Omakut, and press `Delete` to remove an item.
 - Media and volume pills stay out of the bar until a real MPRIS player is playing. If you pause media by clicking the Now Playing widget, that player stays available in the bar and media panel until you resume it or the player disappears.
 - The capture panel supports keyboard navigation, including the screen-recording audio choices, with `Up`, `Down`, `Enter`, and `Esc`.
 - The AI pill follows the live Codex account state: it shows the weekly Codex window when available, skips unavailable short-window data, and opens the usage panel for the full account breakdown and other AI providers.

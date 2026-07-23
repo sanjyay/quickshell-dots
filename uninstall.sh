@@ -217,6 +217,7 @@ systemctl --user try-restart elephant.service >/dev/null 2>&1 || true
 if [[ -f "$HOME/.local/bin/swayosd-client" ]] && grep -q 'quickshell-rise-owned-swayosd-client' "$HOME/.local/bin/swayosd-client"; then rm -f "$HOME/.local/bin/swayosd-client"; fi
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-theme-switcher"
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-wallpaper-switcher"
+rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-history-thumbs"
 rm -f "${XDG_RUNTIME_DIR:-/tmp}/qs-rise-osd.json"
 rm -f "${XDG_CACHE_HOME:-$HOME/.cache}/qs-rise-notifications.json"
 systemctl --user unmask swayosd-server.service >/dev/null 2>&1 || true

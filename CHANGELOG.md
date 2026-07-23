@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### History Switcher
+
+- Replaced the two-pane clipboard picker with a fullscreen blurred History
+  switcher that presents clipboard text, images, and recent screen recordings
+  in a curved card fan under `Super + Ctrl + V`.
+- Kept Elephant restoration, deletion, stable entry IDs, and invisible
+  type-ahead filtering while adding recording-file clipboard copy and a
+  separate scissors action that opens the selected recording in Omakut.
+- Prevented stationary-pointer hover feedback from changing the selected card,
+  and batched initial clipboard and recording results to keep the fan stable as
+  it opens.
+
+### Bar Layout
+
+- Compacted workspace buttons when more than four workspaces are visible so
+  the workspace group does not crowd the centre and right-side bar groups.
+
+### Installation And Cleanup
+
+- Added the History window namespace to the managed Hyprland blur rules,
+  verified the replacement panel during installation, and removed generated
+  recording thumbnails during uninstallation.
+
 - Updated the Codex usage parser and panel mapping so the bar follows the live account state instead of assuming a fixed 5h + weekly layout.
 
 - Added a persistent, single-select Gap Anim section with thirteen themed gap effects, an efficient recommended combination, and a no-animation option.

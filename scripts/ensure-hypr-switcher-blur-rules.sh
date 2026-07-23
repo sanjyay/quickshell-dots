@@ -12,6 +12,8 @@ layerrule = blur on, match:namespace quickshell-theme-switcher
 layerrule = ignore_alpha 0, match:namespace quickshell-theme-switcher
 layerrule = blur on, match:namespace quickshell-wallpaper-switcher
 layerrule = ignore_alpha 0, match:namespace quickshell-wallpaper-switcher
+layerrule = blur on, match:namespace quickshell-history
+layerrule = ignore_alpha 0, match:namespace quickshell-history
 # <<< quickshell-rise managed switcher blur rules <<<
 EOF
 )"

@@ -62,7 +62,7 @@ tracked `.qsb` shader is also binary and has no meaningful line count.
 | 9 | `versions/default/panels/MediaBrowserHearthstone.qml` | 541 |
 | 10 | `versions/default/panels/VolumePanel.qml` | 540 |
 | 11 | `versions/default/panels/MediaBrowserPanel.qml` | 532 |
-| 12 | `versions/default/panels/ClipboardHistoryPanel.qml` | 518 |
+| 12 | `versions/default/panels/HistoryPanel.qml` | 548 |
 | 13 | `versions/default/panels/CpuPanel.qml` | 514 |
 | 14 | `versions/default/panels/ThemeSwitcherPanel.qml` | 503 |
 | 15 | `versions/default/panels/MediaBrowserCarousel.qml` | 497 |

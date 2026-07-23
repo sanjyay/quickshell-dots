@@ -354,7 +354,7 @@ ShellRoot {
     OmarchyMenuPanel { root: theme }
     ThemeSwitcherPanel { root: theme }
     WallpaperSwitcherPanel { root: theme }
-    ClipboardHistoryPanel { root: theme }
+    HistoryPanel { root: theme }
     EmojiPickerPanel { root: theme }
     CapturePanel { root: theme }
     AppLauncherPanel { root: theme }

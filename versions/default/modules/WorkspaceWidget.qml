@@ -36,6 +36,10 @@ Item {
         if (extraWs > 0) list.push(extraWs)   // focused-beyond-range, stable per id
         return list
     }
+    // Active-mode workspaces are data-driven and can grow without a fixed upper
+    // bound. Once the row exceeds four entries, tighten only its horizontal
+    // geometry so it cannot crowd the bar's protected centre region.
+    readonly property bool dense: workspaceList.length > 4
 
     Rectangle {
         x: -root.wsPillPad; anchors.verticalCenter: parent.verticalCenter
@@ -59,7 +63,7 @@ Item {
     Row {
         id: wsRow
         anchors.centerIn: parent
-        spacing: 5
+        spacing: wsWidget.dense ? 2 : 5
 
         Repeater {
             model: wsWidget.workspaceList
@@ -85,9 +89,11 @@ Item {
 
                 readonly property bool isEmpty: !isFocused && !isOccupied
 
-                implicitWidth: root.workspaceStyle === "numbers" ? 22
-                             : root.workspaceStyle === "magic"   ? (isFocused ? 20 : 18)
-                             : (isFocused ? 32 : 16)
+                implicitWidth: root.workspaceStyle === "numbers" ? (wsWidget.dense ? 18 : 22)
+                             : root.workspaceStyle === "magic"   ? (isFocused ? (wsWidget.dense ? 18 : 20)
+                                                                           : (wsWidget.dense ? 14 : 18))
+                             : (isFocused ? (wsWidget.dense ? 26 : 32)
+                                          : (wsWidget.dense ? 12 : 16))
                 implicitHeight: 28
                 width: implicitWidth
                 height: implicitHeight
@@ -137,7 +143,7 @@ Item {
                 Rectangle {
                     visible: root.workspaceStyle === "numbers"
                     anchors.centerIn: parent
-                    width:  20
+                    width:  wsWidget.dense ? 17 : 20
                     height: 20
                     radius: root.styleRadiusSmall ? 5 : height / 2
                     color: isFocused  ? Qt.rgba(root.seal.r, root.seal.g, root.seal.b, 0.30)

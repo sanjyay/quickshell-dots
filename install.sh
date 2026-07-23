@@ -279,6 +279,7 @@ verify_installed_copy() {
              modules/TailscaleWidget.qml \
              panels/TailscalePanel.qml \
              panels/WallpaperSwitcherPanel.qml \
+             panels/HistoryPanel.qml \
              NotificationManager.qml \
              NotificationToastOverlay.qml \
              HardwareOsdOverlay.qml \
@@ -288,6 +289,10 @@ verify_installed_copy() {
       exit 1
     }
   done
+  [[ ! -e "$DEST/panels/ClipboardHistoryPanel.qml" ]] || {
+    err "Retired panels/ClipboardHistoryPanel.qml remains in the installed tree"
+    exit 1
+  }
 }
 verify_installed_copy
 info "Verified installed bar matches source tree"

@@ -15,6 +15,7 @@
 | Updater helpers | `~/.config/quickshell/bin/` | Project-owned updater/helper scripts |
 | User units | `~/.config/systemd/user/` | Individually owned services/timers |
 | Persistent updater checkout | `~/.local/share/quickshell-dots/` | Derived deployment source |
+| History recording thumbnails | `~/.cache/quickshell-history-thumbs/` | Generated project cache removed on uninstall |
 
 `install.sh` uses a local checkout when its directory contains `versions/`;
 otherwise it shallow-clones the configured repository. It recursively copies
@@ -82,7 +83,8 @@ bindings`, and `managed notification bindings`. The menu block has distinct
 Quickshell and Omarchy command sets. A separate exact launcher/toggle helper
 maintains `SUPER SPACE` launcher and `SUPER SHIFT SPACE` provider-toggle lines.
 The look-and-feel file contains the `quickshell-rise managed switcher blur
-rules` block. User lines outside these exact markers/lines are not owned.
+rules` block for the native theme, wallpaper, and History window namespaces.
+User lines outside these exact markers/lines are not owned.
 
 ## Update and uninstall
 
@@ -97,8 +99,9 @@ Quickshell or Omarchy profile without starting either provider stack.
 `uninstall.sh` refuses to remove a foreign bar directory without `.qsrise`. It
 removes exact project-owned integrations and caches, keeps the editable local
 AUR blacklist supplement, removes the owned bar, and restores the newest bar
-backup if present. It also changes live services and therefore must never be
-run against a real home during normal validation. The isolated full-lifecycle
+backup if present. Generated History recording thumbnails are included in that
+cache cleanup. It also changes live services and therefore must never be run
+against a real home during normal validation. The isolated full-lifecycle
 fixture executes it only with temporary roots and lifecycle command shims.
 
 ## Profile behavior
