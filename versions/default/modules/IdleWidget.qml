@@ -10,21 +10,20 @@ Item {
     property bool awake: false
 
     visible: awake
-    implicitWidth: awake ? 20 : 0
+    implicitWidth: awake ? 16 : 0
     implicitHeight: 28
     width: implicitWidth
     height: implicitHeight
 
 
-    readonly property string tooltipText: "Idle lock disabled"
+    readonly property string tooltipText: "Idle lock"
 
     Text {
         anchors.centerIn: parent
-        anchors.verticalCenterOffset: 2
         text: "\uF0F4"   // coffee (Nerd Font / JetBrainsMono)
         color: root.seal
         font.family: root.mono
-        font.pixelSize: 24
+        font.pixelSize: 15
     }
 
     Process {

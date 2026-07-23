@@ -115,8 +115,26 @@ Scope {
         toasts = []; recent = []; saveCache()
     }
 
+    function screenRecordingPath(entry) {
+        if (String(entry.summary || "").trim() !== "Screen recording saved") return ""
+        var preview = String(entry.image || "")
+        if (preview.indexOf("file://") === 0) preview = decodeURIComponent(preview.substring(7))
+        else if (preview.indexOf("image://icon/") === 0)
+            preview = decodeURIComponent(preview.substring("image://icon/".length))
+        var suffix = "-preview.png"
+        if (preview.length <= suffix.length || preview.slice(-suffix.length) !== suffix) return ""
+        return preview.slice(0, -suffix.length) + ".mp4"
+    }
+
     function invoke(entry, identifier) {
         if (!entry.notification) return
+        var recordingPath = screenRecordingPath(entry)
+        if ((!identifier || identifier === "default") && recordingPath !== "") {
+            Quickshell.execDetached(["omacut", recordingPath])
+            entry.notification.dismiss()
+            close(entry.key, false)
+            return
+        }
         var actions = entry.notification.actions || []
         var fallback = null
         for (var i = 0; i < actions.length; i++) {

@@ -15,6 +15,7 @@ PanelWindow {
     WlrLayershell.keyboardFocus: root.captureVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     visible: root.captureVisible
     property bool recordingChoices: false
+    property string pendingAction: ""
     property var rows: recordingChoices ? [
         {label:"With no audio", detail:"record the selected screen area", icon:"", action:"recording-no-audio"},
         {label:"With desktop audio", detail:"include system audio", icon:"", action:"recording-desktop"},
@@ -28,9 +29,9 @@ PanelWindow {
     ]
     function run(action) {
         if (action === "recording") { recordingChoices = true; list.selectedIndex = 0; return }
+        pendingAction = action
         root.captureVisible = false
-        proc.command = [Quickshell.env("HOME") + "/.local/bin/qs-capture", action]
-        proc.running = false; proc.running = true
+        actionLaunchTimer.restart()
     }
 
     function moveSelection(delta) {
@@ -88,6 +89,22 @@ PanelWindow {
         }
     }
     Process { id: proc }
+    Timer {
+        id: actionLaunchTimer
+        // The recorder freezes the current desktop for its selection UI. Leave
+        // enough time for the popup's layer surface to be fully unmapped first,
+        // otherwise that frozen frame can retain part of the menu.
+        interval: 300
+        repeat: false
+        onTriggered: {
+            var action = panel.pendingAction
+            panel.pendingAction = ""
+            if (action === "") return
+            proc.command = [Quickshell.env("HOME") + "/.local/bin/qs-capture", action]
+            proc.running = false
+            proc.running = true
+        }
+    }
     onVisibleChanged: if (visible) {
         recordingChoices = root.captureAction === "recording"
         root.activateFocusedPopupScreen()

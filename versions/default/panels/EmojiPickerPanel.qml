@@ -70,7 +70,8 @@ PanelWindow {
         { id: "featured-44", emoji: "🎵", label: "musical note" },
         { id: "featured-45", emoji: "💯", label: "hundred points" }
     ]
-    readonly property int columns: Math.max(1, Math.floor(grid.width / grid.cellWidth))
+    readonly property int rowHeight: 38
+    readonly property int visibleRows: Math.max(1, Math.floor(emojiList.height / rowHeight))
     readonly property var selectedItem: items.length > 0
         ? items[Math.max(0, Math.min(selectedIndex, items.length - 1))] : null
     readonly property bool inputDebug: Quickshell.env("QS_EMOJI_INPUT_DEBUG") === "1"
@@ -82,8 +83,8 @@ PanelWindow {
     function setSelection(index) {
         selectedIndex = items.length > 0 ? Math.max(0, Math.min(index, items.length - 1)) : 0
         if (items.length > 0) {
-            grid.currentIndex = selectedIndex
-            grid.positionViewAtIndex(selectedIndex, GridView.Contain)
+            emojiList.currentIndex = selectedIndex
+            emojiList.positionViewAtIndex(selectedIndex, ListView.Contain)
         }
     }
 
@@ -165,13 +166,13 @@ PanelWindow {
         } else if (event.key === Qt.Key_Left) {
             branch = "left"; if (count > 0) setSelection((selectedIndex - 1 + count) % count); event.accepted = true
         } else if (event.key === Qt.Key_Down) {
-            branch = "down"; if (count > 0) setSelection(Math.min(count - 1, selectedIndex + columns)); event.accepted = true
+            branch = "down"; if (count > 0) setSelection(Math.min(count - 1, selectedIndex + 1)); event.accepted = true
         } else if (event.key === Qt.Key_Up) {
-            branch = "up"; if (count > 0) setSelection(Math.max(0, selectedIndex - columns)); event.accepted = true
+            branch = "up"; if (count > 0) setSelection(Math.max(0, selectedIndex - 1)); event.accepted = true
         } else if (event.key === Qt.Key_PageDown) {
-            branch = "pageDown"; if (count > 0) setSelection(Math.min(count - 1, selectedIndex + columns * 4)); event.accepted = true
+            branch = "pageDown"; if (count > 0) setSelection(Math.min(count - 1, selectedIndex + visibleRows)); event.accepted = true
         } else if (event.key === Qt.Key_PageUp) {
-            branch = "pageUp"; if (count > 0) setSelection(Math.max(0, selectedIndex - columns * 4)); event.accepted = true
+            branch = "pageUp"; if (count > 0) setSelection(Math.max(0, selectedIndex - visibleRows)); event.accepted = true
         } else if (event.key === Qt.Key_Home && keyboardInput.text.length === 0) {
             branch = "home"; if (count > 0) setSelection(0); event.accepted = true
         } else if (event.key === Qt.Key_End && keyboardInput.text.length === 0) {
@@ -201,12 +202,12 @@ PanelWindow {
 
     Rectangle {
         id: card
-        width: Math.min(620, parent.width - 24)
+        width: Math.min(560, parent.width - 24)
         height: Math.min(430, parent.height - 48)
         x: Math.round((parent.width - width) / 2)
         y: Math.round((parent.height - height) / 2)
         radius: root.pillRadius
-        color: root.bg
+        color: Qt.rgba(root.bg.r, root.bg.g, root.bg.b, 1)
         border.color: root.pillBorder
         border.width: root.pillBorderW
         clip: true
@@ -229,25 +230,24 @@ PanelWindow {
             }
         }
 
-        GridView {
-            id: grid
-            anchors { top: parent.top; left: parent.left; right: parent.right; bottom: separator.top }
-            anchors.margins: 14
-            anchors.bottomMargin: 10
+        ListView {
+            id: emojiList
+            anchors.fill: parent
+            anchors.margins: 12
             clip: true
             interactive: true
-            cellWidth: 64
-            cellHeight: 60
+            spacing: 3
             model: panel.items
             currentIndex: 0
             keyNavigationEnabled: false
-            cacheBuffer: 164
+            cacheBuffer: panel.rowHeight * 5
             boundsBehavior: Flickable.StopAtBounds
             WheelHandler {
                 onWheel: function(event) {
                     var direction = event.angleDelta.y < 0 ? 1 : -1
-                    var maximum = Math.max(0, grid.contentHeight - grid.height)
-                    grid.contentY = Math.max(0, Math.min(maximum, grid.contentY + direction * grid.cellHeight * 2))
+                    var maximum = Math.max(0, emojiList.contentHeight - emojiList.height)
+                    emojiList.contentY = Math.max(0, Math.min(maximum,
+                        emojiList.contentY + direction * panel.rowHeight * 3))
                     event.accepted = true
                 }
             }
@@ -274,17 +274,47 @@ PanelWindow {
             delegate: Rectangle {
                 required property int index
                 required property var modelData
-                width: grid.cellWidth - 6
-                height: grid.cellHeight - 6
+                width: emojiList.width
+                height: panel.rowHeight
                 radius: root.tileRadius
                 color: panel.selectedIndex === index ? root.fillHover : root.fillIdle
                 border.color: panel.selectedIndex === index ? root.seal : root.sep
-                border.width: panel.selectedIndex === index ? 2 : 1
+                border.width: 1
                 Text {
-                    anchors.centerIn: parent
+                    id: emojiGlyph
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 38
                     text: modelData.emoji
                     color: root.ink
-                    font.pixelSize: 28
+                    font.pixelSize: 21
+                    horizontalAlignment: Text.AlignHCenter
+                }
+                Text {
+                    anchors.left: emojiGlyph.right
+                    anchors.leftMargin: 10
+                    anchors.right: codePoint.left
+                    anchors.rightMargin: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: modelData.label
+                    color: root.ink
+                    font.family: root.mono
+                    font.pixelSize: 10
+                    elide: Text.ElideRight
+                }
+                Text {
+                    id: codePoint
+                    anchors.right: parent.right
+                    anchors.rightMargin: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 148
+                    text: panel.unicodeLabel(modelData.emoji)
+                    color: root.sumi
+                    font.family: root.mono
+                    font.pixelSize: 9
+                    horizontalAlignment: Text.AlignRight
+                    elide: Text.ElideRight
                 }
                 HoverHandler { onHoveredChanged: if (hovered) panel.setSelection(index) }
                 TapHandler { acceptedButtons: Qt.LeftButton; onTapped: panel.activate(index) }
@@ -298,61 +328,6 @@ PanelWindow {
                 font.family: root.mono
                 font.pixelSize: 10
             }
-        }
-
-        Rectangle {
-            id: separator
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: detailArea.top
-            height: 1
-            color: root.sep
-        }
-
-        Item {
-            id: detailArea
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: 104
-
-            Text {
-                id: selectedPreview
-                anchors.left: parent.left
-                anchors.leftMargin: 20
-                anchors.verticalCenter: parent.verticalCenter
-                width: 72
-                text: panel.selectedItem ? panel.selectedItem.emoji : ""
-                color: root.ink
-                font.pixelSize: 40
-                horizontalAlignment: Text.AlignHCenter
-            }
-
-            Column {
-                anchors.left: selectedPreview.right
-                anchors.leftMargin: 12
-                anchors.right: parent.right
-                anchors.rightMargin: 24
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 7
-                Text {
-                    width: parent.width
-                    text: panel.selectedItem ? panel.selectedItem.label : ""
-                    color: root.ink
-                    font.family: root.mono
-                    font.pixelSize: 11
-                    elide: Text.ElideRight
-                }
-                Text {
-                    width: parent.width
-                    text: panel.selectedItem ? panel.unicodeLabel(panel.selectedItem.emoji) : ""
-                    color: root.sumi
-                    font.family: root.mono
-                    font.pixelSize: 9
-                    elide: Text.ElideRight
-                }
-            }
-
         }
     }
 

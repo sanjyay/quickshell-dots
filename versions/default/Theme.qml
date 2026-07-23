@@ -19,6 +19,7 @@ Item {
     Component.onCompleted: {
         console.log("Theme.qml completed cameraSwitch=" + (cameraSwitch ? cameraSwitch.monitorVersion : "null"))
         refreshTailscale()
+        mediaTrackArmTimer.restart()
     }
     onCameraSwitchChanged: console.log("Theme.qml cameraSwitch changed cameraSwitch=" + (cameraSwitch ? cameraSwitch.monitorVersion : "null"))
 
@@ -1102,6 +1103,51 @@ Item {
     }
 
     // ── Quickshell transient OSD ───────────────────────────────
+    property bool mediaTrackNotificationsReady: false
+    property string lastMediaTrackKey: ""
+    readonly property string observedMediaTrackKey: {
+        var player = mediaSelection.player
+        if (!player || !player.trackTitle) return ""
+        return String(player.dbusName || player.identity || "player") + "\u001f"
+            + String(player.trackTitle || "") + "\u001f" + String(player.trackArtist || "")
+    }
+    onObservedMediaTrackKeyChanged: scheduleMediaTrackNotification()
+
+    function currentMediaTrackKey() {
+        return observedMediaTrackKey
+    }
+
+    function scheduleMediaTrackNotification() {
+        if (!mediaTrackNotificationsReady) {
+            lastMediaTrackKey = currentMediaTrackKey()
+            return
+        }
+        mediaTrackChangeTimer.restart()
+    }
+
+    Timer {
+        id: mediaTrackArmTimer
+        interval: 750
+        onTriggered: {
+            theme.lastMediaTrackKey = theme.currentMediaTrackKey()
+            theme.mediaTrackNotificationsReady = true
+        }
+    }
+
+    Timer {
+        id: mediaTrackChangeTimer
+        interval: 100
+        onTriggered: {
+            var player = mediaSelection.player
+            var key = theme.currentMediaTrackKey()
+            if (!player || key === "" || key === theme.lastMediaTrackKey) return
+            theme.lastMediaTrackKey = key
+            var title = String(player.trackTitle || "Media")
+            var artist = String(player.trackArtist || "")
+            theme.showHardwareOsd("media", "", title + (artist ? "\n" + artist : ""), "󰎈", "")
+        }
+    }
+
     property bool osdVisible: false
     property string osdKind: ""
     property string osdValue: ""
@@ -1110,9 +1156,12 @@ Item {
     property string osdScreenName: ""
     property int osdSerial: 0
     function showHardwareOsd(kind, value, detail, icon, screenName) {
-        osdKind = kind || "status"
+        var nextKind = kind || "status"
+        var nextDetail = detail || ""
+        if (nextKind === "media" && osdVisible && osdKind === "media" && osdDetail === nextDetail) return
+        osdKind = nextKind
         osdValue = value === undefined ? "" : String(value)
-        osdDetail = detail || ""
+        osdDetail = nextDetail
         osdIcon = icon || ""
         if (screenName) osdScreenName = screenName
         else { activateFocusedPopupScreen(); osdScreenName = activePopupScreenName }

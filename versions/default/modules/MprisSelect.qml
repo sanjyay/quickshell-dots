@@ -6,8 +6,8 @@ import Quickshell.Services.Mpris
 // The bar widget and the panel both instantiate this, so they can never
 // disagree about the current player.
 //
-// playerctld (and dead apps) can leave ghost entries that report Playing
-// after the real player has exited. Treat those as "no player".
+// playerctld can leave a ghost entry that reports Playing after the real
+// player has exited. Treat that proxy as "no player".
 QtObject {
     id: sel
 
@@ -27,7 +27,10 @@ QtObject {
     function isReal(p) {
         if (!p) return false
         if (isProxy(p)) return false
-        return p.playbackState === MprisPlaybackState.Playing && hasTrack(p)
+        // Browsers can publish Playing before the first track metadata update.
+        // Select the live player immediately so playback-driven widgets appear;
+        // metadata consumers will update independently when the title arrives.
+        return p.playbackState === MprisPlaybackState.Playing
     }
 
     function hasTrack(p) {

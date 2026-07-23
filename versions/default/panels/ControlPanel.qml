@@ -46,18 +46,6 @@ PanelWindow {
         }
     }
 
-    Process {
-        id: qsModeProc
-        command: ["bash", "-lc", "qs-mode quickshell"]
-        running: false
-    }
-
-    Process {
-        id: omarchyModeProc
-        command: ["bash", "-lc", "qs-mode omarchy"]
-        running: false
-    }
-
     // ── reusable tile: neutral by default, highlights only on hover ──
     component Tile: Rectangle {
         property string label
@@ -178,24 +166,6 @@ PanelWindow {
                     root.controlVisible = false
                     refreshProc.running = false
                     refreshProc.running = true
-                }
-            }
-            Tile {
-                width: parent.width
-                label: "Quickshell UI"
-                onActivated: {
-                    root.controlVisible = false
-                    qsModeProc.running = false
-                    qsModeProc.running = true
-                }
-            }
-            Tile {
-                width: parent.width
-                label: "Omarchy UI"
-                onActivated: {
-                    root.controlVisible = false
-                    omarchyModeProc.running = false
-                    omarchyModeProc.running = true
                 }
             }
             // ── POWER (collapsed sub-menu; nothing destructive pre-shown) ──

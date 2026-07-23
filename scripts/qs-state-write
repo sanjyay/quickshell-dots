@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""Atomically replace a private state file from a JSON stdin envelope."""
+
+import json
+import os
+from pathlib import Path
+import sys
+import tempfile
+
+
+def write_atomic(path: Path, payload: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            os.fchmod(stream.fileno(), 0o600)
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def write_json_atomic(path: Path, payload: str) -> None:
+    json.loads(payload)
+    write_atomic(path, payload)
+
+
+def main() -> int:
+    validate_json = len(sys.argv) == 3 and sys.argv[1] == "--json"
+    if len(sys.argv) != (3 if validate_json else 2):
+        print("usage: qs-state-write [--json] PATH", file=sys.stderr)
+        return 2
+    envelope = sys.stdin.readline()
+    if not envelope:
+        print("qs-state-write: missing input", file=sys.stderr)
+        return 2
+    payload = json.loads(envelope)
+    if not isinstance(payload, dict) or not isinstance(payload.get("data"), str):
+        print("qs-state-write: input must contain a string data field", file=sys.stderr)
+        return 2
+    data = payload["data"]
+    if validate_json:
+        json.loads(data)
+    write_atomic(Path(sys.argv[-1]), data)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
