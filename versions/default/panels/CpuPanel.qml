@@ -18,21 +18,23 @@ PanelWindow {
 
     readonly property int barBottom: 35
     readonly property int gap: 8
-    readonly property int maxSamples: 30
     readonly property string cpuIcon: "\uf2db"
     readonly property string ramIcon: "\uf538"
 
     property int cpuPct: 0
     property int cpuTemp: 0
-    property var cpuHistory: []
+    property real cpuClockGHz: 0
+    property int cpuCores: 0
+    property int cpuThreads: 0
     property string gpuDriver: ""
     property int gpuUtil: 0
     property int gpuTemp: 0
     property int gpuMemUsed: 0
     property int gpuMemTotal: 0
     property bool gpuMemAvailable: false
+    property int gpuClockMHz: 0
+    property real gpuPowerW: -1
     property string gpuSource: ""
-    property var gpuHistory: []
     readonly property bool hasGpu: gpuDriver !== "" && gpuDriver !== "none"
     property int ramPct: 0
     property real ramUsedGiB: 0.0
@@ -42,19 +44,12 @@ PanelWindow {
         return v > 0 ? v + "\u00B0C" : "--\u00B0C"
     }
 
-    function pushSample(history, value) {
-        var h = history.slice()
-        h.push(Math.max(0, Math.min(1, value / 100)))
-        if (h.length > maxSamples) h.shift()
-        return h
-    }
-
     function mibToGib(v) {
         return (Math.max(0, v) / 1024).toFixed(1)
     }
 
-    function vramPct() {
-        return gpuMemAvailable && gpuMemTotal > 0 ? Math.max(0, Math.min(100, Math.round(gpuMemUsed * 100 / gpuMemTotal))) : 0
+    function powerText(v) {
+        return v >= 0 ? v.toFixed(1) + " W" : "--"
     }
     function gpuProbeCommand(debug) {
         return "p=\"$HOME/.config/quickshell/bar/modules/qs-gpu-probe.sh\"; " +
@@ -79,10 +74,10 @@ PanelWindow {
 
     Rectangle {
         id: card
-        width: 640
-        height: col.implicitHeight + 24
+        width: 610
+        height: 172
         radius: reveal > 0.001 ? root.pillRadius : 0
-        color: root.bg
+        color: Qt.rgba(root.bg.r, root.bg.g, root.bg.b, 0.96)
         border.color: root.pillBorder
         border.width: root.pillBorderW
         PillShadow { theme: root }
@@ -103,344 +98,164 @@ PanelWindow {
 
         MouseArea { anchors.fill: parent; onClicked: {} }
 
+        Rectangle {
+            id: anchorNotch
+            width: 10
+            height: 10
+            rotation: 45
+            color: card.color
+            border.color: root.pillBorder
+            border.width: root.pillBorderW
+            x: Math.max(18, Math.min(card.width - width - 18, root.cpuBarX - card.x - width / 2))
+            y: root.barPosition === "bottom" ? card.height - height / 2 : -height / 2
+        }
+
         Column {
             id: col
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 6
+            anchors.margins: 16
+            spacing: 10
 
-            Item {
+            Row {
                 width: parent.width
-                height: 18
-                UiText {
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "SYSTEM"
-                    color: root.ink
-                    font.family: root.mono
-                    font.pixelSize: 12
-                    font.letterSpacing: 2
-                    font.weight: Font.Medium
-                }
-                UiText {
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "\u2715"
-                    color: closeMa.containsMouse ? root.seal : root.sumi
-                    font.pixelSize: 12
-                    Behavior on color { ColorAnimation { duration: 120 } }
-                    MouseArea {
-                        id: closeMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.cpuVisible = false
-                    }
-                }
-            }
+                height: 140
+                spacing: 0
 
-            Rectangle { width: parent.width; height: 1; color: root.sep }
-
-            Grid {
-                width: parent.width
-                columns: 3
-                rowSpacing: 0
-                columnSpacing: 10
-
-                MonitorCard {
+                MonitorColumn {
                     root: cpuPanel.root
-                    width: (parent.width - 20) / 3
-                    height: 162
-                    icon: cpuPanel.cpuIcon
+                    width: (parent.width - 2) / 3
+                    height: parent.height
                     title: "CPU"
                     primary: cpuPanel.tempText(cpuPanel.cpuTemp)
-                    secondary: cpuPanel.cpuPct + "%"
-                    history: cpuPanel.cpuHistory
-                    bottomLabel: "USAGE"
-                    bottomText: cpuPanel.cpuPct + "%"
-                    bottomPercent: cpuPanel.cpuPct
+                    usagePercent: cpuPanel.cpuPct
+                    metrics: [
+                        { label: "Clock", value: cpuPanel.cpuClockGHz > 0 ? cpuPanel.cpuClockGHz.toFixed(2) + " GHz" : "--" },
+                        { label: "Cores", value: cpuPanel.cpuCores > 0 ? cpuPanel.cpuCores + "C / " + cpuPanel.cpuThreads + "T" : "--" }
+                    ]
                 }
 
-                MonitorCard {
+                Rectangle { width: 1; height: parent.height; color: root.sep }
+
+                MonitorColumn {
                     root: cpuPanel.root
-                    width: (parent.width - 20) / 3
-                    height: 162
-                    gpuIcon: true
+                    width: (parent.width - 2) / 3
+                    height: parent.height
                     title: "GPU"
                     primary: cpuPanel.hasGpu ? cpuPanel.tempText(cpuPanel.gpuTemp) : "--\u00B0C"
-                    secondary: cpuPanel.hasGpu ? cpuPanel.gpuUtil + "%" : "offline"
-                    history: cpuPanel.gpuHistory
-                    bottomLabel: "VRAM"
-                    bottomText: cpuPanel.gpuMemAvailable && cpuPanel.gpuMemTotal > 0
-                                ? cpuPanel.mibToGib(cpuPanel.gpuMemUsed) + " / " + cpuPanel.mibToGib(cpuPanel.gpuMemTotal) + " GiB"
-                                : "--"
-                    bottomPercent: cpuPanel.vramPct()
+                    usagePercent: cpuPanel.hasGpu ? cpuPanel.gpuUtil : 0
+                    metrics: [
+                        { label: "VRAM", value: cpuPanel.gpuMemAvailable && cpuPanel.gpuMemTotal > 0
+                            ? cpuPanel.mibToGib(cpuPanel.gpuMemUsed) + "/" + cpuPanel.mibToGib(cpuPanel.gpuMemTotal) + " GiB" : "--" },
+                        { label: "Clock", value: cpuPanel.gpuClockMHz > 0 ? cpuPanel.gpuClockMHz + " MHz" : "--" },
+                        { label: "Power", value: cpuPanel.powerText(cpuPanel.gpuPowerW) }
+                    ]
                 }
 
-                MonitorCard {
+                Rectangle { width: 1; height: parent.height; color: root.sep }
+
+                MonitorColumn {
                     root: cpuPanel.root
-                    width: (parent.width - 20) / 3
-                    height: 162
-                    icon: cpuPanel.ramIcon
+                    width: (parent.width - 2) / 3
+                    height: parent.height
                     title: "RAM"
                     primary: cpuPanel.ramUsedGiB.toFixed(1) + " GiB"
-                    secondary: cpuPanel.ramPct + "%"
-                    bottomLabel: "MEMORY"
-                    bottomText: cpuPanel.ramUsedGiB.toFixed(1) + " / " + cpuPanel.ramTotalGiB.toFixed(1) + " GiB"
-                    bottomPercent: cpuPanel.ramPct
-                    showSparkline: false
-                }
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 36
-                radius: root.tileRadius
-                color: btopMa.containsMouse ? root.fillPrimaryHover : root.seal
-                Behavior on color { ColorAnimation { duration: 120 } }
-                UiText {
-                    anchors.centerIn: parent
-                    text: "Open btop"
-                    color: root.paper
-                    font.family: root.mono
-                    font.pixelSize: 12
-                    font.weight: Font.Medium
-                }
-                MouseArea {
-                    id: btopMa
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        root.cpuVisible = false;
-                        btopRunner.running = false;
-                        btopRunner.running = true;
-                    }
+                    usagePercent: cpuPanel.ramPct
+                    metrics: [
+                        { label: "Used", value: cpuPanel.ramUsedGiB.toFixed(1) + " GiB" },
+                        { label: "Total", value: cpuPanel.ramTotalGiB.toFixed(1) + " GiB" },
+                        { label: "Available", value: Math.max(0, cpuPanel.ramTotalGiB - cpuPanel.ramUsedGiB).toFixed(1) + " GiB" }
+                    ]
                 }
             }
         }
     }
 
-    component MonitorCard: Rectangle {
+    component MonitorColumn: Item {
         required property var root
-        property string icon: ""
         property string title: ""
         property string primary: ""
-        property string secondary: ""
-        property string bottomLabel: ""
-        property string bottomText: ""
-        property real bottomPercent: 0
-        property var history: []
-        property bool gpuIcon: false
-        property bool showSparkline: true
-        property bool showProgress: true
-
-        radius: root.tileRadius
-        color: root.frameWeak
-        border.color: root.sep
-        border.width: 1
+        property real usagePercent: 0
+        property var metrics: []
 
         Column {
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.leftMargin: 14
+            anchors.rightMargin: 14
             spacing: 5
 
-            Row {
-                width: parent.width
-                height: 18
-                spacing: 6
-
-                UiText {
-                    visible: !gpuIcon
-                    width: 18
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: icon
-                    color: root.seal
-                    font.family: root.mono
-                    font.pixelSize: 16
-                    horizontalAlignment: Text.AlignHCenter
-                }
-                GpuBoardIcon {
-                    visible: gpuIcon
-                    anchors.verticalCenter: parent.verticalCenter
-                    tint: root.seal
-                }
-                UiText {
-                    width: parent.width - 70
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: title
-                    color: root.sumiHi
-                    font.family: root.mono
-                    font.pixelSize: 13
-                    font.letterSpacing: 1
-                    font.weight: Font.Medium
-                }
-                UiText {
-                    width: 40
-                    anchors.verticalCenter: parent.verticalCenter
-                    horizontalAlignment: Text.AlignRight
-                    text: secondary
-                    color: root.sumiHi
-                    font.family: root.mono
-                    font.pixelSize: 12
-                    font.weight: Font.Medium
-                }
+            UiText {
+                text: title
+                color: root.sumiHi
+                font.family: root.mono
+                font.pixelSize: 11
+                font.letterSpacing: 1.5
+                font.weight: Font.Medium
             }
 
             UiText {
                 text: primary
                 color: root.seal
                 font.family: root.mono
-                font.pixelSize: 34
+                font.pixelSize: 28
                 font.weight: Font.Medium
                 elide: Text.ElideRight
                 width: parent.width
             }
 
-            Sparkline {
-                visible: showSparkline
+            Row {
                 width: parent.width
-                height: 26
-                history: parent.parent.history
-                tint: root.seal
-                base: root.ink
+                height: 13
+                spacing: 8
+                UiText {
+                    width: 34
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Usage"
+                    color: root.sumiHi
+                    font.family: root.mono
+                    font.pixelSize: 9
+                }
+                Rectangle {
+                    width: parent.width - 42
+                    height: 4
+                    anchors.verticalCenter: parent.verticalCenter
+                    radius: 2
+                    color: root.fillIdle
+                    Rectangle {
+                        width: parent.width * Math.max(0, Math.min(100, usagePercent)) / 100
+                        height: parent.height
+                        radius: 2
+                        color: root.seal
+                        Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+                    }
+                }
             }
 
-            Item {
-                visible: !showSparkline
-                width: parent.width
-                height: 26
-            }
-
-            Column {
-                width: parent.width
-                spacing: 4
-
-                Row {
+            Repeater {
+                model: metrics
+                Item {
+                    required property var modelData
                     width: parent.width
-                    height: 18
-                    spacing: 6
-
+                    height: 14
                     UiText {
-                        width: 46
+                        anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
-                        text: bottomLabel
+                        text: modelData.label
                         color: root.sumiHi
                         font.family: root.mono
-                        font.pixelSize: 10
-                        font.letterSpacing: 1
+                        font.pixelSize: 9
                     }
-
-                    Rectangle {
-                        width: Math.max(28, parent.width - 46 - 82 - 12)
-                        height: 7
-                        anchors.verticalCenter: parent.verticalCenter
-                        radius: 4
-                        color: root.fillIdle
-                        opacity: showProgress ? 1 : 0
-                        Rectangle {
-                            width: parent.width * Math.max(0, Math.min(100, bottomPercent)) / 100
-                            height: parent.height
-                            radius: 4
-                            color: root.seal
-                            Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-                        }
-                    }
-
                     UiText {
-                        width: 82
+                        anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        horizontalAlignment: Text.AlignRight
-                        text: bottomText
+                        text: modelData.value
                         color: root.ink
                         font.family: root.mono
-                        font.pixelSize: 10
+                        font.pixelSize: 9
                         font.weight: Font.Medium
-                        elide: Text.ElideRight
                     }
                 }
             }
-        }
-    }
 
-    component GpuBoardIcon: Canvas {
-        width: 19
-        height: 14
-        property color tint: "white"
-        onTintChanged: requestPaint()
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.clearRect(0, 0, width, height)
-            ctx.strokeStyle = tint
-            ctx.fillStyle = tint
-            ctx.lineWidth = 1.35
-            ctx.lineCap = "round"
-            ctx.lineJoin = "round"
-
-            ctx.strokeRect(2.5, 2.5, 12, 8)
-            ctx.beginPath()
-            ctx.moveTo(14.5, 4.5)
-            ctx.lineTo(17, 4.5)
-            ctx.lineTo(17, 8.5)
-            ctx.lineTo(14.5, 8.5)
-            ctx.stroke()
-
-            ctx.beginPath()
-            ctx.arc(6, 6.5, 1.55, 0, Math.PI * 2)
-            ctx.arc(11, 6.5, 1.55, 0, Math.PI * 2)
-            ctx.stroke()
-
-            ctx.fillRect(4, 11.5, 7, 1)
-            ctx.fillRect(3, 0.8, 1.8, 1)
-            ctx.fillRect(6, 0.8, 1.8, 1)
-            ctx.fillRect(9, 0.8, 1.8, 1)
-            ctx.fillRect(12, 0.8, 1.8, 1)
-        }
-        Component.onCompleted: requestPaint()
-    }
-
-    component Sparkline: Canvas {
-        property var history: []
-        property color tint: "white"
-        property color base: "white"
-        onHistoryChanged: requestPaint()
-        onTintChanged: requestPaint()
-
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.clearRect(0, 0, width, height)
-            ctx.beginPath()
-            ctx.moveTo(0, height - 1)
-            ctx.lineTo(width, height - 1)
-            ctx.strokeStyle = Qt.rgba(base.r, base.g, base.b, 0.12)
-            ctx.lineWidth = 1
-            ctx.stroke()
-
-            var h = history
-            if (h.length < 2) return
-
-            var maxV = 0.25
-            for (var n = 0; n < h.length; n++) {
-                if (h[n] > maxV) maxV = h[n]
-            }
-            maxV = Math.min(1, Math.max(0.25, maxV * 1.15))
-
-            ctx.beginPath()
-            for (var i = 0; i < h.length; i++) {
-                var x = (i / (cpuPanel.maxSamples - 1)) * width
-                var y = height - 2 - (h[i] / maxV) * (height - 4)
-                if (i === 0) ctx.moveTo(x, y)
-                else {
-                    var px = ((i - 1) / (cpuPanel.maxSamples - 1)) * width
-                    var mx = (px + x) / 2
-                    ctx.bezierCurveTo(mx, y, mx, y, x, y)
-                }
-            }
-            ctx.strokeStyle = tint
-            ctx.lineWidth = 1.5
-            ctx.lineCap = "round"
-            ctx.lineJoin = "round"
-            ctx.stroke()
         }
     }
 
@@ -463,6 +278,11 @@ PanelWindow {
             "  echo \"$label $name\" | grep -Eiq 'cpu|package|tctl|tdie|core 0' && { echo \"$v\"; return; }; " +
             "  [ \"$v\" -gt \"$best\" ] 2>/dev/null && best=$v; " +
             "done; echo \"$best\"; }; echo CPU_TEMP $(cpu_temp); " +
+            "awk -F: '/cpu MHz/ {sum+=$2; n++} END{printf \"CPU_CLOCK %.0f\\n\", n?sum/n:0}' /proc/cpuinfo; " +
+            "threads=$(nproc 2>/dev/null || echo 0); " +
+            "cores=$(awk '/^physical id/ {p=$4} /^core id/ {print p \":\" $4}' /proc/cpuinfo 2>/dev/null | sort -u | wc -l); " +
+            "[ \"$cores\" -gt 0 ] 2>/dev/null || cores=$(awk -F: '/^cpu cores/ {gsub(/ /,\"\",$2); print $2; exit}' /proc/cpuinfo); " +
+            "echo CPU_TOPOLOGY ${cores:-0} ${threads:-0}; " +
             "awk '/MemTotal:/ {t=$2} /MemAvailable:/ {a=$2} END{u=t-a; printf \"RAM %.0f %.0f %.0f\\n\", u, t, (t>0?u*100/t:0)}' /proc/meminfo; " +
             cpuPanel.gpuProbeCommand(false)
         ]
@@ -476,9 +296,13 @@ PanelWindow {
                     var parts = lines[i].trim().split(/\s+/)
                     if (parts[0] === "CPU_PCT" && parts.length >= 2) {
                         cpuPanel.cpuPct = parseInt(parts[1]) || 0
-                        cpuPanel.cpuHistory = cpuPanel.pushSample(cpuPanel.cpuHistory, cpuPanel.cpuPct)
                     } else if (parts[0] === "CPU_TEMP" && parts.length >= 2) {
                         cpuPanel.cpuTemp = parseInt(parts[1]) || 0
+                    } else if (parts[0] === "CPU_CLOCK" && parts.length >= 2) {
+                        cpuPanel.cpuClockGHz = (parseFloat(parts[1]) || 0) / 1000
+                    } else if (parts[0] === "CPU_TOPOLOGY" && parts.length >= 3) {
+                        cpuPanel.cpuCores = parseInt(parts[1]) || 0
+                        cpuPanel.cpuThreads = parseInt(parts[2]) || 0
                     } else if (parts[0] === "RAM" && parts.length >= 4) {
                         var usedKB = parseFloat(parts[1]) || 0
                         var totalKB = parseFloat(parts[2]) || 0
@@ -492,16 +316,12 @@ PanelWindow {
                         cpuPanel.gpuMemAvailable = parts[4] !== "--" && parts[5] !== "--"
                         cpuPanel.gpuMemUsed = cpuPanel.gpuMemAvailable ? (parseInt(parts[4]) || 0) : 0
                         cpuPanel.gpuMemTotal = cpuPanel.gpuMemAvailable ? (parseInt(parts[5]) || 0) : 0
-                        cpuPanel.gpuHistory = cpuPanel.pushSample(cpuPanel.gpuHistory, cpuPanel.gpuUtil)
+                        cpuPanel.gpuClockMHz = parts.length >= 7 && parts[6] !== "--" ? (parseInt(parts[6]) || 0) : 0
+                        cpuPanel.gpuPowerW = parts.length >= 8 && parts[7] !== "--" ? (parseFloat(parts[7]) || -1) : -1
                     }
                 }
             }
         }
-    }
-
-    Process {
-        id: btopRunner
-        command: ["bash", "-c", "omarchy-launch-floating-terminal-with-presentation 'btop'"]
     }
 
     Timer {

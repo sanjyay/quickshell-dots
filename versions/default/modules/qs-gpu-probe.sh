@@ -41,7 +41,7 @@ first_temp_for_device() {
 
 probe_nvidia() {
   command -v nvidia-smi >/dev/null 2>&1 || return 1
-  local line temp used total util
+  local line temp used total util clock power
   line="$(nvidia-smi --query-gpu=temperature.gpu,memory.used,memory.total,utilization.gpu --format=csv,noheader,nounits 2>/dev/null | head -1 || true)"
   [ -n "$line" ] || return 1
   IFS=',' read -r temp used total util <<EOF
@@ -51,14 +51,18 @@ EOF
   used="$(printf '%s' "$used" | tr -dc '0-9')"
   total="$(printf '%s' "$total" | tr -dc '0-9')"
   util="$(printf '%s' "$util" | tr -dc '0-9')"
+  clock="$(nvidia-smi --query-gpu=clocks.gr --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -dc '0-9' || true)"
+  power="$(nvidia-smi --query-gpu=power.draw --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -dc '0-9.' || true)"
+  clock="$(printf '%s' "$clock" | tr -dc '0-9')"
+  power="$(printf '%s' "$power" | tr -dc '0-9.')"
   [ -n "$temp" ] || return 1
   emit_debug "vendor=nvidia source=nvidia-smi raw=$line"
-  printf 'GPU nvidia %s %s %s %s\n' "${util:---}" "${temp:---}" "${used:---}" "${total:---}"
+  printf 'GPU nvidia %s %s %s %s %s %s\n' "${util:---}" "${temp:---}" "${used:---}" "${total:---}" "${clock:---}" "${power:---}"
   return 0
 }
 
 probe_drm() {
-  local card dev vendor vendor_name driver util temp used total
+  local card dev vendor vendor_name util temp used total clock power f value
   for card in /sys/class/drm/card*; do
     dev="$card/device"
     [ -d "$dev" ] || continue
@@ -73,7 +77,7 @@ probe_drm() {
     esac
     [ "$vendor_name" != "unknown" ] || continue
 
-    util="--"; temp="--"; used="--"; total="--"
+    util="--"; temp="--"; used="--"; total="--"; clock="--"; power="--"
     if [ -r "$dev/gpu_busy_percent" ]; then
       util="$(cat "$dev/gpu_busy_percent" 2>/dev/null | tr -dc '0-9' || true)"
       [ -n "$util" ] || util="--"
@@ -88,10 +92,26 @@ probe_drm() {
         [ -n "$used" ] || used="--"
         [ -n "$total" ] || total="--"
       fi
+      for f in "$dev"/pp_dpm_sclk; do
+        [ -r "$f" ] || continue
+        value="$(awk '/\*/ {for(i=1;i<=NF;i++) if($i ~ /Mhz$/) {gsub(/Mhz/, "", $i); print $i; exit}}' "$f" 2>/dev/null || true)"
+        [ -n "$value" ] && clock="$value"
+      done
+    elif [ -r "$dev/gt_cur_freq_mhz" ]; then
+      clock="$(cat "$dev/gt_cur_freq_mhz" 2>/dev/null | tr -dc '0-9' || true)"
+      [ -n "$clock" ] || clock="--"
     fi
 
-    emit_debug "vendor=$vendor_name source=$dev util=$util temp=$temp vram_used_mib=$used vram_total_mib=$total"
-    printf 'GPU %s %s %s %s %s\n' "$vendor_name" "$util" "$temp" "$used" "$total"
+    for f in "$dev"/hwmon/hwmon*/power*_average; do
+      [ -r "$f" ] || continue
+      value="$(cat "$f" 2>/dev/null || true)"
+      case "$value" in ""|*[!0-9]*) continue;; esac
+      power="$(awk -v v="$value" 'BEGIN{printf "%.1f",v/1000000}')"
+      break
+    done
+
+    emit_debug "vendor=$vendor_name source=$dev util=$util temp=$temp vram_used_mib=$used vram_total_mib=$total clock_mhz=$clock power_w=$power"
+    printf 'GPU %s %s %s %s %s %s %s\n' "$vendor_name" "$util" "$temp" "$used" "$total" "$clock" "$power"
     return 0
   done
   return 1
@@ -99,5 +119,5 @@ probe_drm() {
 
 probe_nvidia || probe_drm || {
   emit_debug "vendor=none source=unavailable"
-  printf 'GPU none -- -- -- --\n'
+  printf 'GPU none -- -- -- -- -- --\n'
 }
