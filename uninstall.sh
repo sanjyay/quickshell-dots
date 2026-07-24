@@ -213,7 +213,12 @@ rm -f "$HOME/.config/systemd/user/elephant.service.d/50-qs-rise-clipboard-privac
       "$HOME/.local/lib/qs-rise/qs-clipboard-filter.py"
 rmdir "$HOME/.config/systemd/user/elephant.service.d" "$HOME/.local/lib/qs-rise/elephant-bin" "$HOME/.local/lib/qs-rise" 2>/dev/null || true
 systemctl --user daemon-reload >/dev/null 2>&1 || true
-systemctl --user try-restart elephant.service >/dev/null 2>&1 || true
+if [[ -f "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/elephant-service-enabled-by-installer" ]]; then
+  elephant service disable >/dev/null 2>&1 || true
+  rm -f "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/elephant-service-enabled-by-installer"
+else
+  systemctl --user try-restart elephant.service >/dev/null 2>&1 || true
+fi
 if [[ -f "$HOME/.local/bin/swayosd-client" ]] && grep -q 'quickshell-rise-owned-swayosd-client' "$HOME/.local/bin/swayosd-client"; then rm -f "$HOME/.local/bin/swayosd-client"; fi
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-theme-switcher"
 rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-wallpaper-switcher"

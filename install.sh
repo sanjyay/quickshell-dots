@@ -332,8 +332,12 @@ if [[ -f "$src_repo/scripts/qs-mode.sh" ]]; then
   install -m 755 "$src_repo/scripts/qs-clipboard-filter.py" "$privacy_lib/qs-clipboard-filter.py"
   install -m 755 "$src_repo/scripts/qs-elephant-wl-paste.sh" "$privacy_lib/elephant-bin/wl-paste"
   install -m 644 "$src_repo/systemd/elephant-clipboard-privacy.conf" "$privacy_dropin/50-qs-rise-clipboard-privacy.conf"
+  if ! systemctl --user is-enabled elephant.service >/dev/null 2>&1; then
+    elephant service enable >/dev/null
+    touch "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/elephant-service-enabled-by-installer"
+  fi
   systemctl --user daemon-reload
-  systemctl --user try-restart elephant.service >/dev/null 2>&1 || warn "Elephant must be restarted before clipboard privacy filtering becomes active."
+  systemctl --user restart elephant.service >/dev/null 2>&1 || warn "Elephant must be started before clipboard history and privacy filtering become active."
   install -m 755 "$src_repo/scripts/qs-capture.sh" "$HOME/.local/bin/qs-capture"
   if [[ ! -e "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode" ]]; then
     printf 'quickshell\n' > "${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode"
