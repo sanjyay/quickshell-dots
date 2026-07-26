@@ -20,6 +20,7 @@ PanelWindow {
 
     property var items: []
     property var clipboardItems: []
+    property var screenshotItems: []
     property var recordingItems: []
     property int selectedIndex: 0
     property int pendingSelectionIndex: -1
@@ -29,6 +30,7 @@ PanelWindow {
     property string statusText: ""
     property bool syncingList: false
     property bool clipboardLoaded: false
+    property bool screenshotsLoaded: false
     property bool recordingsLoaded: false
     readonly property bool inputDebug: Quickshell.env("QS_CLIPBOARD_INPUT_DEBUG") === "1"
     readonly property var visibleItems: filteredItems()
@@ -43,7 +45,7 @@ PanelWindow {
         var needle = query.trim().toLowerCase()
         return items.filter(function(item) {
             if (activeFilter === "text" && item.kind !== "text") return false
-            if (activeFilter === "image" && item.kind !== "image") return false
+            if (activeFilter === "image" && item.kind !== "image" && item.kind !== "screenshot") return false
             return !needle || item.searchKeywords.indexOf(needle) >= 0
         })
     }
@@ -65,22 +67,33 @@ PanelWindow {
 
     function refresh() {
         clipboardLoaded = false
+        screenshotsLoaded = false
         recordingsLoaded = false
         queryProc.running = false
         queryProc.running = true
+        screenshotProc.running = false
+        screenshotProc.running = true
         recordingProc.running = false
         recordingProc.running = true
     }
 
     function imageSource(item) {
-        if (!item || (item.kind !== "image" && item.kind !== "recording") || !item.imagePath) return ""
+        if (!item || (item.kind !== "image" && item.kind !== "screenshot" && item.kind !== "recording") || !item.imagePath) return ""
         if (item.imagePath.indexOf("file://") === 0) return item.imagePath
         return "file://" + encodeURI(item.imagePath)
     }
 
     function finishRefresh() {
-        if (!clipboardLoaded || !recordingsLoaded) return
-        items = recordingItems.concat(clipboardItems)
+        if (!clipboardLoaded || !screenshotsLoaded || !recordingsLoaded) return
+        var screenshotsBySecond = {}
+        screenshotItems.forEach(function(item) { screenshotsBySecond[Math.floor(item.sortKey)] = true })
+        var uniqueClipboardItems = clipboardItems.filter(function(item) {
+            return item.kind !== "image" || !screenshotsBySecond[Math.floor(item.sortKey)]
+        })
+        items = recordingItems.concat(screenshotItems, uniqueClipboardItems).sort(function(a, b) {
+            if (a.sortKey !== b.sortKey) return b.sortKey - a.sortKey
+            return a.id < b.id ? 1 : (a.id > b.id ? -1 : 0)
+        })
         statusText = ""
         if (pendingSelectionIndex >= 0) {
             var nextIndex = pendingSelectionIndex
@@ -103,6 +116,11 @@ PanelWindow {
             root.clipboardVisible = false
             return
         }
+        if (row.kind === "screenshot") {
+            Quickshell.execDetached(["bash", "-c", "wl-copy --type image/png < \"$1\"", "history-copy", row.filePath])
+            root.clipboardVisible = false
+            return
+        }
         copyProc.command = [Quickshell.env("HOME") + "/.local/bin/qs-clipboard", "copy", row.id]
         copyProc.running = false
         copyProc.running = true
@@ -120,18 +138,18 @@ PanelWindow {
         var row = selectedItem
         if (!row) return
         pendingSelectionIndex = selectedIndex
-        removeProc.command = row.kind === "recording"
+        removeProc.command = row.kind === "recording" || row.kind === "screenshot"
             ? ["bash", "-c", "gio trash -- \"$1\" 2>/dev/null || trash-put -- \"$1\" 2>/dev/null", "history-remove", row.filePath]
             : [Quickshell.env("HOME") + "/.local/bin/qs-clipboard", "delete", row.id]
         removeProc.running = false
         removeProc.running = true
-        statusText = "Removing clipboard entry…"
+        statusText = "Removing history entry…"
         refreshTimer.restart()
     }
 
     function editSelectedImage() {
         var row = selectedItem
-        if (!row || row.kind !== "image" || !row.imagePath) return
+        if (!row || (row.kind !== "image" && row.kind !== "screenshot") || !row.imagePath) return
         editProc.command = [Quickshell.env("HOME") + "/.local/bin/qs-clipboard", "edit", row.imagePath]
         editProc.running = false
         editProc.running = true
@@ -159,6 +177,10 @@ PanelWindow {
                 var fullText = isText ? (preview || String(x.text || "")) : ""
                 var mimeType = String(x.mime || x.mime_type || "")
                 var timestamp = String(x.subtext || "")
+                var parsedTimestamp = Date.parse(timestamp)
+                var eventTime = Number(x.timestamp || x.created_at)
+                if (!isFinite(eventTime) || eventTime <= 0)
+                    eventTime = isNaN(parsedTimestamp) ? (raw.length - i) : parsedTimestamp / 1000
                 var label = isImage ? "Image clipboard entry"
                     : (fullText ? fullText.replace(/\s+/g, " ").trim().slice(0, 120) : "Clipboard entry")
                 var metadata = [timestamp, mimeType].filter(function(value) { return value.length > 0 }).join(" · ")
@@ -173,7 +195,7 @@ PanelWindow {
                     imagePath: isImage ? preview : "",
                     mimeType: mimeType,
                     timestamp: timestamp,
-                    sortKey: Number(x.timestamp || x.created_at || (raw.length - i)),
+                    sortKey: eventTime,
                     searchKeywords: (label + " " + fullText + " " + metadata + " " + mimeType + " " + previewType).toLowerCase(),
                     icon: isImage ? "" : (isText ? "" : "󰋼")
                 })
@@ -190,34 +212,48 @@ PanelWindow {
     }
 
     function parseRecordings(text) {
+        recordingItems = parseMediaFiles(text, "recording")
+        recordingsLoaded = true
+        finishRefresh()
+    }
+
+    function parseScreenshots(text) {
+        screenshotItems = parseMediaFiles(text, "screenshot")
+        screenshotsLoaded = true
+        finishRefresh()
+    }
+
+    function parseMediaFiles(text, kind) {
         var out = []
         var lines = String(text || "").trim().split("\n")
         for (var i = 0; i < lines.length; i++) {
-            var path = lines[i].trim()
+            var fields = lines[i].split("\t")
+            var eventTime = Number(fields.shift())
+            var path = fields.join("\t").trim()
             if (!path) continue
             var name = path.split("/").pop()
             var stem = name.replace(/\.[^.]+$/, "")
-            var stamp = stem.replace(/^screenrecording-/, "").replace("_", "  ")
+            var prefix = kind === "recording" ? /^screenrecording-/ : /^screenshot-/
+            var stamp = stem.replace(prefix, "").replace("_", "  ")
             out.push({
-                id: "recording:" + path,
-                kind: "recording",
-                entryType: "recording",
-                label: stem.replace(/^screenrecording-/, "Screen recording · "),
+                id: kind + ":" + path,
+                kind: kind,
+                entryType: kind,
+                label: stem.replace(prefix, kind === "recording" ? "Screen recording · " : "Screenshot · "),
                 detail: stamp,
                 fullText: "",
                 previewText: "",
-                imagePath: Quickshell.env("HOME") + "/.cache/quickshell-history-thumbs/" + stem + ".jpg",
+                imagePath: kind === "recording"
+                    ? Quickshell.env("HOME") + "/.cache/quickshell-history-thumbs/" + stem + ".jpg" : path,
                 filePath: path,
-                mimeType: "video",
+                mimeType: kind === "recording" ? "video" : "image/png",
                 timestamp: stamp,
-                sortKey: recordingItems.length - i,
-                searchKeywords: (name + " screen recording video " + stamp).toLowerCase(),
-                icon: ""
+                sortKey: isFinite(eventTime) && eventTime > 0 ? eventTime : i,
+                searchKeywords: (name + " " + (kind === "recording" ? "screen recording video " : "screenshot image ") + stamp).toLowerCase(),
+                icon: kind === "recording" ? "" : ""
             })
         }
-        recordingItems = out
-        recordingsLoaded = true
-        finishRefresh()
+        return out
     }
 
     function handleKey(event) {
@@ -240,7 +276,8 @@ PanelWindow {
             branch = "end"; if (count > 0) setSelection(count - 1); event.accepted = true
         } else if (event.key === Qt.Key_Delete && query.length === 0) {
             branch = "remove"; remove(selectedIndex); event.accepted = true
-        } else if (event.key === Qt.Key_E && selectedItem && selectedItem.kind === "image") {
+        } else if (event.key === Qt.Key_E && selectedItem
+                   && (selectedItem.kind === "image" || selectedItem.kind === "screenshot")) {
             branch = "edit"; editSelectedImage(); event.accepted = true
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             branch = "copy"; activate(selectedIndex); event.accepted = true
@@ -336,7 +373,8 @@ PanelWindow {
                         anchors.leftMargin: 18
                         anchors.verticalCenter: parent.verticalCenter
                         text: modelData.kind === "recording" ? "SCREEN RECORDING"
-                            : (modelData.kind === "image" ? "IMAGE" : "CLIPBOARD")
+                            : (modelData.kind === "screenshot" ? "SCREENSHOT"
+                            : (modelData.kind === "image" ? "IMAGE" : "CLIPBOARD"))
                         color: selected ? root.seal : root.sumi
                         font.family: root.mono
                         font.pixelSize: 9
@@ -394,7 +432,8 @@ PanelWindow {
                     anchors.bottom: cardMeta.top
                     anchors.margins: 16
                     anchors.topMargin: 70
-                    visible: historyCard.visible && (modelData.kind === "image" || modelData.kind === "recording")
+                    visible: historyCard.visible && (modelData.kind === "image"
+                        || modelData.kind === "screenshot" || modelData.kind === "recording")
                     source: visible ? panel.imageSource(modelData) : ""
                     sourceSize.width: 512
                     sourceSize.height: 512
@@ -429,7 +468,8 @@ PanelWindow {
                 Column {
                     anchors.centerIn: parent
                     visible: modelData.kind === "other"
-                        || ((modelData.kind === "image" || modelData.kind === "recording") && cardMedia.status === Image.Error)
+                        || ((modelData.kind === "image" || modelData.kind === "screenshot"
+                             || modelData.kind === "recording") && cardMedia.status === Image.Error)
                     spacing: 8
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -511,6 +551,16 @@ PanelWindow {
         stdout: StdioCollector { onStreamFinished: panel.parse(this.text) }
     }
     Process {
+        id: screenshotProc
+        command: ["bash", "-c", [
+            "D=\"${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$(xdg-user-dir PICTURES 2>/dev/null)}}\";",
+            "case \"$D\" in \"\"|\"$HOME\") D=\"$HOME/Pictures\";; esac;",
+            "find \"$D\" -maxdepth 1 -type f -iname 'screenshot-*.png'",
+            "-printf '%T@\\t%p\\n' 2>/dev/null | sort -rn | head -120"
+        ].join(" ")]
+        stdout: StdioCollector { waitForEnd: true; onStreamFinished: panel.parseScreenshots(this.text) }
+    }
+    Process {
         id: recordingProc
         command: ["bash", "-c", [
             "D=\"${OMARCHY_SCREENRECORD_DIR:-${XDG_VIDEOS_DIR:-$(xdg-user-dir VIDEOS 2>/dev/null)}}\";",
@@ -524,7 +574,7 @@ PanelWindow {
             "b=$(basename \"$f\"); o=\"$C/${b%.*}.jpg\";",
             "if [ ! -f \"$o\" ] && command -v ffmpegthumbnailer >/dev/null 2>&1; then",
             "ffmpegthumbnailer -i \"$f\" -o \"$o\" -s 640 -q 7 >/dev/null 2>&1 || true; fi;",
-            "printf '%s\\n' \"$f\";",
+            "printf '%s\\t%s\\n' \"$ts\" \"$f\";",
             "done"
         ].join(" ")]
         stdout: StdioCollector { waitForEnd: true; onStreamFinished: panel.parseRecordings(this.text) }

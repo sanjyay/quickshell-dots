@@ -5,11 +5,14 @@
 ### History Switcher
 
 - Replaced the two-pane clipboard picker with a fullscreen blurred History
-  switcher that presents clipboard text, images, and recent screen recordings
-  in a curved card fan under `Super + Ctrl + V`.
+  switcher that presents clipboard text, images, screenshots, and recent
+  screen recordings in one strict chronological curved card fan under
+  `Super + Ctrl + V`.
 - Kept Elephant restoration, deletion, stable entry IDs, and invisible
   type-ahead filtering while adding recording-file clipboard copy and a
   separate scissors action that opens the selected recording in Omakut.
+- Unified the fan ordering so every item type now follows the same oldest-to-
+  newest timeline instead of being grouped by content type.
 - Prevented stationary-pointer hover feedback from changing the selected card,
   and batched initial clipboard and recording results to keep the fan stable as
   it opens.
