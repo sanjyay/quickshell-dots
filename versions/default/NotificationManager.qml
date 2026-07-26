@@ -87,7 +87,7 @@ Scope {
         if (timeout === 0) return
         if (timeout < 0 || timeout === undefined) {
             if (entry.urgency === NotificationUrgency.Critical) return
-            timeout = 5000
+            timeout = 2500
         }
         expiry.createObject(manager, { "entryKey": entry.key, "interval": timeout }).start()
     }

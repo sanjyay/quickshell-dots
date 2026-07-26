@@ -132,6 +132,7 @@ Common actions:
 - Press `Esc` or click the dimmed backdrop to lock again.
 - Open the launcher/control widget to change bar style, widgets, privacy module visibility, workspaces, logo, and splits.
 - Use the widget controls to hide the notification bell independently from the status/tray group.
+- Normal notifications auto-dismiss after about 2.5 seconds by default; critical notifications and notifications with an explicit `expireTimeout` keep their own timing rules.
 - Use the self-update badge when it appears to update this shell from inside the bar.
 - Use the System info widget for quick CPU/GPU temperatures; click it for CPU, GPU, VRAM, and RAM details. The GPU probe supports NVIDIA and DRM/sysfs GPU data for temperature, utilization, and VRAM where the driver exposes it.
 - Use the network cluster for network, Bluetooth, microphone, and camera privacy controls.
