@@ -1,272 +1,154 @@
-<h1 align="center"> Quickshell Rise </h1>
+# Quickshell Rise for Omarchy Quattro
 
-<h4 align="center"> My Quickshell bar for Omarchy — my new Rise journey into Quickshell starts here. Enjoy! </h4>
+Quickshell Rise is a custom full bar for the Omarchy Quattro shell. It runs as
+the `io.github.sanjyay.quickshell-rise` plugin inside the one long-lived
+`omarchy-shell` Quickshell process. It does not launch a second Quickshell
+configuration or replace Quattro's notification, clipboard, OSD, lock, polkit,
+capture, theme, wallpaper, audio, Bluetooth, or NetworkManager providers.
 
-> This project is based on [HANCORE-linux/quickshell-dots](https://github.com/HANCORE-linux/quickshell-dots). Credit goes to HANCORE-linux for the original Quickshell Rise work; this repository is my maintained version with my own changes on top.
+> This branch targets the Quattro alpha architecture introduced by Omarchy PR
+> #6231. Classic Omarchy and standalone `qs -c bar` operation are unsupported.
 
-## Install / Remove
+## Install
 
-Install and start the bar for the current session:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/install.sh | bash
-```
-
-Install and keep the bar after reboot:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/install.sh | bash -s -- --autostart
-```
-
-Remove the bar and restore your previous config:
+From a local checkout:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/uninstall.sh | bash
+./install.sh
 ```
 
-The installer backs up an existing config to `~/.config/quickshell/bar.bak.<timestamp>`.
-
-## What You Get
-
-| Area | Highlights |
-|---|---|
-| Bar layout | unlock mode, insert/reorder widget groups by drag/drop, persistent order, split groups, magnetic hover, top/bottom position |
-| Control center | quick actions, widget toggles, notification visibility, workspace modes, bar style, and split controls |
-| Pickers | native emoji, theme, wallpaper, screenshot, and video pickers with Tanzaku, Hearthstone, and Carousel styles |
-| Core widgets | workspaces, playback-aware volume, System info (CPU/GPU/RAM), battery, power profile, network, optional Tailscale status, Bluetooth, weather, MPRIS, tray, notifications |
-| Privacy tools | microphone mute indicator/toggle and Lenovo LOQ camera kill-switch status |
-| Updates | shell update badge and one-click shell refresh |
-| AI usage | Claude, Codex, and OpenCode usage pill with provider switcher, detail panel, and automatic Codex activity visibility |
-| Super menu | native Quickshell Omarchy menu with nested navigation, empty states, backend action dispatch, and no Walker submenu fallback |
-| Native surfaces | top-right notification stack, fullscreen blurred History card fan, and compact upper-centred hardware OSD, all per monitor and visible in fullscreen |
-
-<details>
-<summary>Full feature list</summary>
-
-| Module | Function |
-|---|---|
-| Unlock &amp; reorder | unlock the bar, drag widget-groups to swap positions, persistent |
-| Image pickers | theme, wallpaper, screenshots, videos, 3 selectable styles, cached thumbnails |
-| Self-update | in-bar badge only after a newer shell version is confirmed, one-click update and restart |
-| AI usage | combined Claude, Codex, and OpenCode usage pill |
-| Workspaces | switch, overview, 10 / 5 / active-only modes, dots / numbers / magic styles |
-| Weather | current conditions, metric / imperial toggle |
-| Clock | time, calendar, scroll 24h / 12h toggle, timezone picker |
-| Tailscale | optional, reorderable status; left-click toggles `tailscale up` / `tailscale down`, right-click opens connection details, and hover stays silent |
-| MPRIS | media controls |
-| Notifications | native `org.freedesktop.Notifications` service, four-card top-right stack, actions, DND, history, unread count, and clear |
-| History | fullscreen curved card fan with one strict oldest-to-newest timeline across Elephant text, copied images, screenshots, and recent screen recordings; includes invisible filtering, restore/copy, delete, recording thumbnails, and a separate Omakut action |
-| System monitors | compact System info widget with CPU/GPU temperatures, CPU/GPU usage, VRAM, and RAM usage |
-| Privacy tools | microphone mute state, active microphone clients, Lenovo LOQ camera hardware switch status |
-| Speed test | manual Cloudflare speed test in the network panel |
-| Control center | quick toggles, power, Bar Functions fly-out |
-| Notification visibility | independent notification bell toggle inside the status group |
-| Bar style | border, shadow, frost, pill radius, top/bottom position |
-| Split groups | positional pill splits + 13 selectable gap animations and a fully disabled mode |
-| Magnetic hover | subtle pointer-only pill scale and neighbor pull animation without layout reflow |
-
-Gap effects are selected from Control Panel → Splits → Gap Anim. The
-selection is exclusive and persists across bar restarts and theme changes;
-choose **No gap animation** to stop decorative gap rendering completely.
-Available effects are Flowing sine wave, Audio-reactive waveform, Network
-pulse, Breathing glow, Particle stream, Comet sweep, Electric arc, Gradient
-drift, Widget energy transfer, Idle ripple, Clock-synchronized wave, Workspace
-transition trail, and Recommended combo.
-| Hardware OSD | non-interactive upper-centred volume, brightness, media, lock, radio, profile, icon-only camera state, and display-state feedback |
-| Keybind IPC | `qs -c bar ipc call themeSwitcher toggle` plus wallpaper/media picker IPC |
-| Super menu | Quickshell-rendered Omarchy actions, nested sections, type-ahead, keyboard navigation, and no Walker submenu handoff |
-| Per-widget panels | click widget to open its popup |
-
-</details>
-
-## Requirements
-
-Built for **Omarchy / Hyprland**. In Quickshell mode it owns `org.freedesktop.Notifications` and hardware OSD presentation; `qs-mode omarchy` restores Mako, SwayOSD, Waybar, and upstream bindings. It also integrates with `omarchy-*` helpers, Omarchy theme files, Hyprland, MPRIS players, and Omarchy's hook system.
-
-Required packages are checked by the installer:
-
-Install `quickshell`, `git`, `jq`, `curl`, `ttf-jetbrains-mono-nerd`, and
-`ttf-material-symbols-variable` through your distribution's normal administrator workflow.
-
-<details>
-<summary>Optional widget dependencies</summary>
-
-Optional packages enable specific widgets:
-
-Install `pamixer`, `power-profiles-daemon`, `bluez-utils`, `iwd`, `impala`,
-`hypridle`, `gpu-screen-recorder`, and `psmisc` through your distribution's
-normal administrator workflow.
-
-Notes:
-
-- `pamixer`, `pactl`, or `wpctl` support the audio and microphone controls. Most PipeWire setups already provide `wpctl`.
-- `bluez-utils` provides `bluetoothctl`, which the Bluetooth widget currently uses.
-- Lenovo LOQ camera switch monitoring reads the Ideapad extra buttons input device; if it cannot open the device, add your user to the input group or create a udev rule for that input device.
-- `power-profiles-daemon` is needed for the power-profile widget.
-- `iwd` and `impala` are used by the Wi-Fi panel on classic Omarchy setups. If NetworkManager is active, the panel opens `nmtui` instead.
-- `gpu-screen-recorder` enables the screen-recording widget.
-- `voxtype` is optional for the Voxtype widget.
-- The install script checks required tools and warns about missing optional tools.
-- AI usage backends are local-only. They write usage numbers to `~/.cache/*.json`, do not store API keys, and refresh on timers.
-
-</details>
-
-## Compatibility
-
-This bar is built for classic Omarchy setups where Waybar is the stock bar. The installer stops Waybar so both bars do not overlap.
-
-<details>
-<summary>Omarchy 4 / omarchy-shell note</summary>
-
-On **Omarchy 4.0 / omarchy-shell**, this setup is not tested yet. Omarchy 4 already ships its own Quickshell shell, so running both shells at the same time may create duplicate bars or conflicting keybinds. Use this on Omarchy 4 only if you know how to disable or separate the built-in shell.
-
-</details>
-
-## Usage
-
-Most interactions follow one rule: click a widget to open its panel.
-
-Common actions:
-
-- Double-click an empty bar area to unlock drag/drop mode.
-- Press `Esc` or click the dimmed backdrop to lock again.
-- Open the launcher/control widget to change bar style, widgets, privacy module visibility, workspaces, logo, and splits.
-- Use the widget controls to hide the notification bell independently from the status/tray group.
-- Normal notifications auto-dismiss after about 2.5 seconds by default; critical notifications and notifications with an explicit `expireTimeout` keep their own timing rules.
-- Use the self-update badge when it appears to update this shell from inside the bar.
-- Use the System info widget for quick CPU/GPU temperatures; click it for CPU, GPU, VRAM, and RAM details. The GPU probe supports NVIDIA and DRM/sysfs GPU data for temperature, utilization, and VRAM where the driver exposes it.
-- Use the network cluster for network, Bluetooth, microphone, and camera privacy controls.
-- The Super menu is rendered and navigated by Quickshell. It keeps nested Omarchy action pages, empty submenu states, type-ahead, back navigation, and keyboard focus inside the custom themed menu while still running Omarchy's backend commands for final actions.
-- The app launcher displays cached applications immediately from `~/.cache/quickshell/app-launcher/apps.json`, silently refreshes the cache in the background, and uses the same visual density and selection styling as the Super menu.
-- `Super + Ctrl + V` opens the native fullscreen History switcher: clipboard text, copied images, screenshots, and recent screen recordings appear in one strict chronological curved card fan over the blurred desktop. Browse with arrows, clicks, or the wheel; type to filter without opening extra chrome; press `Enter` or double-click to restore/copy the focused card, use the selected recording card's scissors action to open it in Omakut, and press `Delete` to remove an item.
-- Media and volume pills stay out of the bar until a real MPRIS player is playing. If you pause media by clicking the Now Playing widget, that player stays available in the bar and media panel until you resume it or the player disappears.
-- The capture panel supports keyboard navigation, including the screen-recording audio choices, with `Up`, `Down`, `Enter`, and `Esc`.
-- The AI pill follows the live Codex account state: it shows the weekly Codex window when available, skips unavailable short-window data, and opens the usage panel for the full account breakdown and other AI providers.
-
-<details>
-<summary>Click bindings</summary>
-
-| Widget | Left | Middle | Right | Scroll |
-|---|---|---|---|---|
-| Audio | mute toggle / drag to set volume | - | volume panel | volume |
-| Clock | calendar | - | timezone picker | toggle 24h / 12h |
-| System info | CPU/GPU/RAM panel | - | - | - |
-| Power Profile | panel | - | cycle profile | - |
-| Network | open system manager | - | panel | - |
-| Bluetooth | panel with up to 3 paired devices | - | open Bluetooth manager | - |
-| Microphone | mute toggle | - | - | - |
-| Camera | - | - | - | - |
-| AI usage | open quota panel | - | switch provider | - |
-| Weather | panel | - | force refresh | - |
-| Voxtype | cycle model | - | config | - |
-| Workspace | switch workspace | - | overview | - |
-| MPRIS | play / pause | - | toggle panel | - |
-| Tray bar widget | toggle tray panel | - | - | - |
-| Tray icon | activate | context menu | hide icon | - |
-
-</details>
-
-<details>
-<summary>Theme / wallpaper / emoji keybinds</summary>
-
-The installed Quickshell bindings provide native theme, wallpaper, and emoji switchers:
-
-| Action | Key | Omarchy default |
-|---|---|---|
-| Theme | `Super` + `Ctrl` + `Shift` + `Space` | Quickshell theme switcher |
-| Wallpaper | `Super` + `Ctrl` + `Space` | Quickshell wallpaper picker |
-| Emoji | `Super` + `Ctrl` + `E` | Search and paste emoji or symbols |
-
-To route those keys to this bar's pickers, add this to `~/.config/hypr/bindings.conf`:
-
-```conf
-unbind = SUPER CTRL SHIFT, SPACE
-bind = SUPER CTRL SHIFT, SPACE, exec, qs -c bar ipc call themeSwitcher toggle
-unbind = SUPER CTRL, SPACE
-bindd = SUPER CTRL, SPACE, Quickshell wallpaper switcher, exec, qs -c bar ipc call -- wallpaperSwitcher toggle
-unbind = SUPER CTRL, E
-bindd = SUPER CTRL, E, Quickshell emoji picker, exec, qs -c bar ipc call -- emoji open
-```
-
-`install.sh` creates `bindings.conf` if it does not already exist, and `uninstall.sh` removes the Quickshell-managed entries again.
-
-Then run:
+Remote installation:
 
 ```bash
-hyprctl reload
+tmp="$(mktemp -d)"
+git clone https://github.com/sanjyay/quickshell-dots.git "$tmp/quickshell-rise"
+"$tmp/quickshell-rise/install.sh"
+rm -rf "$tmp"
 ```
 
-Other picker IPC commands:
+The installer validates Quattro, stages and validates the plugin, records the
+current bar and shell configuration, installs the plugin atomically, selects it
+with `omarchy bar use`, installs a marked Hyprland Lua binding block, and runs
+health checks. A mandatory failure restores the previous plugin, bar,
+`shell.json`, and bindings automatically.
 
-```bash
-qs -c bar ipc call picker screenshots
-qs -c bar ipc call picker videos
-```
-
-`qs -c bar ipc call picker wallpaper` remains a compatibility alias for the native wallpaper switcher.
-
-</details>
-
-<details>
-<summary>Manual autostart hook</summary>
-
-If you did not install with `--autostart`, add the Omarchy post-boot hook manually:
-
-```bash
-mkdir -p ~/.config/omarchy/hooks/post-boot.d
-curl -fsSL -o ~/.config/omarchy/hooks/post-boot.d/quickshell-rise \
-  https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/contrib/post-boot.d/quickshell-rise
-chmod +x ~/.config/omarchy/hooks/post-boot.d/quickshell-rise
-```
-
-Remove only the hook:
-
-```bash
-rm -f ~/.config/omarchy/hooks/post-boot.d/quickshell-rise
-```
-
-</details>
-
-## Updates
-
-The bar checks for shell updates and shows an update badge only after this repo is confirmed to have a newer version. Refreshes clear stale update state first, so the badge stays hidden while checks are running and when no update is available.
-
-<details>
-<summary>Shell updates</summary>
-
-Click the shell update badge to review changes and apply the update.
-
-</details>
-
-## Repo Structure
-
-<details>
-<summary>Project layout</summary>
-
-The `versions/default/` folder is the complete, self-contained bar config.
+Installation state is stored at:
 
 ```text
-versions/default/
-├── shell.qml        # entry point
-├── BarSlot.qml      # slot-based bar
-├── Theme.qml        # colors, state, flags
-├── Palette.js       # reads Omarchy colors.toml
-├── IconMap.js       # icon name to codepoint
-├── assets/          # bundled logo assets
-├── modules/         # bar widgets
-└── panels/          # popups and overlays
+~/.local/state/quickshell-rise/install-state.json
 ```
 
-</details>
+## Update
 
-## Credits
+Run the installer again from an updated checkout:
 
-This repository is based on [HANCORE-linux/quickshell-dots](https://github.com/HANCORE-linux/quickshell-dots). Thanks to HANCORE-linux for the original Quickshell Rise project and design foundation.
+```bash
+git pull --ff-only
+./install.sh
+```
 
-Parts of the original project are adapted from [Omarchy Shell](https://github.com/basecamp/omarchy/tree/omarchy-shell) and modified to integrate with Quickshell Rise. This includes the Carousel picker and selected widget functionality.
+For a plugin checkout installed through Omarchy's Git lifecycle:
 
-The Tanzaku and Hearthstone pickers are original implementations created for this project.
+```bash
+omarchy plugin update io.github.sanjyay.quickshell-rise --yes
+omarchy plugin rescan
+omarchy bar use io.github.sanjyay.quickshell-rise
+```
+
+The project installer is preferred when migrations or binding changes are
+included because it provides full transaction rollback.
+
+## Rollback And Uninstall
+
+An in-progress failed install rolls back automatically. To remove Rise:
+
+```bash
+./uninstall.sh
+```
+
+Uninstall switches away from Rise before deleting it, restores the recorded
+previous bar when it remains valid (otherwise `omarchy.bar`), removes only the
+marked Lua block and project-owned legacy artifacts, rescans plugins, reloads
+Hyprland, and verifies shell IPC. Repeating uninstall is safe.
+
+## Features
+
+- Multi-monitor top or bottom full bar.
+- Left, center, and right widget groups.
+- Unlock mode, drag ordering, persisted group order, splitting, split gaps,
+  magnetic hover, and configurable styling.
+- Workspaces, clock/calendar, PipeWire audio, MPRIS, battery, power profiles,
+  NetworkManager-facing network state, Bluetooth, microphone/privacy state,
+  Lenovo camera switch state, weather, tray, system metrics, Tailscale, AI
+  usage, native idle state, and shell-update state.
+- Rise control center and non-singleton per-widget panels.
+- Rise launcher, Super menu, theme/wallpaper presentation, media pickers, and
+  configurable Tanzaku, Hearthstone, and Carousel picker styles where they do
+  not compete with Quattro services.
+- Quattro-owned notifications, clipboard/history, hardware OSD, capture,
+  lock/polkit, theme, wallpaper, audio, Bluetooth, and network backends.
+- The idle widget is a read-only observer of Omarchy’s native stay-awake
+  state; it updates from external shortcut changes and only toggles when the
+  user clicks it.
+
+Vertical left/right placement is intentionally unsupported until Rise's custom
+layout has correct vertical geometry. Use:
+
+```bash
+omarchy bar position top
+# or
+omarchy bar position bottom
+```
+
+## IPC
+
+Use the canonical Quattro IPC:
+
+```bash
+omarchy-shell shell ping
+omarchy-shell launcher open
+omarchy-shell menu toggle
+omarchy-shell shell toggle omarchy.clipboard
+omarchy-shell shell toggle omarchy.emojis
+```
+
+Plugin and bar lifecycle:
+
+```bash
+omarchy plugin validate .
+omarchy plugin rescan
+omarchy plugin enable io.github.sanjyay.quickshell-rise
+omarchy bar use io.github.sanjyay.quickshell-rise
+```
+
+## Dependencies
+
+Required project tools are `git`, `jq`, `lua`, and `hyprctl`, in addition to the
+Omarchy Quattro runtime. Tailscale, power profiles, Lenovo camera state, and AI
+provider CLIs/credentials are optional and affect only their widgets.
+
+Elephant, Waybar, Mako, SwayOSD, Impala, iwctl, classic hypridle hooks, and
+`qs-mode` are obsolete and are never installed or started.
+
+See [docs/QUATTRO-MIGRATION.md](docs/QUATTRO-MIGRATION.md) for the feature and
+backend migration matrix, validation status, and exact technical limitations.
+
+## Repository
+
+```text
+manifest.json                 Quattro plugin manifest
+runtime/Bar.qml               Deferred full-bar plugin entry point
+versions/rise/Bar.qml         Rise production bar composition
+versions/default/modules/     Rise widgets and shared controls
+versions/default/panels/      Rise non-singleton panels and pickers
+versions/default/services/    Plugin-owned optional data adapters
+scripts/                      Optional helpers and legacy migration sources
+tests/                        Static and fixture validation
+docs/                         Architecture and migration documentation
+install.sh                    Transactional Quattro installer
+uninstall.sh                  State-aware Quattro uninstaller
+```
 
 ## License
 
-[MIT](LICENSE) © 2026 sanjyay
+MIT

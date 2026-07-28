@@ -1,5 +1,22 @@
 # Changelog
 
+## 4.0.0-alpha.1
+
+- Migrated Quickshell Rise from a standalone Quickshell configuration to an
+  Omarchy Quattro full-bar plugin.
+- Added the namespaced `io.github.sanjyay.quickshell-rise` manifest and injected
+  full-bar entry-point contract.
+- Replaced direct classic theme parsing with Quattro semantic color roles.
+- Removed Rise ownership of notifications, clipboard history, and hardware OSD
+  from the Quattro runtime path.
+- Replaced the classic installer/uninstaller with transactional plugin lifecycle,
+  Lua binding management, state recording, rollback, and exact prior-bar restore.
+- Removed Elephant and classic Waybar/Mako/SwayOSD provider management from
+  normal installation and uninstallation.
+- Added deferred host initialization, structured Rise health and geometry IPC,
+  a full-bar smoke fixture, layered installer health diagnostics, and explicit
+  classification of preserved legacy tests.
+
 ## Unreleased
 
 ### History Switcher
