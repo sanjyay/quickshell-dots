@@ -1,13 +1,17 @@
-# Maintainer Documentation
+# Documentation Map
 
-These documents describe the pre-refactor baseline captured on 2026-07-22.
-They supplement rather than replace the user-facing `README.md`.
+If you want the short version first, read the top-level `README.md`.
+This folder holds the deeper notes that are useful when changing the bar,
+installer, or migration behavior.
 
-- `architecture.md`: active QML roots and reference ownership.
-- `runtime-ownership.md`: installation, update, uninstall, and profile flow.
-- `ipc-compatibility.md`: external IPC and script compatibility surface.
-- `providers-and-polling.md`: external state providers and polling owners.
-- `state-and-cache.md`: persistent state, caches, and their formats.
-- `refactoring-baseline.md`: tracked line metrics and largest files.
-- `safe-validation.md`: isolated validation rules and current test limits.
+- `architecture.md`: which files create the live bar and which shared services own
+  the current state.
+- `runtime-ownership.md`: how installation, updates, rollback, and uninstall work.
+- `ipc-compatibility.md`: the external commands and IPC endpoints the repo keeps.
+- `providers-and-polling.md`: optional providers, refresh loops, and ownership.
+- `state-and-cache.md`: what is stored on disk and how the caches are shaped.
+- `refactoring-baseline.md`: the tracked size and cleanup baseline.
+- `safe-validation.md`: what can be tested safely without touching the live session.
 
+The migration guide at `docs/QUATTRO-MIGRATION.md` is the best starting point if
+you want to understand how Rise fits into Omarchy Quattro.
