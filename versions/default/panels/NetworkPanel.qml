@@ -73,7 +73,7 @@ PanelWindow {
         if (!network.installed) return "Network unavailable"
         if (!network.wifiEnabled && !network.connected) return "Networking disabled"
         var title = network.connectionType === "ethernet" ? "Ethernet"
-            : network.connectionType === "wifi" ? "Wi-Fi"
+            : network.connectionType === "wifi" ? (network.connectedSsid || "Wi-Fi")
             : network.needsAttention ? "Limited connectivity" : "Disconnected"
         var detail = headerDetail()
         return detail === "" ? title : title + " (" + detail + ")"

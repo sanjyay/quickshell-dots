@@ -13,6 +13,12 @@ grep -Fq 'omarchy-shell quickshell-rise-health ping' "$install"
 grep -Fq 'omarchy-shell shell debugBarGeometry' "$install"
 grep -Fq 'previousBarId:' "$install"
 grep -Fq 'managedLuaBlock:' "$install"
+grep -Fq -- '-- BEGIN QUICKSHELL-RISE HISTORY BLUR' "$install"
+grep -Fq 'namespace = "^quickshell-history$"' "$install"
+grep -Fq 'blur = true' "$install"
+grep -Fq 'ignore_alpha = 0' "$install"
+grep -Fq 'filesModified: [$bindingsPath, $looknfeelPath]' "$install"
+grep -Fq -- '-- BEGIN QUICKSHELL-RISE HISTORY BLUR' "$uninstall"
 grep -Fq 'omarchy bar use "$previous_bar"' "$uninstall"
 grep -Fq 'omarchy plugin remove "$PLUGIN_ID" --yes' "$uninstall"
 
@@ -40,6 +46,24 @@ strip_block "$tmp/once" >"$tmp/twice"
 cmp -s "$tmp/once" "$tmp/twice"
 grep -Fq 'o.bind("SUPER + A", "personal", "true")' "$tmp/twice"
 ! grep -Fq 'QUICKSHELL-RISE' "$tmp/twice"
+
+looknfeel="$tmp/looknfeel.lua"
+cat >"$looknfeel" <<'LUA'
+hl.config({ general = { gaps_in = 4 } })
+-- BEGIN QUICKSHELL-RISE HISTORY BLUR
+hl.config({ decoration = { blur = { enabled = true } } })
+hl.layer_rule({ match = { namespace = "^quickshell-history$" }, blur = true })
+-- END QUICKSHELL-RISE HISTORY BLUR
+LUA
+awk '
+  $0 == "-- BEGIN QUICKSHELL-RISE HISTORY BLUR" { managed=1; next }
+  $0 == "-- END QUICKSHELL-RISE HISTORY BLUR" { managed=0; next }
+  !managed { print }
+' "$looknfeel" >"$tmp/looknfeel.clean"
+grep -Fq 'gaps_in = 4' "$tmp/looknfeel.clean"
+! grep -Fq 'QUICKSHELL-RISE HISTORY BLUR' "$tmp/looknfeel.clean"
+lua -e "assert(loadfile('$tmp/looknfeel.clean'))"
+
 ! grep -Fq 'SUPER + SPACE' "$install"
 grep -Fq 'omarchy-shell launcher open' "$repo/scripts/qs-menu-action.sh"
 ! grep -Fq 'AppLauncherPanel {' "$repo/versions/rise/Bar.qml"

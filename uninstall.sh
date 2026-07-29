@@ -9,6 +9,9 @@ SHELL_CONFIG="$HOME/.config/omarchy/shell.json"
 BINDINGS="$HOME/.config/hypr/bindings.lua"
 BLOCK_BEGIN="-- BEGIN QUICKSHELL-RISE MANAGED BLOCK"
 BLOCK_END="-- END QUICKSHELL-RISE MANAGED BLOCK"
+LOOKNFEEL="$HOME/.config/hypr/looknfeel.lua"
+BLUR_BLOCK_BEGIN="-- BEGIN QUICKSHELL-RISE HISTORY BLUR"
+BLUR_BLOCK_END="-- END QUICKSHELL-RISE HISTORY BLUR"
 IDLE_WRAPPER="$HOME/.local/bin/quickshell-rise-idle-toggle"
 
 info() { printf '==> %s\n' "$*"; }
@@ -47,6 +50,19 @@ if [[ -f "$BINDINGS" ]]; then
   ' "$BINDINGS" >"$temp"
   if have lua; then lua -e "assert(loadfile('$temp'))"; fi
   install -m 644 "$temp" "$BINDINGS"
+  rm -f -- "$temp"
+  trap - EXIT
+fi
+if [[ -f "$LOOKNFEEL" ]]; then
+  temp="$(mktemp "${TMPDIR:-/tmp}/quickshell-rise.looknfeel.XXXXXX")"
+  trap 'rm -f -- "${temp:-}"' EXIT
+  awk -v begin="$BLUR_BLOCK_BEGIN" -v end="$BLUR_BLOCK_END" '
+    $0 == begin { managed=1; next }
+    $0 == end { managed=0; next }
+    !managed { print }
+  ' "$LOOKNFEEL" >"$temp"
+  if have lua; then lua -e "assert(loadfile('$temp'))"; fi
+  install -m 644 "$temp" "$LOOKNFEEL"
   rm -f -- "$temp"
   trap - EXIT
 fi

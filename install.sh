@@ -12,6 +12,9 @@ SHELL_CONFIG="$HOME/.config/omarchy/shell.json"
 BINDINGS="$HOME/.config/hypr/bindings.lua"
 BLOCK_BEGIN="-- BEGIN QUICKSHELL-RISE MANAGED BLOCK"
 BLOCK_END="-- END QUICKSHELL-RISE MANAGED BLOCK"
+LOOKNFEEL="$HOME/.config/hypr/looknfeel.lua"
+BLUR_BLOCK_BEGIN="-- BEGIN QUICKSHELL-RISE HISTORY BLUR"
+BLUR_BLOCK_END="-- END QUICKSHELL-RISE HISTORY BLUR"
 LEGACY_IDLE_WRAPPER="$HOME/.local/bin/quickshell-rise-idle-toggle"
 
 info() { printf '==> %s\n' "$*"; }
@@ -33,10 +36,12 @@ stage="$temp_root/plugin"
 backup_plugin="$temp_root/previous-plugin"
 backup_shell="$temp_root/shell.json"
 backup_bindings="$temp_root/bindings.lua"
+backup_looknfeel="$temp_root/looknfeel.lua"
 transaction_open=1
 had_plugin=0
 had_shell=0
 had_bindings=0
+had_looknfeel=0
 previous_bar="omarchy.bar"
 if [[ -f "$STATE_FILE" ]] &&
    jq -e --arg id "$PLUGIN_ID" '.schemaVersion == 1 and .pluginId == $id' "$STATE_FILE" >/dev/null 2>&1; then
@@ -71,6 +76,11 @@ rollback() {
   else
     rm -f -- "$BINDINGS"
   fi
+  if (( had_looknfeel )); then
+    install -m 644 "$backup_looknfeel" "$LOOKNFEEL"
+  else
+    rm -f -- "$LOOKNFEEL"
+  fi
   omarchy plugin rescan >/dev/null 2>&1 || warn "plugin rescan failed during rollback"
   omarchy bar use "$previous_bar" >/dev/null 2>&1 || omarchy bar use omarchy.bar >/dev/null 2>&1 || true
   hyprctl reload >/dev/null 2>&1 || warn "Hyprland reload failed during rollback"
@@ -88,10 +98,8 @@ jq -e --arg id "$PLUGIN_ID" '.schemaVersion == 1 and .id == $id and (.kinds | in
 info "Staging and validating the plugin"
 git clone --quiet --no-hardlinks -- "$repo_root" "$stage"
 # Overlay the local working tree so a checkout can install the code being
-# validated without committing it first. Preserve the user's unrelated audio
-# edit rather than silently deploying it as part of this migration.
+# validated without committing it first.
 while IFS= read -r path; do
-  [[ "$path" == "versions/default/modules/AudioWidget.qml" ]] && continue
   if [[ -e "$repo_root/$path" ]]; then
     mkdir -p -- "$stage/$(dirname -- "$path")"
     install -m "$(stat -c '%a' "$repo_root/$path")" "$repo_root/$path" "$stage/$path"
@@ -104,9 +112,6 @@ done < <(
     git -C "$repo_root" diff --name-only HEAD
   } | sort -u
 )
-if ! git -C "$repo_root" diff --quiet -- versions/default/modules/AudioWidget.qml; then
-  warn "preserving the pre-existing AudioWidget.qml worktree change outside this installation"
-fi
 omarchy plugin validate "$stage"
 [[ -x "$stage/scripts/ai-usage-collector" ]] ||
   die "repository is incomplete: scripts/ai-usage-collector is missing or not executable"
@@ -126,6 +131,10 @@ fi
 if [[ -f "$BINDINGS" ]]; then
   install -m 644 "$BINDINGS" "$backup_bindings"
   had_bindings=1
+fi
+if [[ -f "$LOOKNFEEL" ]]; then
+  install -m 644 "$LOOKNFEEL" "$backup_looknfeel"
+  had_looknfeel=1
 fi
 
 info "Installing the plugin atomically"
@@ -208,6 +217,29 @@ o.bind("SUPER + CTRL + V", "Quickshell Rise clipboard history", "omarchy-shell q
 LUA
 lua -e "assert(loadfile('$bindings_temp'))"
 install -m 644 "$bindings_temp" "$BINDINGS"
+
+info "Installing the history blur layer rule"
+looknfeel_temp="$temp_root/looknfeel.new"
+if [[ -f "$LOOKNFEEL" ]]; then
+  awk -v begin="$BLUR_BLOCK_BEGIN" -v end="$BLUR_BLOCK_END" '
+    $0 == begin { managed=1; next }
+    $0 == end { managed=0; next }
+    !managed { print }
+  ' "$LOOKNFEEL" >"$looknfeel_temp"
+fi
+cat >>"$looknfeel_temp" <<LUA
+
+-- BEGIN QUICKSHELL-RISE HISTORY BLUR
+hl.config({ decoration = { blur = { enabled = true } } })
+hl.layer_rule({
+  match = { namespace = "^quickshell-history$" },
+  blur = true,
+  ignore_alpha = 0
+})
+-- END QUICKSHELL-RISE HISTORY BLUR
+LUA
+lua -e "assert(loadfile('$looknfeel_temp'))"
+install -m 644 "$looknfeel_temp" "$LOOKNFEEL"
 hyprctl reload >/dev/null
 [[ ! -e "$TARGET/versions/default/modules/IdleInhibitorWidget.qml" ]] ||
   die "obsolete private IdleInhibitorWidget was installed"
@@ -380,6 +412,7 @@ jq -n \
   --arg shellConfigBackup "$STATE_HOME/shell.before.json" \
   --arg pluginPath "$TARGET" \
   --arg bindingsPath "$BINDINGS" \
+  --arg looknfeelPath "$LOOKNFEEL" \
   --arg blockBegin "$BLOCK_BEGIN" \
   --arg blockEnd "$BLOCK_END" \
   --arg timestamp "$timestamp" \
@@ -391,7 +424,7 @@ jq -n \
     previousBarId: $previousBarId,
     previousShellConfigBackup: $shellConfigBackup,
     filesCreated: [$pluginPath],
-    filesModified: [$bindingsPath],
+    filesModified: [$bindingsPath, $looknfeelPath],
     managedLuaBlock: {begin: $blockBegin, end: $blockEnd},
     systemdUserUnits: [],
     optionalBackends: {

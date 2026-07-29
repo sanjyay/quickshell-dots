@@ -254,7 +254,7 @@ Item {
         onExited:  { tip.hide() }
         onClicked: function(mouse) {
             tip.hide()
-            if (mouse.button === Qt.LeftButton) {
+            if (mouse.button === Qt.RightButton) {
                 if (rootMod.player) {
                     var current = rootMod.player
                     if (rootMod.playing) root.rememberMprisPausedPlayer(current)

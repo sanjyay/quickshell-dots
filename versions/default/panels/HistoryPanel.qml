@@ -336,17 +336,23 @@ PanelWindow {
         id: fanFocus
         anchors.fill: parent
         focus: root.clipboardVisible
+        readonly property real cardHeight: Math.min(430, panel.height * 0.62)
+        readonly property real searchOffset: panel.query.length > 0 ? 44 : 0
+        readonly property real selectedCardTop: (height - cardHeight) / 2 - 12
+            + searchOffset - cardHeight * 0.08
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: function(event) { panel.handleKey(event) }
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            y: Math.max(60, parent.height * 0.11)
-            text: panel.query.length > 0 ? panel.query : "HISTORY"
+            y: Math.max(12, fanFocus.selectedCardTop - implicitHeight - 10)
+            z: 40
+            visible: panel.query.length > 0
+            text: panel.query
             color: root.ink
             font.family: root.mono
-            font.pixelSize: panel.query.length > 0 ? 16 : 12
-            font.letterSpacing: panel.query.length > 0 ? 0.5 : 4
+            font.pixelSize: 16
+            font.letterSpacing: 0.5
             opacity: 0.82
         }
 
@@ -364,7 +370,8 @@ PanelWindow {
                 width: Math.min(330, panel.width * 0.28)
                 height: Math.min(430, panel.height * 0.62)
                 x: Math.round((panel.width - width) / 2 + relativeIndex * Math.min(132, panel.width * 0.11))
-                y: Math.round((panel.height - height) / 2 + distance * 24 + (selected ? -12 : 10))
+                y: Math.round((panel.height - height) / 2 + distance * 24
+                    + (selected ? -12 : 10) + fanFocus.searchOffset)
                 z: 20 - distance
                 rotation: relativeIndex * 9
                 scale: selected ? 1.08 : Math.max(0.78, 1 - distance * 0.065)

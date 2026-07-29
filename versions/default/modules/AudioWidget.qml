@@ -41,53 +41,48 @@ Item {
 
         UiText {
             anchors.verticalCenter: parent.verticalCenter
-            text: "VOL"
+            text: rootMod.muted ? "\uf6a9" : (rootMod.volume < 50 ? "\uf027" : "\uf028")
             color: rootMod.muted
                 ? Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.25)
                 : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.6)
             font.family: root.mono
-            font.pixelSize: 12
-            font.letterSpacing: 0.5
+            font.pixelSize: 13
         }
 
-        // ── workspace-capsule style slider ──
-        Item {
+        // ── volume value integrated into the proportional bar ──
+        Rectangle {
             id: slider
-            width: 34
+            width: 48
             height: 14
             anchors.verticalCenter: parent.verticalCenter
+            radius: 4
+            clip: true
+            color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.24)
+            border.color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.12)
+            border.width: 1
 
             readonly property real ratio: rootMod.muted ? 0 : Math.min(rootMod.volume / 100, 1)
 
-            // track capsule
-            Rectangle {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width
-                height: 8
-                radius: 4
-                color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.18)
-            }
-
-            // fill capsule — seal pill like the active workspace
             Rectangle {
                 anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(slider.ratio > 0 ? 8 : 0, parent.width * slider.ratio)
-                height: 8
-                radius: 4
+                anchors.top: parent.top
+                width: parent.width * slider.ratio
+                height: parent.height
+                radius: 0
                 color: root.seal
                 Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
             }
-        }
 
-        UiText {
-            anchors.verticalCenter: parent.verticalCenter
-            text: String(rootMod.volume).padStart(2, '0') + "%"
-            color: rootMod.muted
-                ? Qt.rgba(root.seal.r, root.seal.g, root.seal.b, 0.35)
-                : root.seal
-            font.family: root.mono
-            font.pixelSize: 12
+            UiText {
+                anchors.centerIn: parent
+                text: String(rootMod.volume)
+                color: rootMod.muted
+                    ? Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.35)
+                    : root.ink
+                font.family: root.mono
+                font.pixelSize: 9
+                font.weight: Font.Medium
+            }
         }
     }
 
@@ -163,7 +158,7 @@ Item {
         onClicked: (e) => {
             if (rootMod.volumeDragged) return
             tip.hide()
-            if (e.button === Qt.LeftButton)  { muteRunner.running = false; muteRunner.running = true }
+            if (e.button === Qt.RightButton) { muteRunner.running = false; muteRunner.running = true }
             else                             { root.volVisible = !root.volVisible }
         }
     }
