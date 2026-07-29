@@ -110,6 +110,21 @@ Item {
         function closeSystemMetrics(): void {
             if (root.rise) root.rise.closeSystemMetrics()
         }
+        function openCalendar(): void {
+            if (root.rise) root.rise.openCalendar()
+        }
+        function showCalendarMonth(year: int, month: int): bool {
+            return root.rise ? root.rise.showCalendarMonth(year, month) : false
+        }
+        function closeCalendar(): void {
+            if (root.rise) root.rise.closeCalendar()
+        }
+        function holidayDiagnostics(): string {
+            return JSON.stringify(root.rise ? root.rise.holidayDiagnostics() : {
+                status: "unavailable",
+                records: []
+            })
+        }
     }
 
     Loader {

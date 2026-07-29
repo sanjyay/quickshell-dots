@@ -21,6 +21,11 @@ grep -Fq 'filesModified: [$bindingsPath, $looknfeelPath]' "$install"
 grep -Fq -- '-- BEGIN QUICKSHELL-RISE HISTORY BLUR' "$uninstall"
 grep -Fq 'omarchy bar use "$previous_bar"' "$uninstall"
 grep -Fq 'omarchy plugin remove "$PLUGIN_ID" --yes' "$uninstall"
+grep -Fq 'systemd/quickshell-rise-holiday-annual-update.service' "$install"
+grep -Fq 'systemctl --user enable --now "$HOLIDAY_UPDATE_UNIT.timer"' "$install"
+grep -Fq '"quickshell-rise-holiday-annual-update.timer"' "$install"
+grep -Fq 'quickshell-rise-holiday-annual-update' "$uninstall"
+grep -Fq 'XDG_DATA_HOME' "$uninstall"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf -- "$tmp"' EXIT

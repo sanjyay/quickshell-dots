@@ -6,6 +6,7 @@ QtObject {
 
     required property string path
     property bool validateJson: false
+    property var writerCommand: ["qs-state-write"]
     property string pending: ""
     property string inFlight: ""
 
@@ -23,9 +24,9 @@ QtObject {
     }
 
     property Process writeProcess: Process {
-        command: writer.validateJson
-            ? ["qs-state-write", "--json", writer.path]
-            : ["qs-state-write", writer.path]
+        command: writer.writerCommand.concat(writer.validateJson
+            ? ["--json", writer.path]
+            : [writer.path])
         stdinEnabled: true
         onStarted: writeProcess.write(JSON.stringify({ data: writer.inFlight }) + "\n")
         onExited: function(exitCode) {

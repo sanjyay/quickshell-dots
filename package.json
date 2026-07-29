@@ -1,0 +1,10 @@
+{
+  "name": "quickshell-rise-runtime",
+  "private": true,
+  "version": "4.0.0-alpha.1",
+  "description": "Pinned runtime data dependencies for Quickshell Rise",
+  "license": "MIT",
+  "dependencies": {
+    "date-holidays": "3.34.0"
+  }
+}

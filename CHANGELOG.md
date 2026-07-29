@@ -19,6 +19,39 @@
 
 ## Unreleased
 
+### Calendar Holidays
+
+- Added offline public-holiday markers and hover/selection details to the
+  calendar, backed by pinned `date-holidays` data, timezone-to-country
+  detection, manual country/subdivision settings, asynchronous year loading,
+  deterministic filtering, and atomic XDG caching.
+- Added a compact in-calendar holiday settings page with searchable
+  dataset-derived country and subdivision lists, automatic/manual selection,
+  persisted category controls, and distinct national and regional scopes.
+- Replaced the generic dataset bank category with India-only, locally
+  calculated second/fourth-Saturday bank-branch closure markers.
+- Changed holiday markers to color-coded rings around the date number, with
+  concentric rings when several holiday classes occur on one date.
+- Increased holiday-ring saturation and brightness while retaining separate
+  theme-derived colors for national, regional, and bank-Saturday dates.
+- Changed the calendar grid to a Sunday-first `SU MO TU WE TH FR SA` layout,
+  including matching date offsets and weekend styling.
+- Fixed subdivision selection and schema migration so choosing Tamil Nadu
+  enables regional holidays immediately while preserving later explicit
+  regional-toggle choices.
+- Added an official regional-provider override for Tamil Nadu 2026 using
+  Government Gazette Extraordinary No. 721 / G.O.(Ms.) No.708. It supplies 23
+  statewide public holidays while excluding the Gazette's bank-only annual
+  account-closing entry, falls back to `date-holidays` for other region-years,
+  and versions provider-aware caches.
+- Added a conservative Tamil Nadu recurring fallback for years without a
+  published annual file, restoring New Year's Day on 1 January 2027 without
+  guessing movable state holidays. Holiday caches now use schema 5.
+- Added a persistent January 1 systemd user timer that retrieves only a
+  project-published, officially sourced annual Tamil Nadu JSON file, validates
+  it before atomic XDG-data installation, invalidates its year cache, and keeps
+  the offline recurring fallback when no reviewed release is available.
+
 ### History Switcher
 
 - Replaced the two-pane clipboard picker with a fullscreen blurred History

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "countryCode": "IN",
+  "subdivisionCode": "TN",
+  "subdivisionName": "Tamil Nadu",
+  "providerId": "tn-recurring-fixed",
+  "source": {
+    "publisher": "Government of Tamil Nadu",
+    "basis": [
+      "Tamil Nadu Government Gazette Extraordinary No. 375, 22 November 2024",
+      "Tamil Nadu Government Gazette Extraordinary No. 721, 11 November 2025"
+    ],
+    "officialAnnualList": false,
+    "description": "Conservative fallback for fixed-date observances present in consecutive official annual orders."
+  },
+  "holidays": [
+    { "monthDay": "01-01", "name": "New Year's Day", "type": "public", "scope": "regional" }
+  ]
+}

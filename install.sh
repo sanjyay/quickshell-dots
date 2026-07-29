@@ -16,13 +16,15 @@ LOOKNFEEL="$HOME/.config/hypr/looknfeel.lua"
 BLUR_BLOCK_BEGIN="-- BEGIN QUICKSHELL-RISE HISTORY BLUR"
 BLUR_BLOCK_END="-- END QUICKSHELL-RISE HISTORY BLUR"
 LEGACY_IDLE_WRAPPER="$HOME/.local/bin/quickshell-rise-idle-toggle"
+UNIT_DIR="$HOME/.config/systemd/user"
+HOLIDAY_UPDATE_UNIT="quickshell-rise-holiday-annual-update"
 
 info() { printf '==> %s\n' "$*"; }
 warn() { printf '!! %s\n' "$*" >&2; }
 die() { printf 'quickshell-rise: %s\n' "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
-for command in git jq lua hyprctl pgrep omarchy omarchy-shell mktemp; do
+for command in git jq lua hyprctl pgrep omarchy omarchy-shell mktemp node npm; do
   have "$command" || die "required Quattro command is unavailable: $command"
 done
 [[ -n ${OMARCHY_PATH:-} && -f "$OMARCHY_PATH/shell/services/PluginRegistry.qml" ]] ||
@@ -37,11 +39,23 @@ backup_plugin="$temp_root/previous-plugin"
 backup_shell="$temp_root/shell.json"
 backup_bindings="$temp_root/bindings.lua"
 backup_looknfeel="$temp_root/looknfeel.lua"
+backup_holiday_service="$temp_root/$HOLIDAY_UPDATE_UNIT.service"
+backup_holiday_timer="$temp_root/$HOLIDAY_UPDATE_UNIT.timer"
 transaction_open=1
 had_plugin=0
 had_shell=0
 had_bindings=0
 had_looknfeel=0
+had_holiday_service=0
+had_holiday_timer=0
+if [[ -f "$UNIT_DIR/$HOLIDAY_UPDATE_UNIT.service" ]]; then
+  install -m 644 "$UNIT_DIR/$HOLIDAY_UPDATE_UNIT.service" "$backup_holiday_service"
+  had_holiday_service=1
+fi
+if [[ -f "$UNIT_DIR/$HOLIDAY_UPDATE_UNIT.timer" ]]; then
+  install -m 644 "$UNIT_DIR/$HOLIDAY_UPDATE_UNIT.timer" "$backup_holiday_timer"
+  had_holiday_timer=1
+fi
 previous_bar="omarchy.bar"
 if [[ -f "$STATE_FILE" ]] &&
    jq -e --arg id "$PLUGIN_ID" '.schemaVersion == 1 and .pluginId == $id' "$STATE_FILE" >/dev/null 2>&1; then
@@ -81,6 +95,20 @@ rollback() {
   else
     rm -f -- "$LOOKNFEEL"
   fi
+  systemctl --user disable --now "$HOLIDAY_UPDATE_UNIT.timer" >/dev/null 2>&1 || true
+  if (( had_holiday_service )); then
+    install -m 644 "$backup_holiday_service" "$UNIT_DIR/$HOLIDAY_UPDATE_UNIT.service"
+  else
+    rm -f -- "$UNIT_DIR/$HOLIDAY_UPDATE_UNIT.service"
+  fi
+  if (( had_holiday_timer )); then
+    install -m 644 "$backup_holiday_timer" "$UNIT_DIR/$HOLIDAY_UPDATE_UNIT.timer"
+    systemctl --user daemon-reload >/dev/null 2>&1 || true
+    systemctl --user enable --now "$HOLIDAY_UPDATE_UNIT.timer" >/dev/null 2>&1 || true
+  else
+    rm -f -- "$UNIT_DIR/$HOLIDAY_UPDATE_UNIT.timer"
+    systemctl --user daemon-reload >/dev/null 2>&1 || true
+  fi
   omarchy plugin rescan >/dev/null 2>&1 || warn "plugin rescan failed during rollback"
   omarchy bar use "$previous_bar" >/dev/null 2>&1 || omarchy bar use omarchy.bar >/dev/null 2>&1 || true
   hyprctl reload >/dev/null 2>&1 || warn "Hyprland reload failed during rollback"
@@ -112,6 +140,40 @@ done < <(
     git -C "$repo_root" diff --name-only HEAD
   } | sort -u
 )
+info "Installing pinned offline holiday data"
+npm --prefix "$stage" ci --omit=dev --ignore-scripts --no-audit --no-fund
+# npm creates command shims as symlinks, while Quattro plugins intentionally
+# reject every symlink. date-holidays is consumed as a library, so no shim is
+# needed at runtime.
+rm -rf -- "$stage/node_modules/.bin"
+[[ -x "$stage/scripts/holiday-helper.js" ]] ||
+  die "repository is incomplete: scripts/holiday-helper.js is missing or not executable"
+[[ -f "$stage/node_modules/date-holidays/LICENSE" ]] ||
+  die "date-holidays runtime data or its license was not installed"
+holiday_smoke="$(TZ=Asia/Kolkata XDG_CACHE_HOME="$temp_root/cache" \
+  node "$stage/scripts/holiday-helper.js" get \
+    --country auto --year 2026 --subdivision "" \
+    --show-national true --show-regional true)"
+jq -e '.ok == true and .country == "IN" and
+  any(.holidays[]; .date == "2026-01-26" and .type == "public")' \
+  <<<"$holiday_smoke" >/dev/null ||
+  die "installed holiday helper failed its offline India smoke check"
+regional_holiday_smoke="$(XDG_CACHE_HOME="$temp_root/cache" \
+  node "$stage/scripts/holiday-helper.js" holidays IN 2026 TN \
+    --show-national true --show-regional true)"
+jq -e '.ok == true and .provider.id == "tn-government-2026" and
+  any(.holidays[]; .date == "2026-01-15" and .name == "Pongal" and
+    .scope == "regional" and .subdivisionCode == "TN")' \
+  <<<"$regional_holiday_smoke" >/dev/null ||
+  die "installed official Tamil Nadu holiday provider failed its offline smoke check"
+recurring_holiday_smoke="$(XDG_CACHE_HOME="$temp_root/cache" \
+  node "$stage/scripts/holiday-helper.js" holidays IN 2027 TN \
+    --show-national true --show-regional true)"
+jq -e '.ok == true and .provider.id == "tn-recurring-fixed" and
+  any(.holidays[]; .date == "2027-01-01" and .name == "New Year'\''s Day" and
+    .scope == "regional" and .subdivisionCode == "TN")' \
+  <<<"$recurring_holiday_smoke" >/dev/null ||
+  die "installed Tamil Nadu recurring fallback failed its offline smoke check"
 omarchy plugin validate "$stage"
 [[ -x "$stage/scripts/ai-usage-collector" ]] ||
   die "repository is incomplete: scripts/ai-usage-collector is missing or not executable"
@@ -194,6 +256,29 @@ for network_file in \
   versions/default/panels/NetworkPanel.qml; do
   cmp -s "$repo_root/$network_file" "$TARGET/$network_file" ||
     die "installed network runtime differs from staged source: $network_file"
+done
+for holiday_file in \
+  runtime/Bar.qml \
+  data/holidays/IN/TN/2026.json \
+  data/holidays/IN/TN/recurring.json \
+  scripts/holiday-helper.js \
+  scripts/holiday-annual-update.js \
+  scripts/import-regional-holidays.js \
+  scripts/regional-holiday-provider.js \
+  versions/default/services/HolidayCalendarModel.js \
+  versions/default/services/HolidayService.qml \
+  versions/default/services/HolidaySelection.js \
+  versions/default/panels/CalendarPopup.qml \
+  versions/default/modules/AtomicStateWriter.qml \
+  versions/rise/Bar.qml; do
+  cmp -s "$repo_root/$holiday_file" "$TARGET/$holiday_file" ||
+    die "installed holiday runtime differs from staged source: $holiday_file"
+done
+for holiday_unit in \
+  systemd/quickshell-rise-holiday-annual-update.service \
+  systemd/quickshell-rise-holiday-annual-update.timer; do
+  cmp -s "$repo_root/$holiday_unit" "$TARGET/$holiday_unit" ||
+    die "installed holiday update unit differs from staged source: $holiday_unit"
 done
 cmp -s "$repo_root/versions/default/panels/HistoryPanel.qml" \
   "$TARGET/versions/default/panels/HistoryPanel.qml" ||
@@ -403,6 +488,17 @@ done
 cmp -s "$repo_root/scripts/ai-usage-collector" "$TARGET/scripts/ai-usage-collector" ||
   die "installed AI usage collector differs from repository source"
 
+info "Installing the annual verified holiday update timer"
+mkdir -p -- "$UNIT_DIR"
+install -m 644 "$TARGET/systemd/$HOLIDAY_UPDATE_UNIT.service" \
+  "$UNIT_DIR/$HOLIDAY_UPDATE_UNIT.service"
+install -m 644 "$TARGET/systemd/$HOLIDAY_UPDATE_UNIT.timer" \
+  "$UNIT_DIR/$HOLIDAY_UPDATE_UNIT.timer"
+systemctl --user daemon-reload
+systemctl --user enable --now "$HOLIDAY_UPDATE_UNIT.timer" >/dev/null
+systemctl --user is-enabled "$HOLIDAY_UPDATE_UNIT.timer" >/dev/null ||
+  die "annual holiday update timer was not enabled"
+
 revision="$(git -C "$TARGET" rev-parse HEAD)"
 timestamp="$(date --iso-8601=seconds)"
 jq -n \
@@ -426,7 +522,8 @@ jq -n \
     filesCreated: [$pluginPath],
     filesModified: [$bindingsPath, $looknfeelPath],
     managedLuaBlock: {begin: $blockBegin, end: $blockEnd},
-    systemdUserUnits: [],
+    systemdUserUnits: ["quickshell-rise-holiday-annual-update.service",
+      "quickshell-rise-holiday-annual-update.timer"],
     optionalBackends: {
       quattroClipboard: true,
       quattroNotifications: true,

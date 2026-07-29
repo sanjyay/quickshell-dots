@@ -28,6 +28,14 @@ Item {
     property string initializationError: ""
     property int createdWindowCount: 0
     readonly property bool idleInhibited: theme.idleInhibited
+    readonly property var riseSettings: {
+        var config = root.barConfig || {}
+        return config.settings && typeof config.settings === "object" ? config.settings : config
+    }
+    readonly property var calendarHolidaySettings: {
+        var calendar = riseSettings.calendar || {}
+        return calendar.holidays && typeof calendar.holidays === "object" ? calendar.holidays : {}
+    }
 
     readonly property bool hostReady: omarchyPath !== ""
         && shell !== null
@@ -142,6 +150,62 @@ Item {
         theme.cpuVisible = false
     }
 
+    function openCalendar() {
+        theme.openCalendar()
+    }
+
+    function showCalendarMonth(year, month) {
+        if (year < 1900 || year > 2200 || month < 1 || month > 12) return false
+        var now = new Date()
+        theme.openCalendar()
+        theme.calendarMonthOffset = (year - now.getFullYear()) * 12
+            + (month - 1 - now.getMonth())
+        theme.selectedDay = 1
+        theme.selectedCalendarDate = theme.localIsoDate(year, month - 1, 1)
+        theme.calendarTick++
+        return true
+    }
+
+    function closeCalendar() {
+        theme.calendarVisible = false
+    }
+
+    function holidayDiagnostics() {
+        var service = theme.holidays
+        var records = []
+        var regional = []
+        var bankClosures = []
+        var dates = Object.keys(service.holidaysByDate).sort()
+        for (var i = 0; i < dates.length; i++) {
+            var rows = service.holidaysByDate[dates[i]] || []
+            for (var j = 0; j < rows.length; j++) {
+                records.push(rows[j])
+                if (rows[j].scope === "regional") regional.push(rows[j])
+                if (rows[j].type === "bank-closure") bankClosures.push(rows[j])
+            }
+        }
+        return {
+            status: service.status,
+            stateLoaded: service.stateLoaded,
+            migrationPending: service.migrationPending,
+            countryMode: service.countrySelectionMode,
+            detectedCountry: service.detectedCountryCode,
+            effectiveCountry: service.effectiveCountryCode,
+            configuredSubdivision: service.configuredSubdivisionCode,
+            effectiveSubdivision: service.effectiveSubdivisionCode,
+            showNational: service.showNational,
+            showRegional: service.showRegional,
+            displayedYear: service.displayedYear,
+            providerId: service.activeProviderId,
+            providerKind: service.activeProviderKind,
+            providerSource: service.activeProviderSource,
+            holidayDates: dates,
+            records: records,
+            regional: regional,
+            bankClosures: bankClosures
+        }
+    }
+
     function debugBarGeometry() {
         var geometry = []
         for (var i = 0; i < barScreens.length; i++) {
@@ -176,6 +240,7 @@ Item {
         systemMetricsReady: root.initialized
         networkServiceReady: root.initialized
         shellHost: root.shell
+        calendarHolidayConfig: root.calendarHolidaySettings
     }
 
     // IPC handlers must live outside the per-monitor BarSlot delegate. Otherwise

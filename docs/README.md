@@ -10,6 +10,8 @@ installer, or migration behavior.
 - `ipc-compatibility.md`: the external commands and IPC endpoints the repo keeps.
 - `providers-and-polling.md`: optional providers, refresh loops, and ownership.
 - `state-and-cache.md`: what is stored on disk and how the caches are shaped.
+- `holidays.md`: calendar holiday configuration, offline data, cache,
+  troubleshooting, licensing, and limitations.
 - `refactoring-baseline.md`: the tracked size and cleanup baseline.
 - `safe-validation.md`: what can be tested safely without touching the live session.
 

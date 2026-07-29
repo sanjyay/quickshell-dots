@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "countryCode": "IN",
+  "subdivisionCode": "TN",
+  "subdivisionName": "Tamil Nadu",
+  "year": 2026,
+  "providerId": "tn-government-2026",
+  "source": {
+    "publisher": "Government of Tamil Nadu",
+    "title": "Public Holidays under Negotiable Instruments Act, Tamil Nadu for the year 2026",
+    "order": "G.O. Ms. No. 708, Public (Miscellaneous), 11 November 2025",
+    "gazette": "Tamil Nadu Government Gazette Extraordinary No. 721, Part II—Section 1",
+    "notification": "No. II(1)/PUMIS/29(g)/2025",
+    "url": "https://stationeryprinting.tn.gov.in/extraordinary/2025/721_Ex_II_1_2025.pdf",
+    "official": true,
+    "retrievedAt": "2026-07-29"
+  },
+  "holidays": [
+    { "date": "2026-01-01", "name": "New Year's Day", "type": "public", "scope": "regional" },
+    { "date": "2026-01-15", "name": "Pongal", "type": "public", "scope": "regional" },
+    { "date": "2026-01-16", "name": "Thiruvalluvar Day", "type": "public", "scope": "regional" },
+    { "date": "2026-01-17", "name": "Uzhavar Thirunal", "type": "public", "scope": "regional" },
+    { "date": "2026-01-26", "name": "Republic Day", "type": "public", "scope": "regional" },
+    { "date": "2026-02-01", "name": "Thai Poosam", "type": "public", "scope": "regional" },
+    { "date": "2026-03-19", "name": "Telugu New Year's Day", "type": "public", "scope": "regional" },
+    { "date": "2026-03-21", "name": "Ramzan (Idu'l Fitr)", "type": "public", "scope": "regional" },
+    { "date": "2026-03-31", "name": "Mahaveer Jayanthi", "type": "public", "scope": "regional" },
+    { "date": "2026-04-03", "name": "Good Friday", "type": "public", "scope": "regional" },
+    { "date": "2026-04-14", "name": "Tamil New Year's Day / Dr. B.R. Ambedkar's Birthday", "type": "public", "scope": "regional" },
+    { "date": "2026-05-01", "name": "May Day", "type": "public", "scope": "regional" },
+    { "date": "2026-05-28", "name": "Bakrid (Idul Azha)", "type": "public", "scope": "regional" },
+    { "date": "2026-06-26", "name": "Muharram (Yaom-E-Shahadath)", "type": "public", "scope": "regional" },
+    { "date": "2026-08-15", "name": "Independence Day", "type": "public", "scope": "regional" },
+    { "date": "2026-08-26", "name": "Milad-un-Nabi (Prophet's Birthday)", "type": "public", "scope": "regional" },
+    { "date": "2026-09-04", "name": "Krishna Jayanthi", "type": "public", "scope": "regional" },
+    { "date": "2026-09-14", "name": "Vinayakar Chathurthi", "type": "public", "scope": "regional" },
+    { "date": "2026-10-02", "name": "Gandhi Jayanthi", "type": "public", "scope": "regional" },
+    { "date": "2026-10-19", "name": "Ayutha Pooja", "type": "public", "scope": "regional" },
+    { "date": "2026-10-20", "name": "Vijaya Dasami", "type": "public", "scope": "regional" },
+    { "date": "2026-11-08", "name": "Deepavali", "type": "public", "scope": "regional" },
+    { "date": "2026-12-25", "name": "Christmas", "type": "public", "scope": "regional" }
+  ],
+  "excluded": [
+    {
+      "date": "2026-04-01",
+      "name": "Annual closing of Accounts for Commercial Banks & Co-operative Banks",
+      "reason": "The Gazette marks this entry as applicable only to commercial and co-operative banks."
+    }
+  ]
+}

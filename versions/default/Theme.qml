@@ -16,6 +16,7 @@ Item {
     MprisSelect { id: mediaSelection }
 
     property var cameraSwitch: null
+    property var calendarHolidayConfig: ({})
 
     Component.onCompleted: {
         console.log("Theme.qml completed cameraSwitch=" + (cameraSwitch ? cameraSwitch.monitorVersion : "null"))
@@ -556,15 +557,54 @@ Item {
     property int calendarMonthOffset: 0
     property int calendarTick: 0
     property int selectedDay: 0
+    property string selectedCalendarDate: ""
+    readonly property date calendarDisplayDate: {
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth() + calendarMonthOffset, 1);
+    }
+    readonly property int calendarDisplayYear: calendarDisplayDate.getFullYear()
+    readonly property int calendarDisplayMonth: calendarDisplayDate.getMonth()
+    readonly property var holidays: holidayService
+
+    function holidayConfigValue(name, fallback) {
+        var config = calendarHolidayConfig || {}
+        return config[name] !== undefined ? config[name] : fallback
+    }
+
+    HolidayService {
+        id: holidayService
+        enabled: theme.holidayConfigValue("enabled", true) === true
+        defaultCountryMode: String(theme.holidayConfigValue("countryMode",
+            String(theme.holidayConfigValue("country", "auto")).toLowerCase() === "auto" ? "auto" : "manual"))
+        defaultCountry: String(theme.holidayConfigValue("country", ""))
+        defaultSubdivision: String(theme.holidayConfigValue("subdivision", ""))
+        defaultShowNational: theme.holidayConfigValue("showNational", true) !== false
+        defaultShowRegional: theme.holidayConfigValue("showRegional", true) !== false
+        defaultRegionalExplicit: (theme.calendarHolidayConfig || {}).showRegional !== undefined
+        showInGrid: theme.holidayConfigValue("showInGrid", true) === true
+        panelVisible: theme.calendarVisible
+        displayedYear: theme.calendarDisplayYear
+    }
+
+    function localIsoDate(year, month, day) {
+        if (day < 1) return ""
+        return String(year).padStart(4, "0") + "-"
+            + String(month + 1).padStart(2, "0") + "-"
+            + String(day).padStart(2, "0")
+    }
+
+    function calendarIsoDate(day) {
+        return localIsoDate(calendarDisplayYear, calendarDisplayMonth, day)
+    }
 
     readonly property var calendarCells: {
         calendarTick;
         const now = new Date();
-        const first = new Date(now.getFullYear(), now.getMonth() + calendarMonthOffset, 1);
+        const first = calendarDisplayDate;
         const year = first.getFullYear();
         const month = first.getMonth();
         const lastDay = new Date(year, month + 1, 0).getDate();
-        const startDay = (first.getDay() + 6) % 7;
+        const startDay = first.getDay();
         const today = new Date();
         const isCurrentMonth = year === today.getFullYear() && month === today.getMonth();
         const cells = [];
@@ -584,16 +624,16 @@ Item {
     }
 
     readonly property string calendarYear: {
-        const now = new Date();
-        const d = new Date(now.getFullYear(), now.getMonth() + calendarMonthOffset, 1);
-        return String(d.getFullYear());
+        return String(calendarDisplayYear);
     }
 
     function openCalendar() {
         activateFocusedPopupScreen();
         calendarMonthOffset = 0;
         calendarTick++;
-        selectedDay = (new Date()).getDate();
+        const today = new Date();
+        selectedDay = today.getDate();
+        selectedCalendarDate = localIsoDate(today.getFullYear(), today.getMonth(), selectedDay);
         calendarVisible = true;
     }
 

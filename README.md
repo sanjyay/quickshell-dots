@@ -14,6 +14,12 @@ classic standalone `qs -c bar` usage.
   Bluetooth, microphone, weather, tray, system metrics, Tailscale, AI usage,
   idle, and update widgets.
 - Rise control center and detail panels.
+- Offline public-holiday markers and details in the calendar, with safe
+  timezone-based country detection, an in-calendar searchable country/region
+  selector, national/regional controls, an official bundled Tamil Nadu 2026
+  calendar, and locally calculated Indian second/fourth-Saturday bank-closure
+  markers. A persistent user timer checks each January 1 for the next verified
+  annual Tamil Nadu file.
 - Quattro-native notifications, clipboard history, OSD, lock/polkit, capture,
   theme, wallpaper, audio, Bluetooth, and network backends.
 - A clipboard history panel on `SUPER+CTRL+V`.
@@ -89,9 +95,17 @@ omarchy plugin validate .
 
 ## Requirements
 
-You need `git`, `jq`, `lua`, `hyprctl`, and the Omarchy Quattro runtime.
+You need `git`, `jq`, `lua`, `hyprctl`, `node`, `npm`, and the Omarchy Quattro runtime.
 Optional features such as Tailscale, power profiles, camera state, and the AI
 provider CLIs only affect their own widgets.
+
+The installer pins and installs the ISC/CC BY-SA 3.0 `date-holidays` package.
+Calendar holiday lookups remain offline. The separately managed annual updater
+uses HTTPS once each January 1 to retrieve a project-published, validated
+official Tamil Nadu file; it never scrapes government pages or invents dates.
+See
+[docs/holidays.md](docs/holidays.md) for configuration, cache location,
+troubleshooting, attribution, and limitations.
 
 Legacy standalone pieces such as Elephant, Waybar, Mako, SwayOSD, Impala,
 iwctl, classic hypridle hooks, and `qs-mode` are not part of the current bar.

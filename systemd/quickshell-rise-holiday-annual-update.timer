@@ -1,0 +1,10 @@
+[Unit]
+Description=Check for verified annual holiday data every January 1
+
+[Timer]
+OnCalendar=*-01-01 09:00:00
+Persistent=true
+RandomizedDelaySec=30min
+
+[Install]
+WantedBy=timers.target
