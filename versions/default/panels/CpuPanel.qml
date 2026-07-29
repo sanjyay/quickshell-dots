@@ -1,7 +1,6 @@
 import QtQuick
 import "../modules"
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
 
 PanelWindow {
@@ -21,24 +20,24 @@ PanelWindow {
     readonly property string cpuIcon: "\uf2db"
     readonly property string ramIcon: "\uf538"
 
-    property int cpuPct: 0
-    property int cpuTemp: 0
-    property real cpuClockGHz: 0
-    property int cpuCores: 0
-    property int cpuThreads: 0
-    property string gpuDriver: ""
-    property int gpuUtil: 0
-    property int gpuTemp: 0
-    property int gpuMemUsed: 0
-    property int gpuMemTotal: 0
-    property bool gpuMemAvailable: false
-    property int gpuClockMHz: 0
-    property real gpuPowerW: -1
-    property string gpuSource: ""
-    readonly property bool hasGpu: gpuDriver !== "" && gpuDriver !== "none"
-    property int ramPct: 0
-    property real ramUsedGiB: 0.0
-    property real ramTotalGiB: 0.0
+    readonly property var metricsModel: root.systemMetrics
+    readonly property int cpuPct: metricsModel.cpuPercent
+    readonly property int cpuTemp: metricsModel.cpuTemperature
+    readonly property real cpuClockGHz: metricsModel.cpuClockGHz
+    readonly property int cpuCores: metricsModel.cpuCores
+    readonly property int cpuThreads: metricsModel.cpuThreads
+    readonly property string gpuDriver: metricsModel.gpuProvider
+    readonly property int gpuUtil: metricsModel.gpuUsagePercent === null ? 0 : metricsModel.gpuUsagePercent
+    readonly property int gpuTemp: metricsModel.gpuTemperatureC === null ? 0 : metricsModel.gpuTemperatureC
+    readonly property int gpuMemUsed: metricsModel.gpuVramUsedMiB === null ? 0 : metricsModel.gpuVramUsedMiB
+    readonly property int gpuMemTotal: metricsModel.gpuVramTotalMiB === null ? 0 : metricsModel.gpuVramTotalMiB
+    readonly property bool gpuMemAvailable: metricsModel.gpuVramUsedMiB !== null && metricsModel.gpuVramTotalMiB !== null
+    readonly property int gpuClockMHz: metricsModel.gpuClockMHz === null ? 0 : metricsModel.gpuClockMHz
+    readonly property real gpuPowerW: metricsModel.gpuPowerWatts === null ? -1 : metricsModel.gpuPowerWatts
+    readonly property bool hasGpu: metricsModel.gpuDisplayModelReady
+    readonly property int ramPct: metricsModel.ramPercent
+    readonly property real ramUsedGiB: metricsModel.ramUsedGiB
+    readonly property real ramTotalGiB: metricsModel.ramTotalGiB
 
     function tempText(v) {
         return v > 0 ? v + "\u00B0C" : "--\u00B0C"
@@ -50,11 +49,6 @@ PanelWindow {
 
     function powerText(v) {
         return v >= 0 ? v.toFixed(1) + " W" : "--"
-    }
-    function gpuProbeCommand(debug) {
-        return "p=\"$HOME/.config/quickshell/bar/modules/qs-gpu-probe.sh\"; " +
-               "[ -x \"$p\" ] || p=\"versions/default/modules/qs-gpu-probe.sh\"; " +
-               "\"$p\"" + (debug ? " --debug" : "")
     }
 
     property real reveal: root.cpuVisible ? 1 : 0
@@ -259,76 +253,4 @@ PanelWindow {
         }
     }
 
-    Process {
-        id: dataProc
-        command: ["bash", "-c",
-            "read _ u1 n1 s1 i1 w1 q1 sq1 st1 _ < /proc/stat && " +
-            "sleep 0.5 && " +
-            "read _ u2 n2 s2 i2 w2 q2 sq2 st2 _ < /proc/stat && " +
-            "di=$(( (i2+w2)-(i1+w1) )) && " +
-            "dn=$(( (u2+n2+s2+q2+sq2+st2)-(u1+n1+s1+q1+sq1+st1) )) && " +
-            "dt=$((di+dn)) && echo CPU_PCT $((dt>0?100*dn/dt:0)); " +
-            "cpu_temp(){ best=0; " +
-            "for f in /sys/class/hwmon/hwmon*/temp*_input /sys/class/thermal/thermal_zone*/temp; do " +
-            "  [ -r \"$f\" ] || continue; dir=${f%/*}; name=$(cat \"$dir/name\" 2>/dev/null); " +
-            "  case \"$name\" in amdgpu|nvidia|nouveau) continue;; esac; " +
-            "  v=$(cat \"$f\" 2>/dev/null); [ -n \"$v\" ] || continue; [ \"$v\" -gt 1000 ] 2>/dev/null && v=$((v/1000)); " +
-            "  [ \"$v\" -ge 20 ] 2>/dev/null && [ \"$v\" -le 120 ] 2>/dev/null || continue; " +
-            "  label=${f%_input}_label; label=$(cat \"$label\" 2>/dev/null); " +
-            "  echo \"$label $name\" | grep -Eiq 'cpu|package|tctl|tdie|core 0' && { echo \"$v\"; return; }; " +
-            "  [ \"$v\" -gt \"$best\" ] 2>/dev/null && best=$v; " +
-            "done; echo \"$best\"; }; echo CPU_TEMP $(cpu_temp); " +
-            "awk -F: '/cpu MHz/ {sum+=$2; n++} END{printf \"CPU_CLOCK %.0f\\n\", n?sum/n:0}' /proc/cpuinfo; " +
-            "threads=$(nproc 2>/dev/null || echo 0); " +
-            "cores=$(awk '/^physical id/ {p=$4} /^core id/ {print p \":\" $4}' /proc/cpuinfo 2>/dev/null | sort -u | wc -l); " +
-            "[ \"$cores\" -gt 0 ] 2>/dev/null || cores=$(awk -F: '/^cpu cores/ {gsub(/ /,\"\",$2); print $2; exit}' /proc/cpuinfo); " +
-            "echo CPU_TOPOLOGY ${cores:-0} ${threads:-0}; " +
-            "awk '/MemTotal:/ {t=$2} /MemAvailable:/ {a=$2} END{u=t-a; printf \"RAM %.0f %.0f %.0f\\n\", u, t, (t>0?u*100/t:0)}' /proc/meminfo; " +
-            cpuPanel.gpuProbeCommand(false)
-        ]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var lines = this.text.trim().split("\n")
-                cpuPanel.gpuDriver = ""
-                cpuPanel.gpuSource = ""
-                cpuPanel.gpuMemAvailable = false
-                for (var i = 0; i < lines.length; i++) {
-                    var parts = lines[i].trim().split(/\s+/)
-                    if (parts[0] === "CPU_PCT" && parts.length >= 2) {
-                        cpuPanel.cpuPct = parseInt(parts[1]) || 0
-                    } else if (parts[0] === "CPU_TEMP" && parts.length >= 2) {
-                        cpuPanel.cpuTemp = parseInt(parts[1]) || 0
-                    } else if (parts[0] === "CPU_CLOCK" && parts.length >= 2) {
-                        cpuPanel.cpuClockGHz = (parseFloat(parts[1]) || 0) / 1000
-                    } else if (parts[0] === "CPU_TOPOLOGY" && parts.length >= 3) {
-                        cpuPanel.cpuCores = parseInt(parts[1]) || 0
-                        cpuPanel.cpuThreads = parseInt(parts[2]) || 0
-                    } else if (parts[0] === "RAM" && parts.length >= 4) {
-                        var usedKB = parseFloat(parts[1]) || 0
-                        var totalKB = parseFloat(parts[2]) || 0
-                        cpuPanel.ramUsedGiB = usedKB / (1024 * 1024)
-                        cpuPanel.ramTotalGiB = totalKB / (1024 * 1024)
-                        cpuPanel.ramPct = Math.max(0, Math.min(100, Math.round(parseFloat(parts[3]) || 0)))
-                    } else if (parts[0] === "GPU" && parts.length >= 6) {
-                        cpuPanel.gpuDriver = parts[1]
-                        cpuPanel.gpuUtil = parts[2] === "--" ? 0 : (parseInt(parts[2]) || 0)
-                        cpuPanel.gpuTemp = parts[3] === "--" ? 0 : (parseInt(parts[3]) || 0)
-                        cpuPanel.gpuMemAvailable = parts[4] !== "--" && parts[5] !== "--"
-                        cpuPanel.gpuMemUsed = cpuPanel.gpuMemAvailable ? (parseInt(parts[4]) || 0) : 0
-                        cpuPanel.gpuMemTotal = cpuPanel.gpuMemAvailable ? (parseInt(parts[5]) || 0) : 0
-                        cpuPanel.gpuClockMHz = parts.length >= 7 && parts[6] !== "--" ? (parseInt(parts[6]) || 0) : 0
-                        cpuPanel.gpuPowerW = parts.length >= 8 && parts[7] !== "--" ? (parseFloat(parts[7]) || -1) : -1
-                    }
-                }
-            }
-        }
-    }
-
-    Timer {
-        interval: 1500
-        running: cpuPanel.visible && root.cpuVisible
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: { dataProc.running = false; dataProc.running = true }
-    }
 }

@@ -186,7 +186,7 @@ Item {
         }
     }
 
-    readonly property string quotesPath8: Quickshell.env("HOME") + "/.config/quickshell/bar/quotes.txt"
+    readonly property url quotesPath8: Qt.resolvedUrl("../quotes.txt")
     property var quotes8: [
         { q: "THE ONLY WAY TO DO GREAT WORK IS TO LOVE WHAT YOU DO.", a: "STEVE JOBS" }
     ]
@@ -431,9 +431,6 @@ Item {
 
     function themeName7() {
         var n = pendingThemeName7
-        if (n === "") {
-            try { n = String(themeNameState.text() || "").trim() } catch (e) {}
-        }
         if (n === "" && theme.lastAppliedName !== undefined)
             n = String(theme.lastAppliedName || "").trim()
         return n
@@ -441,27 +438,14 @@ Item {
 
     function scheduleThemeText7(name) {
         if (name !== undefined) pendingThemeName7 = String(name || "").trim()
-        themeNameState.reload()
         themeTextTimer.restart()
-    }
-
-    // theme switch rewrites the live theme files; debounce them into one name pulse
-    FileView {
-        id: themeColorsState
-        path: theme.colorsPath
-        watchChanges: true
-        onFileChanged: root.scheduleThemeText7()
-    }
-
-    FileView {
-        id: themeNameState
-        path: Quickshell.env("HOME") + "/.config/omarchy/current/theme.name"
-        watchChanges: true
-        onFileChanged: root.scheduleThemeText7()
     }
 
     Connections {
         target: theme
+        function onPaperChanged() {
+            root.scheduleThemeText7()
+        }
         function onLastAppliedNameChanged() {
             if (theme.lastAppliedName !== "") root.scheduleThemeText7(theme.lastAppliedName)
         }

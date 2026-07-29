@@ -3,8 +3,9 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import Quickshell.Services.UPower
-import "Palette.js" as Palette
+import qs.Commons
 import "modules"
+import "services"
 
 Item {
     id: theme
@@ -23,19 +24,17 @@ Item {
     }
     onCameraSwitchChanged: console.log("Theme.qml cameraSwitch changed cameraSwitch=" + (cameraSwitch ? cameraSwitch.monitorVersion : "null"))
 
-    readonly property string colorsPath: Quickshell.env("HOME") + "/.config/omarchy/current/theme/colors.toml"
-
-    property color paper:   "#181616"
-    property color ink:     "#c5c9c5"
-    property color inkDeep: "#c8c093"
-    property color sumi:    "#a6a69c"
+    readonly property color paper: Color.bar.background
+    readonly property color ink: Color.bar.text
+    readonly property color inkDeep: Color.foreground
+    readonly property color sumi: Color.bar.text
     readonly property color sumiHi:  Qt.rgba(sumi.r*0.45 + ink.r*0.55, sumi.g*0.45 + ink.g*0.55, sumi.b*0.45 + ink.b*0.55, 1.0)  // lifted section-header text
-    property color indigo:  "#658594"
+    readonly property color indigo: Color.accent
     property color green:   "#8a9a73"   // gate "OK" verdict
     property color color02: "#8a9a73"   // colors.toml color2
     property color color03: "#c8b36a"   // colors.toml color3
-    property color sealRaw:    "#c4746e"
-    property color accentHint: sealRaw    // filled by palette; default = same as red
+    readonly property color sealRaw: Color.urgent
+    readonly property color accentHint: Color.accent
     readonly property int barReservedExtent: 38
     property string barColor: "red"
     readonly property bool pointerTrace: Quickshell.env("QS_POINTER_TRACE") === "1"
@@ -151,12 +150,12 @@ Item {
     property var barLayoutControllers: ({})
     property bool _barLayoutSyncing: false
 
-    readonly property bool anyPopupVisible: menuVisible || themeSwitcherVisible || wallpaperSwitcherVisible || clipboardVisible || emojiPickerVisible || captureVisible || appLauncherVisible || calendarVisible || cpuVisible || aiUsageVisible
+    readonly property bool anyPopupVisible: menuVisible || themeSwitcherVisible || wallpaperSwitcherVisible || clipboardVisible || emojiPickerVisible || captureVisible || calendarVisible || cpuVisible || aiUsageVisible
         || memVisible || volVisible || controlVisible || networkVisible || bluetoothVisible
         || batteryVisible || mprisVisible || tailscaleVisible
         || workspaceVisible || imagePickerVisible || mediaBrowserVisible || notifVisible
         || powerProfileVisible || shellUpdateVisible || trayVisible || trayMenuVisible
-    readonly property bool keyboardPopupVisible: menuVisible || themeSwitcherVisible || wallpaperSwitcherVisible || clipboardVisible || emojiPickerVisible || captureVisible || appLauncherVisible || imagePickerVisible || mediaBrowserVisible
+    readonly property bool keyboardPopupVisible: menuVisible || themeSwitcherVisible || wallpaperSwitcherVisible || clipboardVisible || emojiPickerVisible || captureVisible || imagePickerVisible || mediaBrowserVisible
 
     function registerBarLayoutController(screenName, controller) {
         if (!screenName || !controller) return
@@ -373,7 +372,6 @@ Item {
         if (except !== "clipboardVisible") clipboardVisible = false
         if (except !== "emojiPickerVisible") emojiPickerVisible = false
         if (except !== "captureVisible") captureVisible = false
-        if (except !== "appLauncherVisible") appLauncherVisible = false
         if (except !== "calendarVisible") calendarVisible = false
         if (except !== "cpuVisible") cpuVisible = false
         if (except !== "aiUsageVisible") aiUsageVisible = false
@@ -413,11 +411,6 @@ Item {
         imagePickerVisible = false
         mediaBrowserMode = mode
         mediaBrowserVisible = true
-    }
-
-    function openAppLauncher() {
-        activateFocusedPopupScreen()
-        appLauncherVisible = true
     }
 
     // ── Native Omarchy theme switcher ──
@@ -558,10 +551,6 @@ Item {
     }
 
     // ── Calendar state ──
-    property bool appLauncherVisible: false
-    onAppLauncherVisibleChanged: popupOpened("appLauncherVisible")
-
-    // ── Calendar state ──
     property bool calendarVisible: false
     onCalendarVisibleChanged: popupOpened("calendarVisible")
     property int calendarMonthOffset: 0
@@ -611,6 +600,22 @@ Item {
     // ── CPU panel state ──
     property bool cpuVisible: false
     onCpuVisibleChanged: popupOpened("cpuVisible")
+    property bool systemMetricsReady: false
+    property bool networkServiceReady: false
+    readonly property var systemMetrics: systemMetricsService
+
+    SystemMetricsService {
+        id: systemMetricsService
+        enabled: theme.systemMetricsReady
+        panelVisible: theme.cpuVisible
+    }
+
+    readonly property var network: networkService
+    NetworkSummaryService {
+        id: networkService
+        enabled: theme.networkServiceReady
+        panelVisible: theme.networkVisible
+    }
 
     // ── AI usage panel state + which tool the bar pill shows ──
     property bool   aiUsageVisible: false
@@ -619,6 +624,68 @@ Item {
         if (aiUsageVisible) refreshAiUsage()
     }
     property string aiTool: "codex"   // "claude", "codex", or "opencode" — icon shown in the bar
+    property bool aiCollectorReady: false
+    readonly property var aiUsage: aiUsageService
+    readonly property string aiClStatus: aiUsageService.aiClStatus
+    readonly property string aiCxStatus: aiUsageService.aiCxStatus
+    readonly property string aiOcStatus: aiUsageService.aiOcStatus
+    readonly property string aiClMessage: aiUsageService.aiClMessage
+    readonly property string aiCxMessage: aiUsageService.aiCxMessage
+    readonly property string aiOcMessage: aiUsageService.aiOcMessage
+    readonly property string aiClCollectedAt: aiUsageService.aiClCollectedAt
+    readonly property string aiCxCollectedAt: aiUsageService.aiCxCollectedAt
+    readonly property string aiOcCollectedAt: aiUsageService.aiOcCollectedAt
+
+    AiUsageService {
+        id: aiUsageService
+        startupReady: theme.aiCollectorReady
+        panelVisible: theme.aiUsageVisible
+        selectedTool: theme.aiTool
+        onProviderDataChanged: theme.syncAiUsageFields()
+        onAiClockTickChanged: {
+            theme.aiClockTick = aiClockTick
+            theme.syncAiUsageFields()
+        }
+        Component.onCompleted: theme.syncAiUsageFields()
+    }
+
+    function syncAiUsageFields() {
+        aiClHas = aiUsageService.aiClHas
+        aiClFresh = aiUsageService.aiClFresh
+        aiClPct5h = aiUsageService.aiClPct5h
+        aiClPct7d = aiUsageService.aiClPct7d
+        aiClBlocked = aiUsageService.aiClBlocked
+        aiClTokens = aiUsageService.aiClTokens
+        aiClRate = aiUsageService.aiClRate
+        aiClReset5hTs = aiUsageService.aiClReset5hTs
+        aiClReset7dTs = aiUsageService.aiClReset7dTs
+        aiClToday = aiUsageService.aiClToday
+        aiCxHas = aiUsageService.aiCxHas
+        aiCxFresh = aiUsageService.aiCxFresh
+        aiCxState = aiUsageService.aiCxState
+        aiCxHas5h = aiUsageService.aiCxHas5h
+        aiCxHasWeekly = aiUsageService.aiCxHasWeekly
+        aiCxPct5h = aiUsageService.aiCxPct5h
+        aiCxPct7d = aiUsageService.aiCxPct7d
+        aiCxPlan = aiUsageService.aiCxPlan
+        aiCxCreditsAvailable = aiUsageService.aiCxCreditsAvailable
+        aiCxCredits = aiUsageService.aiCxCredits
+        aiCxTokens = aiUsageService.aiCxTokens
+        aiCxRate = aiUsageService.aiCxRate
+        aiCxReset5hTs = aiUsageService.aiCxReset5hTs
+        aiCxReset7dTs = aiUsageService.aiCxReset7dTs
+        aiCxToday = aiUsageService.aiCxToday
+        aiOcHas = aiUsageService.aiOcHas
+        aiOcFresh = aiUsageService.aiOcFresh
+        aiOcPct5h = aiUsageService.aiOcPct5h
+        aiOcPct7d = aiUsageService.aiOcPct7d
+        aiOcPlan = aiUsageService.aiOcPlan
+        aiOcTokens = aiUsageService.aiOcTokens
+        aiOcRate = aiUsageService.aiOcRate
+        aiOcModel = aiUsageService.aiOcModel
+        aiOcToday = aiUsageService.aiOcToday
+        aiOcModels = aiUsageService.aiOcModels
+    }
 
     // ── AI usage data (single source of truth) ───────────────────
     // The bar pill (ClaudeWidget) and the AiUsagePanel both render from these —
@@ -684,168 +751,24 @@ Item {
         return new Date(ts * 1000).toLocaleString(Qt.locale(), "MMM d, yyyy h:mm AP")
     }
 
-    Process {
-        id: aiReadClaude
-        command: ["bash", "-c",
-            "f=\"$HOME/.cache/claude-usage.json\"; stat -c %Y \"$f\" 2>/dev/null; cat \"$f\" 2>/dev/null"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var raw = this.text, nl = raw.indexOf("\n")
-                var mtime = nl > 0 ? (parseInt(raw.substring(0, nl)) || 0) : 0
-                var ageOk = mtime > 0 && (Date.now() / 1000 - mtime) < 900
-                try {
-                    var d = JSON.parse((nl > 0 ? raw.substring(nl + 1) : "").trim())
-                    theme.aiClHas = true
-                    theme.aiClFresh = ageOk && d._source !== "stale"
-                    theme.aiClPct5h = theme.aiPct(d["5h-utilization"])
-                    theme.aiClPct7d = theme.aiPct(d["7d-utilization"])
-                    theme.aiClBlocked = d.status === "rejected" || d.status === "blocked"
-                    theme.aiClReset5hTs = parseInt(d["5h-reset"]) || 0
-                    theme.aiClReset7dTs = parseInt(d["7d-reset"]) || 0
-                    var used = (d["_tokens_used"] || 0), lim = (d["_window_limit"] || 0)
-                    theme.aiClTokens = used ? (used / 1e6).toFixed(2) + "M / " + (lim / 1e6).toFixed(1) + "M" : ""
-                    var rateH = Math.round((d["_rate_per_hour"] || 0) / 1000)
-                    theme.aiClRate = rateH > 0 ? rateH + "k tok/h" : ""
-                    theme.aiClToday = parseInt(d._today_tokens) || 0
-                } catch (e) {
-                    theme.aiClHas = false; theme.aiClFresh = false
-                    theme.aiClPct5h = 0; theme.aiClPct7d = 0
-                    theme.aiClBlocked = false; theme.aiClTokens = ""; theme.aiClRate = ""
-                    theme.aiClReset5hTs = 0; theme.aiClReset7dTs = 0; theme.aiClToday = 0
-                }
-            }
-        }
-    }
-
-    Process {
-        id: aiReadCodex
-        command: ["bash", "-c",
-            "f=\"$HOME/.cache/codex-usage.json\"; stat -c %Y \"$f\" 2>/dev/null; cat \"$f\" 2>/dev/null"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var raw = this.text, nl = raw.indexOf("\n")
-                var mtime = nl > 0 ? (parseInt(raw.substring(0, nl)) || 0) : 0
-                var ageOk = mtime > 0 && (Date.now() / 1000 - mtime) < 900
-                try {
-                    var d = JSON.parse((nl > 0 ? raw.substring(nl + 1) : "").trim())
-                    theme.aiCxHas5h = d["5h-available"] === true
-                    theme.aiCxHasWeekly = d["7d-available"] === true
-                    theme.aiCxCreditsAvailable = d["credits-available"] === true
-                    theme.aiCxHas = theme.aiCxHas5h || theme.aiCxHasWeekly || theme.aiCxCreditsAvailable
-                    theme.aiCxState = !ageOk || d._source === "stale" ? "stale"
-                        : (d._source === "rpc" ? "live" : "cached")
-                    theme.aiCxFresh = theme.aiCxState === "live"
-                    theme.aiCxPct5h = theme.aiPct(d["5h-utilization"])
-                    theme.aiCxPct7d = theme.aiPct(d["7d-utilization"])
-                    theme.aiCxReset5hTs = parseInt(d["5h-reset"]) || 0
-                    theme.aiCxReset7dTs = parseInt(d["7d-reset"]) || 0
-                    theme.aiCxPlan = d._plan || ""
-                    theme.aiCxCredits = theme.aiCxCreditsAvailable ? String(d["credits-remaining"]) : ""
-                    var cxUsed = (d["_tokens_used"] || 0), cxLim = (d["_window_limit"] || 0)
-                    theme.aiCxTokens = cxUsed ? (cxUsed / 1e6).toFixed(2) + "M / " + (cxLim / 1e6).toFixed(1) + "M" : ""
-                    var cxRateH = Math.round((d["_rate_per_hour"] || 0) / 1000)
-                    theme.aiCxRate = cxRateH > 0 ? cxRateH + "k tok/h" : ""
-                    theme.aiCxToday = parseInt(d._today_tokens) || 0
-                } catch (e) {
-                    theme.aiCxHas = false; theme.aiCxFresh = false
-                    theme.aiCxState = "stale"; theme.aiCxHas5h = false; theme.aiCxHasWeekly = false
-                    theme.aiCxPct5h = 0; theme.aiCxPct7d = 0
-                    theme.aiCxPlan = ""; theme.aiCxCreditsAvailable = false; theme.aiCxCredits = ""
-                    theme.aiCxTokens = ""; theme.aiCxRate = ""; theme.aiCxToday = 0
-                    theme.aiCxReset5hTs = 0; theme.aiCxReset7dTs = 0
-                }
-            }
-        }
-    }
-
-    Process {
-        id: aiReadOpenCode
-        command: ["bash", "-c",
-            "f=\"$HOME/.cache/opencode-usage.json\"; stat -c %Y \"$f\" 2>/dev/null; cat \"$f\" 2>/dev/null"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var raw = this.text, nl = raw.indexOf("\n")
-                var mtime = nl > 0 ? (parseInt(raw.substring(0, nl)) || 0) : 0
-                var ageOk = mtime > 0 && (Date.now() / 1000 - mtime) < 900
-                try {
-                    var d = JSON.parse((nl > 0 ? raw.substring(nl + 1) : "").trim())
-                    theme.aiOcHas = true
-                    theme.aiOcFresh = ageOk && d._source !== "stale"
-                    theme.aiOcPct5h = theme.aiPct(d["5h-utilization"])
-                    theme.aiOcPct7d = theme.aiPct(d["7d-utilization"])
-                    theme.aiOcPlan = d._plan || ""
-                    var ocUsed = (d["_tokens_used"] || 0), ocLim = (d["_window_limit"] || 0)
-                    theme.aiOcTokens = ocUsed ? (ocUsed / 1e6).toFixed(2) + "M / " + (ocLim / 1e6).toFixed(1) + "M" : ""
-                    var ocRateH = Math.round((d["_rate_per_hour"] || 0) / 1000)
-                    theme.aiOcRate = ocRateH > 0 ? ocRateH + "k tok/h" : ""
-                    theme.aiOcToday = parseInt(d._today_tokens) || 0
-                    theme.aiOcModel = d._model || ""
-                    theme.aiOcModels = d._models instanceof Array ? d._models : []
-                } catch (e) {
-                    theme.aiOcHas = false; theme.aiOcFresh = false
-                    theme.aiOcPct5h = 0; theme.aiOcPct7d = 0
-                    theme.aiOcPlan = ""; theme.aiOcTokens = ""; theme.aiOcRate = ""; theme.aiOcModel = ""
-                    theme.aiOcToday = 0; theme.aiOcModels = []
-                }
-            }
-        }
-    }
-
-    Process {
-        id: aiRunBackends
-        onExited: aiReadAfterBackend.restart()
-    }
-
-    Timer {
-        id: aiReadAfterBackend
-        interval: 600
-        repeat: false
-        onTriggered: theme.refreshAiUsage(true, true)
-    }
-
-    function kickAiBackends(selectedOnly) {
-        var now = Date.now()
-        var minGap = aiUsageVisible ? 15000 : 60000
-        if (aiRunBackends.running || now - aiLastBackendKick < minGap) return
-        aiLastBackendKick = now
-
-        var names = selectedOnly === true ? [aiTool] : ["claude", "codex", "opencode"]
-        var cmds = []
-        for (var i = 0; i < names.length; i++) {
-            if (names[i] === "claude")
-                cmds.push("[ -x \"$HOME/.local/bin/claude-usage\" ] && \"$HOME/.local/bin/claude-usage\" >/dev/null 2>&1 || true")
-            else if (names[i] === "codex")
-                cmds.push("[ -x \"$HOME/.local/bin/codex-usage\" ] && \"$HOME/.local/bin/codex-usage\" >/dev/null 2>&1 || true")
-            else if (names[i] === "opencode")
-                cmds.push("[ -x \"$HOME/.local/bin/opencode-usage\" ] && \"$HOME/.local/bin/opencode-usage\" >/dev/null 2>&1 || true")
-        }
-        if (cmds.length === 0) return
-        aiRunBackends.command = ["bash", "-lc", cmds.join("; ")]
-        aiRunBackends.running = false
-        aiRunBackends.running = true
-    }
-
     function refreshAiUsage(selectedOnly, skipBackendKick) {
-        aiClockTick++
-        var only = selectedOnly === true
-        if (!only || aiTool === "claude") {
-            aiReadClaude.running = false; aiReadClaude.running = true
-        }
-        if (!only || aiTool === "codex") {
-            aiReadCodex.running = false;  aiReadCodex.running = true
-        }
-        if (!only || aiTool === "opencode") {
-            aiReadOpenCode.running = false; aiReadOpenCode.running = true
-        }
-        if (skipBackendKick !== true) kickAiBackends(only)
+        aiUsageService.refreshAiUsage(selectedOnly, skipBackendKick)
+    }
+
+    function forceAiUsageRefresh(selectedOnly) {
+        return aiUsageService.refresh(selectedOnly === true, true)
+    }
+
+    function aiUsageDiagnosticObject() {
+        return aiUsageService.diagnosticObject()
     }
 
     Timer {
-        // Keep the UI responsive while bounding backend calls; kickAiBackends()
-        // enforces its own slower rate limit.
-        interval: theme.aiUsageVisible ? 5000 : 15000
-        running: true; repeat: true; triggeredOnStart: true
-        onTriggered: theme.refreshAiUsage(theme.aiUsageVisible)
+        // Legacy cache readers above remain inert for migration compatibility;
+        // AiUsageService is the only collector and parser.
+        interval: 60000
+        running: false
+        repeat: false
     }
 
     // ── Memory panel state ──
@@ -965,9 +888,9 @@ Item {
     property bool modCpu:        true
     property bool modVolume:     true
     property bool modNetwork:    true
-    property string networkMode: "none"   // mirrored from NetworkWidget: wifi/ethernet/none
-    property real networkDlRate: 0        // existing NetworkWidget sample; reused by gap animation
-    property real networkUlRate: 0
+    readonly property string networkMode: networkService.connectionType
+    readonly property real networkDlRate: networkService.receiveRateBytes
+    readonly property real networkUlRate: networkService.transmitRateBytes
     property bool omarchyUpdateAvail: false   // mirrored from UpdateWidget (6h poll)
     property bool notifSilenced: false        // mirrored from NotificationSilenceWidget (DND)
     property string notifLatestSummary: ""
@@ -1030,76 +953,21 @@ Item {
     property bool modTailscale:  false   // optional Tailscale status pill; default off
     property bool volumeManual:  false   // user explicitly enabled the volume pill
 
-    // Shared, read-only Tailscale probe. The widget never changes daemon state.
-    property bool tailscaleAvailable: false
-    property string tailscaleStatus: "unknown"
-    property string tailscaleHostName: ""
-    property string tailscaleAddress: ""
-    property string tailscaleTailnet: ""
-    property string tailscaleBackendState: "Unknown"
-    property int tailscalePeerCount: 0
+    TailscaleService {
+        id: tailscaleService
+        settings: ({})
+    }
+    readonly property var tailscale: tailscaleService
+    readonly property bool tailscaleAvailable: tailscaleService.installed
+    readonly property string tailscaleStatus: tailscaleService.statusText
+    readonly property string tailscaleHostName: tailscaleService.selfName
+    readonly property string tailscaleAddress: tailscaleService.selfIp
+    readonly property string tailscaleTailnet: tailscaleService.selectedAccountLabel || tailscaleService.selfDnsName || ""
+    readonly property string tailscaleBackendState: tailscaleService.backendState
+    readonly property int tailscalePeerCount: tailscaleService.peers.length
 
     function refreshTailscale() {
-        tailscaleStatusProc.running = false
-        tailscaleStatusProc.running = true
-    }
-
-    Process {
-        id: tailscaleStatusProc
-        command: ["bash", "-lc",
-            "if ! command -v tailscale >/dev/null 2>&1; then printf '__UNAVAILABLE__\\n'; "
-            + "else tailscale status --json 2>/dev/null || printf '__ERROR__\\n'; fi"]
-        running: false
-        stdout: StdioCollector { id: tailscaleStatusOut }
-        onExited: {
-            var output = tailscaleStatusOut.text.trim()
-            if (output === "__UNAVAILABLE__") {
-                theme.tailscaleAvailable = false
-                theme.tailscaleStatus = "unavailable"
-                theme.tailscaleHostName = ""
-                theme.tailscaleAddress = ""
-                theme.tailscaleTailnet = ""
-                theme.tailscaleBackendState = "Unavailable"
-                theme.tailscalePeerCount = 0
-                return
-            }
-            theme.tailscaleAvailable = true
-            if (output === "__ERROR__" || output === "") {
-                theme.tailscaleStatus = "disconnected"
-                theme.tailscaleBackendState = "Stopped"
-                theme.tailscalePeerCount = 0
-                return
-            }
-            try {
-                var state = JSON.parse(output)
-                var backend = String(state.BackendState || "Unknown")
-                theme.tailscaleBackendState = backend
-                var self = state.Self || ({})
-                theme.tailscaleStatus = backend === "Running" && self.Online
-                    ? "connected"
-                    : (backend === "NeedsLogin" ? "login-required" : "disconnected")
-                theme.tailscaleHostName = String(self.HostName || self.DNSName || "").replace(/\.$/, "")
-                var addresses = state.TailscaleIPs || self.TailscaleIPs || []
-                theme.tailscaleAddress = addresses.length > 0 ? String(addresses[0]) : ""
-                theme.tailscaleTailnet = state.CurrentTailnet ? String(state.CurrentTailnet.Name || "") : ""
-                var peers = state.Peer || ({})
-                var onlinePeers = 0
-                for (var peerId in peers) if (peers[peerId] && peers[peerId].Online) onlinePeers++
-                theme.tailscalePeerCount = onlinePeers
-            } catch (e) {
-                theme.tailscaleStatus = "disconnected"
-                theme.tailscaleBackendState = "Unknown"
-                theme.tailscalePeerCount = 0
-            }
-        }
-    }
-
-    Timer {
-        interval: 10000
-        running: theme.modTailscale
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: theme.refreshTailscale()
+        tailscaleService.refresh(true)
     }
 
     // ── Quickshell transient OSD ───────────────────────────────
@@ -1521,8 +1389,11 @@ Item {
     property bool   mediaBrowserVisible: false
     onMediaBrowserVisibleChanged: popupOpened("mediaBrowserVisible")
     property string mediaBrowserMode:    "screenshots"  // "screenshots" or "videos"
-    // ── Idle inhibitor (Wayland idle-inhibit protocol) ──
-    property bool   idleInhibited:       false
+    // ── Idle state: Omarchy's native service owns lock, screensaver and DPMS. ──
+    property var shellHost: null
+    readonly property var idleService: shellHost ? shellHost.firstPartyServiceFor("omarchy.idle") : null
+    readonly property bool idleInhibited: idleService ? idleService.stayAwake === true : false
+    property int idleWidgetInstances: 0
     // ── Notification state ──
     property bool notifVisible: false
     onNotifVisibleChanged: popupOpened("notifVisible")
@@ -1629,17 +1500,6 @@ Item {
     }
 
     Process {
-        id: paletteReader
-        command: ["cat", theme.colorsPath]
-        running: true
-        stdout: StdioCollector {
-            onStreamFinished: {
-                Palette.apply(theme, Palette.parse(this.text));
-            }
-        }
-    }
-
-    Process {
         id: fontReader
         command: ["omarchy-font-current"]
         running: true
@@ -1648,31 +1508,7 @@ Item {
         }
     }
 
-    IpcHandler {
-        target: "theme"
-        function apply(payload: string): void {
-            let p;
-            try { p = JSON.parse(payload); }
-            catch (e) { console.warn("theme.apply: bad payload —", e); return; }
-            if (!p || !p.colors) return;
-            Palette.apply(theme, Palette.mapKeys(p.colors));
-            theme.lastAppliedName = p.name || "";
-        }
-        function applyLauncher(payload: string): void {
-            let p;
-            try { p = JSON.parse(payload); }
-            catch (e) { console.warn("theme.applyLauncher: bad payload —", e); return; }
-            theme.applyLauncherConfig(p);
-        }
-        function reload(): void {
-            theme.reloadThemePalette()
-        }
-        function setFont(fontName: string): void {
-            theme.setMonoFont(fontName)
-        }
-    }
-
-    // entry point for keybinds: `qs -c bar ipc call picker theme|wallpaper|...`
+    // Bar-local entry point reached through canonical `omarchy-shell` IPC.
     // (unqualified access → resolves to the Theme root's properties; avoids the
     //  function name `theme` shadowing the `id: theme`)
     IpcHandler {
@@ -1683,9 +1519,4 @@ Item {
         function videos(): void      { openMediaBrowser("videos") }
     }
 
-    // Terminal entry point: `qs -c bar ipc call launcher open`
-    IpcHandler {
-        target: "launcher"
-        function open(): void { openAppLauncher() }
-    }
 }

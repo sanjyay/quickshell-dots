@@ -40,7 +40,7 @@ Item {
         duration: 2600; loops: Animation.Infinite
         // gate: only animate while hovered or control panel open — otherwise the
         // Canvas repainted 24/7 via onPhaseChanged even when nobody looks
-        running: ma.containsMouse || root.controlVisible || root.appLauncherVisible
+        running: ma.containsMouse || root.controlVisible
     }
 
     // shadow as a SIBLING of the pill (the pill itself clips, for the wave —
@@ -73,7 +73,7 @@ Item {
             anchors.fill: parent
             // only present while active (hovered or control panel open); fully
             // gone when idle. Fades so it appears/disappears smoothly.
-            opacity: (ma.containsMouse || root.controlVisible || root.appLauncherVisible) ? 0.55 : 0
+            opacity: (ma.containsMouse || root.controlVisible) ? 0.55 : 0
             visible: opacity > 0.001
             Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 

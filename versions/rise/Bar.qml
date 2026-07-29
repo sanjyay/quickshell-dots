@@ -10,11 +10,159 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
-import "panels"
-import "modules"
+import qs.Commons
+import "../default"
+import "../default/panels"
+import "../default/modules"
 
-ShellRoot {
+Item {
     id: root
+
+    property string omarchyPath: ""
+    property var barWidgetRegistry: null
+    property var barConfig: null
+    property var shell: null
+    property var manifest: null
+    property var pluginRegistry: null
+    property bool initialized: false
+    property string initializationError: ""
+    property int createdWindowCount: 0
+    readonly property bool idleInhibited: theme.idleInhibited
+
+    readonly property bool hostReady: omarchyPath !== ""
+        && shell !== null
+        && manifest !== null
+        && barConfig !== null
+
+    function tryInitialize() {
+        if (initialized || !hostReady) return
+        if (typeof barConfig !== "object") {
+            initializationError = "barConfig is not an object"
+            return
+        }
+        initialized = true
+    }
+
+    function registerBarWindow() {
+        createdWindowCount++
+    }
+
+    function unregisterBarWindow() {
+        createdWindowCount = Math.max(0, createdWindowCount - 1)
+    }
+
+    function gpuDiagnostics() {
+        var gpu = theme.systemMetrics
+        return {
+            collectorPath: gpu.gpuCollectorPath,
+            collectorExecutable: true,
+            collectorRunning: gpu.gpuCollectorRunning,
+            lastExitCode: gpu.gpuLastExitCode,
+            stdoutBytes: gpu.gpuStdoutBytes,
+            parseStatus: gpu.gpuParseStatus,
+            status: gpu.gpuStatus,
+            provider: gpu.gpuProvider,
+            device: gpu.gpuDevice,
+            temperatureC: gpu.gpuTemperatureC,
+            usagePercent: gpu.gpuUsagePercent,
+            vramTotalMiB: gpu.gpuVramTotalMiB,
+            clockMHz: gpu.gpuClockMHz,
+            powerWatts: gpu.gpuPowerWatts,
+            collectedAt: gpu.gpuCollectedAt,
+            errorCode: gpu.gpuErrorCode,
+            displayModelReady: gpu.gpuDisplayModelReady
+        }
+    }
+
+    function idleDiagnostics() {
+        var nativeIdle = theme.idleService
+        return {
+            backend: "omarchy-native",
+            requested: theme.idleInhibited,
+            effective: nativeIdle ? nativeIdle.stayAwake === true && nativeIdle.idleEnabled === false : false,
+            serviceReady: nativeIdle !== null,
+            observerInstances: theme.idleWidgetInstances
+        }
+    }
+
+    function refreshAiUsage() {
+        return theme.forceAiUsageRefresh(false)
+    }
+
+    function aiUsageDiagnostics() {
+        return theme.aiUsageDiagnosticObject()
+    }
+
+    function networkDiagnostics() {
+        var net = theme.network
+        return {
+            serviceInstances: 1,
+            installed: net.installed,
+            connected: net.connected,
+            connectionType: net.connectionType,
+            interfaceName: net.interfaceName,
+            connectionSpeedMbps: net.connectionSpeedMbps,
+            connectivity: net.connectivity,
+            pingMs: net.pingMs,
+            packetLossPercent: net.packetLossPercent,
+            receiveRateBytes: net.receiveRateBytes,
+            transmitRateBytes: net.transmitRateBytes,
+            nearbyNetworkCount: net.nearbyNetworks.length,
+            dnsMode: net.dnsMode,
+            speedTestAvailable: net.speedTestAvailable,
+            scanning: net.scanning,
+            lastRefreshAt: net.lastRefreshAt,
+            lastSuccessfulRefreshAt: net.lastSuccessfulRefreshAt,
+            lastErrorCode: net.lastErrorCode || null
+        }
+    }
+
+    function refreshNetwork() {
+        theme.network.refresh(true)
+        return true
+    }
+
+    function openAiUsage(provider) {
+        if (provider === "codex" || provider === "claude" || provider === "opencode")
+            theme.aiTool = provider
+        theme.activateFocusedPopupScreen()
+        theme.aiUsageVisible = true
+    }
+
+    function closeAiUsage() {
+        theme.aiUsageVisible = false
+    }
+
+    function openSystemMetrics() {
+        theme.activateFocusedPopupScreen()
+        theme.cpuVisible = true
+    }
+
+    function closeSystemMetrics() {
+        theme.cpuVisible = false
+    }
+
+    function debugBarGeometry() {
+        var geometry = []
+        for (var i = 0; i < barScreens.length; i++) {
+            var screen = barScreens[i]
+            geometry.push({
+                id: "quickshell-rise",
+                screen: screen.name,
+                x: 0,
+                y: 0,
+                width: screen.width,
+                height: theme.barReservedExtent,
+                visible: initialized
+            })
+        }
+        return geometry
+    }
+
+    onOmarchyPathChanged: tryInitialize()
+    onShellChanged: tryInitialize()
+    onManifestChanged: tryInitialize()
+    onBarConfigChanged: tryInitialize()
 
     CameraSwitchMonitor {
         id: cameraSwitchMonitor
@@ -24,6 +172,10 @@ ShellRoot {
     Theme {
         id: theme
         cameraSwitch: cameraSwitchMonitor
+        aiCollectorReady: root.initialized
+        systemMetricsReady: root.initialized
+        networkServiceReady: root.initialized
+        shellHost: root.shell
     }
 
     // IPC handlers must live outside the per-monitor BarSlot delegate. Otherwise
@@ -35,53 +187,12 @@ ShellRoot {
     }
 
     IpcHandler {
-        target: "osd"
-        function show(kind: string, value: string, detail: string, icon: string, screen: string): void {
-            theme.showHardwareOsd(kind, value, detail, icon, screen)
-        }
-    }
-
-    NotificationManager { id: notificationManager; root: theme }
-    Connections {
-        target: cameraSwitchMonitor
-        function onCameraEnabledChanged() {
-            if (cameraSwitchMonitor.stateKnown)
-                theme.showHardwareOsd("camera", "", cameraSwitchMonitor.cameraEnabled ? "Camera enabled" : "Camera blocked", "", "")
-        }
-    }
-
-    IpcHandler {
-        target: "notifications"
-        function dismiss(): void { if (notificationManager.toasts.length) notificationManager.close(notificationManager.toasts[0].key, true) }
-        function dismissAll(): void { notificationManager.dismissAll() }
-        function toggleDnd(): void { theme.notifSilenced = !theme.notifSilenced }
-        function invoke(): void { if (notificationManager.toasts.length) notificationManager.invoke(notificationManager.toasts[0], "") }
-        function restore(): void { theme.activateFocusedPopupScreen(); theme.notifVisible = true }
-    }
-
-    IpcHandler {
-        target: "health"
-        function ping(): void { }
-    }
-
-    IpcHandler {
         target: "menu"
         function open(route: string): void { theme.openMenu(route || "root") }
         function close(): void { theme.menuVisible = false }
         function toggle(): void {
             if (theme.menuVisible) theme.menuVisible = false
             else theme.openMenu("root")
-        }
-        function ping(): void { }
-    }
-
-    IpcHandler {
-        target: "emoji"
-        function open(): void { theme.openEmojiPicker() }
-        function close(): void { theme.emojiPickerVisible = false }
-        function toggle(): void {
-            if (theme.emojiPickerVisible) theme.emojiPickerVisible = false
-            else theme.openEmojiPicker()
         }
         function ping(): void { }
     }
@@ -109,20 +220,14 @@ ShellRoot {
     }
 
     IpcHandler {
-        target: "clipboard"
+        target: "quickshell-rise-clipboard"
         function open(): void { theme.openClipboard() }
         function close(): void { theme.clipboardVisible = false }
-        function ping(): void { }
-    }
-
-    IpcHandler {
-        target: "capture"
-        function open(): void { theme.captureAction = ""; theme.openCapture() }
-        function close(): void { theme.captureVisible = false }
-        function screenshot(): void { theme.captureAction = "screenshot"; theme.openCapture() }
-        function recording(): void { theme.captureAction = "recording"; theme.openCapture() }
-        function text(): void { theme.captureAction = "text"; theme.openCapture() }
-        function color(): void { theme.captureAction = "color"; theme.openCapture() }
+        function toggle(): void {
+            if (theme.clipboardVisible) theme.clipboardVisible = false
+            else theme.openClipboard()
+        }
+        function state(): string { return theme.clipboardVisible ? "open" : "closed" }
         function ping(): void { }
     }
 
@@ -166,7 +271,7 @@ ShellRoot {
 
     onBarScreensChanged: ensureActivePopupScreen()
     Component.onCompleted: {
-        console.log("shell.qml startup configPath=" + Qt.resolvedUrl("shell.qml"))
+        tryInitialize()
         ensureActivePopupScreen()
     }
 
@@ -304,6 +409,8 @@ ShellRoot {
 
                 root: theme
                 screen: modelData
+                Component.onCompleted: registerBarWindow()
+                Component.onDestruction: unregisterBarWindow()
 
                 BarWindowRecovery {
                     targetWindow: barWindow
@@ -326,38 +433,11 @@ ShellRoot {
         }
     }
 
-    Variants {
-        model: root.barScreens
-
-        delegate: Component {
-            NotificationToastOverlay {
-                required property var modelData
-                root: theme
-                manager: notificationManager
-                targetScreen: modelData
-            }
-        }
-    }
-
-    Variants {
-        model: root.barScreens
-        delegate: Component {
-            HardwareOsdOverlay {
-                required property var modelData
-                root: theme
-                targetScreen: modelData
-            }
-        }
-    }
-
     TooltipOverlay { root: theme }
     OmarchyMenuPanel { root: theme }
     ThemeSwitcherPanel { root: theme }
     WallpaperSwitcherPanel { root: theme }
     HistoryPanel { root: theme }
-    EmojiPickerPanel { root: theme }
-    CapturePanel { root: theme }
-    AppLauncherPanel { root: theme }
     CalendarPopup { root: theme }
     ShellUpdatePanel { root: theme }
     PowerProfilePanel { root: theme }
@@ -366,7 +446,6 @@ ShellRoot {
     AiUsagePanel { root: theme }
     VolumePanel { root: theme }
     TrayPanel { root: theme }
-    NotificationPanel { root: theme; manager: notificationManager }
     NetworkPanel { root: theme }
     BluetoothPanel { root: theme }
     TailscalePanel { root: theme }

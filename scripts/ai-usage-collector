@@ -1,0 +1,563 @@
+#!/usr/bin/env python3
+"""Collect Codex, Claude, and OpenCode usage into one normalized Rise state."""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import json
+import os
+import re
+import select
+import shutil
+import sqlite3
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+SCHEMA_VERSION = 1
+STALE_AFTER_SECONDS = 15 * 60
+HOME = Path(os.environ.get("HOME") or Path.home())
+XDG_STATE_HOME = Path(os.environ.get("XDG_STATE_HOME") or HOME / ".local/state")
+STATE_DIR = XDG_STATE_HOME / "quickshell-rise"
+STATE_FILE = STATE_DIR / "ai-usage.json"
+LOCK_FILE = STATE_DIR / "ai-usage.lock"
+ANSI_RE = re.compile(r"\x1b(?:[@-_][0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def iso_epoch(value: Any) -> int:
+    if isinstance(value, (int, float)):
+        number = int(value)
+        return number // 1000 if number > 10_000_000_000 else number
+    try:
+        text = str(value or "")
+        if not text:
+            return 0
+        if text.isdigit():
+            return iso_epoch(int(text))
+        return int(datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp())
+    except Exception:
+        return 0
+
+
+def iso_from_epoch(value: Any) -> str | None:
+    epoch = iso_epoch(value)
+    if epoch <= 0:
+        return None
+    return datetime.fromtimestamp(epoch, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def write_json_atomic(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    tmp = Path(temporary)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(data, handle, separators=(",", ":"), sort_keys=True)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(tmp, 0o600)
+        json.loads(tmp.read_text(encoding="utf-8"))
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def load_state() -> dict:
+    try:
+        value = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        return value if value.get("schemaVersion") == SCHEMA_VERSION else {}
+    except Exception:
+        return {}
+
+
+def search_path() -> str:
+    roots = [
+        *os.environ.get("PATH", "").split(os.pathsep),
+        str(HOME / ".local/bin"),
+        str(HOME / ".cargo/bin"),
+        str(HOME / ".npm-global/bin"),
+        str(HOME / ".bun/bin"),
+        str(HOME / ".local/share/pnpm"),
+        str(HOME / ".local/share/mise/shims"),
+    ]
+    seen: set[str] = set()
+    return os.pathsep.join(p for p in roots if p and not (p in seen or seen.add(p)))
+
+
+def find_executable(name: str) -> str | None:
+    return shutil.which(name, path=search_path())
+
+
+def base_record(provider: str, executable: str | None) -> dict:
+    return {
+        "provider": provider,
+        "status": "never-collected",
+        "executableFound": executable is not None,
+        "authenticated": None,
+        "collectedAt": utc_now(),
+        "source": None,
+        "errorCode": None,
+        "message": "Collector has not run",
+        "windows": [],
+        "details": {},
+    }
+
+
+def failure(provider: str, executable: str | None, status: str, code: str, message: str,
+            authenticated: bool | None = None, source: str | None = None) -> dict:
+    record = base_record(provider, executable)
+    record.update({
+        "status": status,
+        "authenticated": authenticated,
+        "source": source,
+        "errorCode": code,
+        "message": message,
+    })
+    return record
+
+
+def usage_window(name: str, duration: int, used: Any, reset: Any) -> dict | None:
+    try:
+        used_percent = max(0.0, min(100.0, float(used)))
+    except Exception:
+        return None
+    return {
+        "name": name,
+        "durationMinutes": duration,
+        "usedPercent": round(used_percent, 2),
+        "remainingPercent": round(100.0 - used_percent, 2),
+        "resetsAt": iso_from_epoch(reset),
+    }
+
+
+def strip_ansi(text: str) -> str:
+    return ANSI_RE.sub("", text)
+
+
+def rpc_request(proc: subprocess.Popen, request_id: int, method: str,
+                params: dict | None = None, timeout: float = 6.0) -> dict:
+    assert proc.stdin is not None and proc.stdout is not None
+    proc.stdin.write(json.dumps({"id": request_id, "method": method, "params": params or {}}) + "\n")
+    proc.stdin.flush()
+    deadline = time.monotonic() + timeout
+    saw_non_json = False
+    while time.monotonic() < deadline:
+        ready, _, _ = select.select([proc.stdout], [], [], min(0.25, deadline - time.monotonic()))
+        if not ready:
+            continue
+        line = proc.stdout.readline()
+        if not line:
+            break
+        try:
+            message = json.loads(strip_ansi(line).strip())
+        except Exception:
+            saw_non_json = True
+            continue
+        if message.get("id") == request_id:
+            if message.get("error"):
+                raise RuntimeError(f"{method}: provider returned an RPC error")
+            return message
+    if saw_non_json:
+        raise ValueError(f"{method}: no matching JSON response")
+    raise TimeoutError(method)
+
+
+def codex_rollout() -> dict | None:
+    codex_home = Path(os.environ.get("CODEX_HOME") or HOME / ".codex")
+    newest: Path | None = None
+    newest_mtime = 0.0
+    for root in (codex_home / "sessions", codex_home / "archived_sessions"):
+        if not root.exists():
+            continue
+        for path in root.rglob("*.jsonl"):
+            try:
+                mtime = path.stat().st_mtime
+            except OSError:
+                continue
+            if mtime > newest_mtime:
+                newest, newest_mtime = path, mtime
+    if newest is None:
+        return None
+    latest = None
+    try:
+        with newest.open(encoding="utf-8", errors="replace") as handle:
+            for raw in handle:
+                if '"rate_limits"' not in raw:
+                    continue
+                try:
+                    limits = (json.loads(raw).get("payload") or {}).get("rate_limits")
+                except Exception:
+                    continue
+                if isinstance(limits, dict):
+                    latest = limits
+    except OSError:
+        return None
+    if not latest:
+        return None
+
+    def convert(window: Any) -> dict:
+        if not isinstance(window, dict):
+            return {}
+        return {
+            "usedPercent": window.get("used_percent"),
+            "windowDurationMins": window.get("window_minutes"),
+            "resetsAt": window.get("resets_at"),
+        }
+
+    return {
+        "primary": convert(latest.get("primary")),
+        "secondary": convert(latest.get("secondary")),
+        "credits": latest.get("credits"),
+        "plan": latest.get("plan_type") or "",
+        "source": "codex-rollout",
+    }
+
+
+def codex_rpc(executable: str) -> dict:
+    env = os.environ.copy()
+    env["HOME"] = str(HOME)
+    env["PATH"] = search_path()
+    proc = subprocess.Popen(
+        [executable, "-s", "read-only", "-a", "untrusted", "app-server"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+    try:
+        rpc_request(proc, 1, "initialize", {
+            "clientInfo": {"name": "quickshell-rise-ai-usage", "version": "1"}
+        }, timeout=8)
+        assert proc.stdin is not None
+        proc.stdin.write(json.dumps({"method": "initialized", "params": {}}) + "\n")
+        proc.stdin.flush()
+        account = (rpc_request(proc, 2, "account/read", timeout=5).get("result") or {}).get("account") or {}
+        result = rpc_request(proc, 3, "account/rateLimits/read", timeout=6).get("result") or {}
+        limits = result.get("rateLimits") or {}
+        if not any(isinstance(limits.get(key), dict) for key in ("primary", "secondary")):
+            raise ValueError("rate-limit response has no windows")
+        return {
+            "primary": limits.get("primary") or {},
+            "secondary": limits.get("secondary") or {},
+            "credits": limits.get("credits"),
+            "plan": limits.get("planType") or account.get("planType") or account.get("type") or "",
+            "source": "codex-app-server",
+        }
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=1)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
+def codex_windows(data: dict) -> list[dict]:
+    windows = []
+    for raw in (data.get("primary"), data.get("secondary")):
+        if not isinstance(raw, dict) or raw.get("usedPercent") is None:
+            continue
+        duration = int(raw.get("windowDurationMins") or 0)
+        name = "5h" if duration == 300 else "weekly" if duration == 10080 else f"{duration}m"
+        window = usage_window(name, duration, raw.get("usedPercent"), raw.get("resetsAt"))
+        if window:
+            windows.append(window)
+    return windows
+
+
+def collect_codex() -> dict:
+    executable = find_executable("codex")
+    auth_file = Path(os.environ.get("CODEX_HOME") or HOME / ".codex") / "auth.json"
+    if executable is None:
+        return failure("codex", None, "unavailable", "executable-not-found", "Codex CLI is not installed")
+    if not auth_file.is_file():
+        return failure("codex", executable, "unauthenticated", "authentication-missing",
+                       "Codex is installed but not authenticated", False)
+    try:
+        data = codex_rpc(executable)
+    except TimeoutError:
+        data = codex_rollout()
+        if data is None:
+            return failure("codex", executable, "timed-out", "provider-timeout",
+                           "Codex rate-limit request timed out", True)
+    except ValueError:
+        data = codex_rollout()
+        if data is None:
+            return failure("codex", executable, "parse-failed", "response-invalid",
+                           "Codex returned an unreadable rate-limit response", True)
+    except Exception:
+        data = codex_rollout()
+        if data is None:
+            return failure("codex", executable, "command-failed", "provider-command-failed",
+                           "Codex could not provide rate-limit data", True)
+    windows = codex_windows(data)
+    credits = data.get("credits")
+    credit_available = isinstance(credits, dict) and credits.get("balance") is not None
+    if not windows and not credit_available:
+        return failure("codex", executable, "never-collected", "no-usage-data",
+                       "Codex has not recorded rate-limit data yet", True, data.get("source"))
+    record = base_record("codex", executable)
+    record.update({
+        "status": "ok",
+        "authenticated": True,
+        "source": data.get("source"),
+        "errorCode": None,
+        "message": None,
+        "windows": windows,
+        "details": {
+            "plan": str(data.get("plan") or ""),
+            "creditsAvailable": credit_available,
+            "creditsRemaining": str(credits.get("balance")) if credit_available else "",
+        },
+    })
+    return record
+
+
+def claude_credentials() -> tuple[str | None, str | None]:
+    path = HOME / ".claude/.credentials.json"
+    if not path.is_file():
+        return None, "authentication-missing"
+    try:
+        token = json.loads(path.read_text(encoding="utf-8"))["claudeAiOauth"]["accessToken"]
+        return (str(token), None) if token else (None, "authentication-missing")
+    except Exception:
+        return None, "authentication-invalid"
+
+
+def collect_claude() -> dict:
+    executable = find_executable("claude")
+    token, auth_error = claude_credentials()
+    if executable is None:
+        return failure("claude", None, "unavailable", "executable-not-found", "Claude CLI is not installed")
+    if token is None:
+        message = "Claude is installed but not authenticated" if auth_error == "authentication-missing" \
+            else "Claude credentials could not be read"
+        status = "unauthenticated" if auth_error == "authentication-missing" else "parse-failed"
+        return failure("claude", executable, status, auth_error or "authentication-missing", message, False)
+    request = urllib.request.Request(
+        "https://api.anthropic.com/api/oauth/usage",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "anthropic-beta": "oauth-2025-04-20",
+            "User-Agent": "claude-code/quickshell-rise",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            data = json.loads(response.read())
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            return failure("claude", executable, "unauthenticated", "authentication-rejected",
+                           "Claude authentication was rejected", False)
+        return failure("claude", executable, "command-failed", "provider-http-error",
+                       "Claude usage service returned an error", True)
+    except json.JSONDecodeError:
+        return failure("claude", executable, "parse-failed", "response-invalid",
+                       "Claude returned an unreadable usage response", True)
+    except Exception:
+        return failure("claude", executable, "command-failed", "provider-command-failed",
+                       "Claude usage could not be collected", True)
+    windows = []
+    for key, name, duration in (("five_hour", "5h", 300), ("seven_day", "7d", 10080)):
+        raw = data.get(key)
+        if not isinstance(raw, dict) or raw.get("utilization") is None:
+            continue
+        window = usage_window(name, duration, raw.get("utilization"), raw.get("resets_at"))
+        if window:
+            windows.append(window)
+    if not windows:
+        return failure("claude", executable, "never-collected", "no-usage-data",
+                       "Claude returned no quota windows", True, "claude-oauth")
+    record = base_record("claude", executable)
+    record.update({
+        "status": "ok",
+        "authenticated": True,
+        "source": "claude-oauth",
+        "errorCode": None,
+        "message": None,
+        "windows": windows,
+        "details": {},
+    })
+    return record
+
+
+def opencode_messages(connection: sqlite3.Connection, since_ms: int) -> tuple[int, str, list[dict]]:
+    rows = connection.execute(
+        "select time_updated, data from message where time_updated >= ? order by time_updated asc",
+        (since_ms,),
+    ).fetchall()
+    total = 0
+    newest_model = ""
+    by_model: dict[str, int] = {}
+    for _, raw in rows:
+        try:
+            data = json.loads(raw or "{}")
+        except Exception:
+            continue
+        if data.get("role") != "assistant":
+            continue
+        tokens = data.get("tokens") or {}
+        cache = tokens.get("cache") or {}
+        value = sum(int(tokens.get(key) or 0) for key in ("input", "output", "reasoning"))
+        value += int(cache.get("write") or 0)
+        total += value
+        model = str(data.get("modelID") or "")
+        provider = str(data.get("providerID") or "")
+        if model:
+            newest_model = model + (f" ({provider})" if provider else "")
+            by_model[newest_model] = by_model.get(newest_model, 0) + value
+    models = [{"name": name, "total": value} for name, value in sorted(
+        by_model.items(), key=lambda item: item[1], reverse=True)[:6]]
+    return total, newest_model, models
+
+
+def collect_opencode() -> dict:
+    executable = find_executable("opencode")
+    data_dir = Path(os.environ.get("OPENCODE_DATA_DIR") or HOME / ".local/share/opencode")
+    database = data_dir / "opencode.db"
+    if not database.is_file():
+        if executable is None:
+            return failure("opencode", None, "unavailable", "executable-not-found",
+                           "OpenCode is not installed and no local usage database exists")
+        return failure("opencode", executable, "never-collected", "no-usage-data",
+                       "OpenCode has not recorded local usage yet")
+    now = time.time()
+    try:
+        connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True, timeout=2)
+        connection.execute("pragma busy_timeout=2000")
+        five, model, models = opencode_messages(connection, int((now - 5 * 3600) * 1000))
+        seven, _, _ = opencode_messages(connection, int((now - 7 * 86400) * 1000))
+        today, _, _ = opencode_messages(
+            connection,
+            int(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp() * 1000),
+        )
+        connection.close()
+    except sqlite3.DatabaseError:
+        return failure("opencode", executable, "parse-failed", "database-invalid",
+                       "OpenCode usage database could not be parsed")
+    except sqlite3.Error:
+        return failure("opencode", executable, "command-failed", "database-unavailable",
+                       "OpenCode usage database could not be read")
+    limit5 = max(1, int(os.environ.get("OPENCODE_USAGE_5H_LIMIT", "1000000")))
+    limit7 = max(1, int(os.environ.get("OPENCODE_USAGE_7D_LIMIT", "20000000")))
+    record = base_record("opencode", executable)
+    record.update({
+        "status": "ok",
+        "authenticated": None,
+        "source": "opencode-sqlite",
+        "errorCode": None,
+        "message": None,
+        "windows": [
+            usage_window("5h soft cap", 300, min(100, five * 100 / limit5), None),
+            usage_window("7d soft cap", 10080, min(100, seven * 100 / limit7), None),
+        ],
+        "details": {
+            "plan": "local soft caps",
+            "model": model,
+            "models": models,
+            "tokens5h": five,
+            "tokens7d": seven,
+            "tokensToday": today,
+            "limit5h": limit5,
+            "limit7d": limit7,
+        },
+    })
+    return record
+
+
+COLLECTORS = {
+    "codex": collect_codex,
+    "claude": collect_claude,
+    "opencode": collect_opencode,
+}
+
+
+def merge_result(previous: dict, current: dict) -> dict:
+    old_success = previous.get("lastSuccess") if isinstance(previous, dict) else None
+    if current.get("status") == "ok":
+        current["lastSuccess"] = {
+            key: value for key, value in current.items() if key != "lastSuccess"
+        }
+    elif isinstance(old_success, dict):
+        current["lastSuccess"] = old_success
+    else:
+        current["lastSuccess"] = None
+    return current
+
+
+def collect(selected: list[str] | None = None) -> dict:
+    old = load_state()
+    old_providers = old.get("providers") if isinstance(old.get("providers"), dict) else {}
+    providers = dict(old_providers)
+    started = utc_now()
+    for name in selected or list(COLLECTORS):
+        try:
+            current = COLLECTORS[name]()
+        except Exception:
+            current = failure(name, find_executable(name), "command-failed", "collector-failed",
+                              f"{name.title()} collector failed")
+        providers[name] = merge_result(old_providers.get(name, {}), current)
+    state = {
+        "schemaVersion": SCHEMA_VERSION,
+        "lastRefreshStartedAt": started,
+        "updatedAt": utc_now(),
+        "staleAfterSeconds": STALE_AFTER_SECONDS,
+        "providers": providers,
+    }
+    write_json_atomic(STATE_FILE, state)
+    return state
+
+
+def diagnostics(state: dict, running: bool = False) -> dict:
+    providers = {}
+    for name, record in (state.get("providers") or {}).items():
+        providers[name] = {
+            "status": record.get("status", "never-collected"),
+            "executableFound": bool(record.get("executableFound")),
+            "cacheReadable": STATE_FILE.is_file() and os.access(STATE_FILE, os.R_OK),
+            "collectedAt": record.get("collectedAt"),
+            "errorCode": record.get("errorCode"),
+            "source": record.get("source"),
+        }
+    return {
+        "initialized": state.get("schemaVersion") == SCHEMA_VERSION,
+        "collectorRunning": running,
+        "lastRefreshStartedAt": state.get("lastRefreshStartedAt"),
+        "statePath": str(STATE_FILE),
+        "providers": providers,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--provider", action="append", choices=sorted(COLLECTORS))
+    parser.add_argument("--diagnose", action="store_true")
+    args = parser.parse_args()
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    with LOCK_FILE.open("a+", encoding="utf-8") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            if args.diagnose:
+                print(json.dumps(diagnostics(load_state(), True), separators=(",", ":")))
+            return 75
+        state = load_state() if args.diagnose else collect(args.provider)
+        if args.diagnose:
+            print(json.dumps(diagnostics(state), separators=(",", ":")))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

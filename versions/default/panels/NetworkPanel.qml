@@ -1,843 +1,769 @@
 import QtQuick
-import "../modules"
+import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import "../IconMap.js" as IconMap
+import "../modules"
 
 PanelWindow {
-    id: netPanel
+    id: panel
     required property var root
 
-    screen: root.activePopupScreen
+    readonly property var network: root.network
+    property real reveal: root.networkVisible ? 1 : 0
+    property int selectedIndex: network.nearbyNetworks.length > 0 ? 0 : -1
+    property int dnsIndex: Math.max(0, dnsProviders.indexOf(network.dnsMode))
+    property string focusSection: "wifi"
+    property string passwordSsid: ""
+    property string passwordText: ""
+    property bool revealPassword: false
+    property bool customDnsOpen: false
+    property string customDnsText: ""
+    property var passwordNetwork: null
+    property int phraseIndex: 0
+    readonly property var dnsProviders: ["DHCP", "Cloudflare", "Google", "Custom"]
+    readonly property var phrases: [
+        "ROUTING CRUMBS", "HANDLING PACKETS", "SORTING FRAMES",
+        "HAULING BYTES", "BENDING LIGHT"
+    ]
 
+    screen: root.activePopupScreen
     color: "transparent"
     anchors { top: true; bottom: true; left: true; right: true }
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "omarchy-network"
+    WlrLayershell.namespace: "quickshell-rise-network"
+    WlrLayershell.keyboardFocus: root.networkVisible
+        ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    visible: reveal > 0.001
 
-    readonly property int barBottom: 35
-    readonly property int gap: 8
-
-    property string mode:  "none"   // wifi | ethernet | none
-    property string ssid:  ""
-    property int    signal: 0
-    property string iface: ""
-    property string ipAddr: ""
-    property string freq:  ""
-
-    property string wdev:   ""      // wifi device name (e.g. wlan0)
-    property bool   hasWifi: false
-    property bool   scanning: false
-    property var    networks: []    // [{conn, ssid, sec, sig}]
-    property var    known:   []     // known ssids
-    property var    savedNetworks: [] // known networks, enriched by the active scan
-    property string wifiTab: "available"
-
-    // ── wifi radio ──
-    property bool   wifiBlocked: false
-
-    // ── link speed (negotiated connection rate) ──
-    property string linkSpeed:   ""
-
-    function flagForCountry(code) {
-        var value = (code || "").toUpperCase()
-        if (!/^[A-Z]{2}$/.test(value)) return ""
-        return String.fromCharCode(
-            0xD83C, 0xDDE6 + value.charCodeAt(0) - 65,
-            0xD83C, 0xDDE6 + value.charCodeAt(1) - 65)
-    }
-
-    function formatMbps(value) {
-        if (!(value > 0)) return "—"
-        return (value >= 100 ? value.toFixed(0) : value.toFixed(1)) + " Mbps"
-    }
-
-    function formatPing(value) {
-        if (!(value > 0)) return "—"
-        return (value < 10 ? value.toFixed(1) : value.toFixed(0)) + " ms"
-    }
-
-    function edgeText() {
-        if (speedTest.phase === "idle" || speedTest.phase === "cancelled") return "Not tested"
-        if (speedTest.phase === "offline") return "Offline"
-        if (speedTest.phase === "error" || speedTest.phase === "timeout") return "Unavailable"
-        if (speedTest.phase === "latency") return "Locating…"
-        var edge = speedTest.edgeCode !== "" ? "Cloudflare · " + speedTest.edgeCode : "Cloudflare Edge"
-        var flag = flagForCountry(speedTest.countryCode)
-        return edge + (flag !== "" ? " " + flag : "")
-    }
-
-    // timestamp captured when a run completes — shown in the green "done" footer
-    property string lastTestStamp: ""
-
-    CloudflareSpeedTest {
-        id: speedTest
-        // live, 2 s-polled source (NetworkWidget → root.networkMode mirror) so a mid-test
-        // disconnect flips online→false at once and onOnlineChanged shows "Offline",
-        // instead of surfacing later as an XHR error/timeout. netPanel.mode (open-only) stays
-        // the source for the panel's detail rows.
-        online: root.networkMode !== "none"
-    }
-
-    Connections {
-        target: speedTest
-        function onPhaseChanged() {
-            if (speedTest.phase === "success")
-                netPanel.lastTestStamp = new Date().toLocaleString(Qt.locale("en_US"), "HH:mm · d MMM")
-        }
-    }
-
-    // ✓ marks show only on a healthy run (in progress or finished ok) — never on error/cancel/offline
-    readonly property bool speedRunOk: speedTest.running || speedTest.phase === "success"
-    property bool speedDetailsVisible: false
-
-    function toggleWifi() {
-        var wasBlocked = netPanel.wifiBlocked
-        rfkillToggle.command = ["bash", "-c", wasBlocked ? "rfkill unblock wifi" : "rfkill block wifi"]
-        rfkillToggle.running = false; rfkillToggle.running = true
-        netPanel.wifiBlocked = !wasBlocked      // optimistic; rfkillState corrects
-        Qt.callLater(function() {
-            rfkillState.running = false; rfkillState.running = true
-            netData.running = false; netData.running = true
-            if (wasBlocked) netPanel.scan()     // just turned ON → look for networks
-        })
-    }
-
-    function scan() {
-        if (scanning || wifiBlocked || root.useNM) return   // NM: no iwctl scan
-        scanning = true
-        scanProc.running = false
-        scanProc.running = true
-        scanWatchdog.restart()        // never stay stuck in "scanning"
-    }
-
-    function connectTo(ssid, sec) {
-        var isKnown = known.indexOf(ssid) >= 0
-        if (sec === "open" || isKnown) {
-            if (!netPanel.wdev) return
-            // argv form (no shell) → a crafted SSID cannot inject commands
-            connectProc.command = ["iwctl", "station", netPanel.wdev, "connect", ssid]
-            connectProc.running = false
-            connectProc.running = true
-            // re-scan shortly to reflect new connection
-            rescanTimer.restart()
-        } else {
-            // unknown secured network — needs passphrase → open impala
-            root.networkVisible = false
-            wifiRunner.running = false
-            wifiRunner.running = true
-        }
-    }
-
-    property real reveal: root.networkVisible ? 1 : 0
     Behavior on reveal {
         NumberAnimation {
             duration: root.networkVisible ? 160 : 120
             easing.type: root.networkVisible ? Easing.OutCubic : Easing.InCubic
         }
     }
-    visible: reveal > 0.001
-    WlrLayershell.keyboardFocus: root.networkVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-    MouseArea { anchors.fill: parent; onClicked: root.networkVisible = false }
+    function closePanel() {
+        passwordSsid = ""
+        passwordText = ""
+        passwordNetwork = null
+        revealPassword = false
+        customDnsOpen = false
+        root.networkVisible = false
+    }
+
+    function headerDetail() {
+        if (network.connectionType === "ethernet" && network.connectionSpeedMbps > 0) {
+            var speed = network.connectionSpeedMbps
+            return speed >= 1000 ? (speed / 1000).toFixed(speed % 1000 === 0 ? 0 : 1)
+                + "gbit" : speed + "mbit"
+        }
+        if (network.connectionType === "wifi" && network.wifiFrequencyMHz > 0) {
+            var frequency = network.wifiFrequencyMHz
+            if (frequency >= 5925) return "6 GHz"
+            if (frequency >= 4900) return "5 GHz"
+            return "2.4 GHz"
+        }
+        return ""
+    }
+
+    function headerTitle() {
+        if (!network.installed) return "Network unavailable"
+        if (!network.wifiEnabled && !network.connected) return "Networking disabled"
+        var title = network.connectionType === "ethernet" ? "Ethernet"
+            : network.connectionType === "wifi" ? "Wi-Fi"
+            : network.needsAttention ? "Limited connectivity" : "Disconnected"
+        var detail = headerDetail()
+        return detail === "" ? title : title + " (" + detail + ")"
+    }
+
+    function iconName() {
+        if (network.connectionType === "ethernet") return "lan"
+        return network.connected ? "signal_wifi_4_bar" : "signal_wifi_off"
+    }
+
+    function metric(value, suffix, decimals) {
+        if (value < 0 || !isFinite(value)) return "Unavailable"
+        return Number(value).toFixed(decimals) + suffix
+    }
+
+    function wifiIcon(strength) {
+        if (strength >= 75) return "signal_wifi_4_bar"
+        if (strength >= 50) return "network_wifi_3_bar"
+        if (strength >= 25) return "network_wifi_2_bar"
+        return "network_wifi_1_bar"
+    }
+
+    function selectedNetwork() {
+        if (selectedIndex < 0 || selectedIndex >= network.nearbyNetworks.length) return null
+        return network.nearbyNetworks[selectedIndex]
+    }
+
+    function activateNetwork(entry) {
+        if (!entry || network.busy) return
+        if (entry.enterprise) {
+            network.lastError = "Enterprise Wi-Fi requires the Omarchy network manager"
+            network.lastErrorCode = "enterprise-wifi-unsupported"
+            return
+        }
+        if (entry.secured && !entry.known) {
+            passwordSsid = entry.ssid
+            passwordNetwork = entry
+            passwordText = ""
+            revealPassword = false
+            Qt.callLater(function() { passwordInput.forceActiveFocus() })
+            return
+        }
+        network.connectNetwork(entry, "")
+    }
+
+    function submitPassword() {
+        var entry = passwordNetwork
+        if (!entry || entry.ssid !== passwordSsid || passwordText === "") return
+        var secret = passwordText
+        passwordText = ""
+        passwordSsid = ""
+        passwordNetwork = null
+        network.connectNetwork(entry, secret)
+        secret = ""
+        card.forceActiveFocus()
+    }
+
+    function activateDns(provider) {
+        if (provider === "Custom") {
+            network.runCustomDns("")
+            closePanel()
+        } else {
+            network.setDns(provider)
+            // Match Quattro: release the exclusive panel focus immediately so
+            // the system polkit authentication dialog can receive input.
+            closePanel()
+        }
+    }
+
+    function submitCustomDns() {
+        if (!network.validCustomDns(customDnsText)) return
+        var value = customDnsText
+        customDnsText = ""
+        customDnsOpen = false
+        network.runCustomDns(value)
+        card.forceActiveFocus()
+    }
+
+    function moveSelection(delta) {
+        focusSection = "wifi"
+        if (network.nearbyNetworks.length === 0) {
+            selectedIndex = -1
+            return
+        }
+        selectedIndex = Math.max(0, Math.min(network.nearbyNetworks.length - 1,
+            (selectedIndex < 0 ? 0 : selectedIndex) + delta))
+        networkList.positionViewAtIndex(selectedIndex, ListView.Contain)
+    }
+
+    onVisibleChanged: if (visible) {
+        selectedIndex = network.nearbyNetworks.length > 0 ? 0 : -1
+        dnsIndex = Math.max(0, dnsProviders.indexOf(network.dnsMode))
+        network.refresh(true)
+        Qt.callLater(function() { card.forceActiveFocus() })
+    }
+
+    Connections {
+        target: network
+        function onNearbyNetworksChanged() {
+            if (network.nearbyNetworks.length === 0) panel.selectedIndex = -1
+            else if (panel.selectedIndex < 0
+                     || panel.selectedIndex >= network.nearbyNetworks.length)
+                panel.selectedIndex = 0
+        }
+    }
+
+    Timer {
+        interval: 2800
+        running: root.networkVisible && network.connected
+        repeat: true
+        onTriggered: panel.phraseIndex = (panel.phraseIndex + 1) % panel.phrases.length
+    }
+
+    IpcHandler {
+        target: "quickshell-rise-network"
+        function open(): string {
+            root.activateFocusedPopupScreen()
+            root.networkVisible = true
+            return "opened"
+        }
+        function close(): string { panel.closePanel(); return "closed" }
+        function refresh(): string { network.refresh(true); return "refreshing" }
+        function speedTest(): string {
+            if (!network.speedTestAvailable || !network.connected) return "unavailable"
+            network.runSpeedTest()
+            return "started"
+        }
+        function setDns(provider: string): string {
+            if (["DHCP", "Cloudflare", "Google"].indexOf(provider) < 0)
+                return "invalid-provider"
+            network.setDns(provider)
+            return network.dnsBusy ? "started" : "unavailable"
+        }
+        function state(): string {
+            return JSON.stringify({
+                visible: root.networkVisible,
+                connected: network.connected,
+                connectionType: network.connectionType,
+                interfaceName: network.interfaceName,
+                connectivity: network.connectivity,
+                nearbyNetworkCount: network.nearbyNetworks.length,
+                dnsMode: network.dnsMode,
+                dnsBusy: network.dnsBusy,
+                scanning: network.scanning,
+                speedTestRunning: network.speedTestRunning,
+                speedTestPhase: network.speedTestPhase,
+                speedTestDownloadMbps: network.speedTestDownloadMbps,
+                speedTestUploadMbps: network.speedTestUploadMbps,
+                speedTestError: network.speedTestError
+            })
+        }
+    }
+
+    MouseArea { anchors.fill: parent; onClicked: panel.closePanel() }
 
     Rectangle {
         id: card
-        width: 300
-        height: col.implicitHeight + 24
-        radius: reveal > 0.001 ? root.pillRadius : 0
+        width: Math.min(390, panel.width - 12)
+        height: Math.min(content.implicitHeight + 24, panel.height - 92)
+        x: Math.round(Math.max(6, Math.min(
+            root.networkBarX - width / 2, panel.width - width - 6)))
+        y: root.barPosition === "bottom"
+            ? panel.height - 35 - 8 - height : 35 + 8
+        radius: panel.reveal > 0.001 ? root.pillRadius : 0
         color: root.bg
         border.color: root.pillBorder
         border.width: root.pillBorderW
+        opacity: panel.reveal
+        focus: root.networkVisible
+        clip: true
         PillShadow { theme: root }
 
-        x: Math.round(Math.max(6, Math.min(root.networkBarX - width / 2, parent.width - width - 6)))
-        y: root.barPosition === "bottom" ? (parent.height - barBottom - gap - height) : (barBottom + gap)
-        opacity: netPanel.reveal
-        focus: root.networkVisible
-
         Keys.onPressed: function(event) {
-            if (event.key === Qt.Key_Escape) { root.networkVisible = false; event.accepted = true }
+            if (passwordSsid !== "" || customDnsOpen) {
+                if (event.key === Qt.Key_Escape) {
+                    passwordSsid = ""
+                    passwordText = ""
+                    passwordNetwork = null
+                    customDnsOpen = false
+                    customDnsText = ""
+                    card.forceActiveFocus()
+                    event.accepted = true
+                }
+                return
+            }
+            if (event.key === Qt.Key_Escape) closePanel()
+            else if (event.key === Qt.Key_Down || event.key === Qt.Key_J) moveSelection(1)
+            else if (event.key === Qt.Key_Up || event.key === Qt.Key_K) moveSelection(-1)
+            else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
+                     || event.key === Qt.Key_Space) activateNetwork(selectedNetwork())
+            else if (event.key === Qt.Key_R) network.refresh(true)
+            else if (event.key === Qt.Key_S) network.runSpeedTest()
+            else if (event.key === Qt.Key_D) focusSection = "dns"
+            else if (event.key === Qt.Key_T) network.toggleNetwork()
+            else return
+            event.accepted = true
         }
 
-        MouseArea { anchors.fill: parent; onClicked: {} }
+        MouseArea {
+            anchors.fill: parent
+            onClicked: function(mouse) { mouse.accepted = true }
+        }
 
-        Column {
-            id: col
+        Flickable {
             anchors.fill: parent
             anchors.margins: 12
-            spacing: 8
+            contentWidth: width
+            contentHeight: content.implicitHeight
+            boundsBehavior: Flickable.StopAtBounds
+            flickableDirection: Flickable.VerticalFlick
+            clip: true
+            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-            // ── header ──
-            Item {
+            Column {
+                id: content
                 width: parent.width
-                height: 24
-                UiText {
-                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                    text: "Network"
-                    color: root.ink; font.family: root.mono; font.pixelSize: 13
-                    font.letterSpacing: 2; font.weight: Font.Medium
-                }
-                UiText {
-                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                    text: "✕"; color: closeMa.containsMouse ? root.seal : root.sumi; font.pixelSize: 12
-                    Behavior on color { ColorAnimation { duration: 120 } }
-                    MouseArea { id: closeMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.networkVisible = false }
-                }
-            }
+                spacing: 10
 
-            Rectangle { width: parent.width; height: 1; color: root.sep }
+                Row {
+                    width: parent.width
+                    height: 44
+                    spacing: 10
 
-            // ── status ──
-            Item {
-                width: parent.width
-                height: 30
-                UiText {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.top
-                    text: {
-                        if (netPanel.mode === "wifi")     return netPanel.signal + "%"
-                        if (netPanel.mode === "ethernet") return "Connected"
-                        return "Offline"
-                    }
-                    color: netPanel.mode === "none" ? root.sumi : root.seal
-                    font.family: root.mono; font.pixelSize: 11; font.weight: Font.Medium
-                }
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    width: parent.width; height: 8; radius: 4
-                    color: root.fillActive
                     Rectangle {
-                        width: parent.width * (netPanel.mode === "wifi" ? netPanel.signal / 100 : (netPanel.mode === "ethernet" ? 1 : 0))
-                        height: parent.height; radius: 4; color: root.seal
-                        Behavior on width { NumberAnimation { duration: 300 } }
+                        width: 34; height: 34; radius: 17
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: Qt.rgba(root.seal.r, root.seal.g, root.seal.b, 0.13)
+                        IconText {
+                            anchors.centerIn: parent
+                            text: IconMap.icon(panel.iconName())
+                            color: network.needsAttention ? root.sealRaw
+                                : network.connected ? root.seal : root.sumi
+                            font.pixelSize: 21
+                        }
+                    }
+
+                    Column {
+                        width: parent.width - 94
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 2
+                        Text {
+                            width: parent.width
+                            text: panel.headerTitle()
+                            color: root.ink
+                            font.family: root.mono
+                            font.pixelSize: 14
+                            font.bold: true
+                            elide: Text.ElideRight
+                        }
+                        Text {
+                            width: parent.width
+                            text: network.connected ? panel.phrases[panel.phraseIndex]
+                                : network.connectivity.toUpperCase()
+                            color: network.needsAttention ? root.sealRaw : root.sumi
+                            font.family: root.mono
+                            font.pixelSize: 9
+                            font.bold: true
+                            font.letterSpacing: 1.1
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Rectangle {
+                        width: 38; height: 20; radius: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: network.wifiDevice !== null
+                        color: network.wifiEnabled ? root.seal : root.pill
+                        border.color: root.pillBorder
+                        border.width: 1
+                        opacity: network.toggling ? 0.55 : 1
+                        Rectangle {
+                            width: 14; height: 14; radius: 7; y: 3
+                            x: network.wifiEnabled ? parent.width - width - 3 : 3
+                            color: network.wifiEnabled ? root.bg : root.sumi
+                            Behavior on x { NumberAnimation { duration: 120 } }
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: !network.toggling
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: network.toggleNetwork()
+                        }
                     }
                 }
-            }
 
-            // ── details ──
-            Column {
-                width: parent.width
-                spacing: 4
-                Row {
+                Text {
                     width: parent.width
-                    visible: netPanel.mode === "wifi"
-                    UiText { text: "SSID"; color: root.sumiHi; font.family: root.mono; font.pixelSize: 11; width: parent.width * 0.4 }
-                    UiText { text: netPanel.ssid; color: root.ink; font.family: root.mono; font.pixelSize: 11; width: parent.width * 0.6; elide: Text.ElideRight }
+                    visible: network.lastError !== ""
+                    text: network.lastError
+                    color: root.sealRaw
+                    font.family: root.mono
+                    font.pixelSize: 9
+                    wrapMode: Text.Wrap
                 }
-                Row {
-                    width: parent.width
-                    UiText { text: "Type"; color: root.sumiHi; font.family: root.mono; font.pixelSize: 11; width: parent.width * 0.4 }
-                    UiText {
-                        text: netPanel.mode === "wifi" ? "Wi-Fi" : (netPanel.mode === "ethernet" ? "Ethernet" : "—")
-                        color: root.ink; font.family: root.mono; font.pixelSize: 11
-                    }
-                }
-                Row {
-                    width: parent.width
-                    visible: netPanel.iface !== ""
-                    UiText { text: "Interface"; color: root.sumiHi; font.family: root.mono; font.pixelSize: 11; width: parent.width * 0.4 }
-                    UiText { text: netPanel.iface; color: root.ink; font.family: root.mono; font.pixelSize: 11 }
-                }
-                Row {
-                    width: parent.width
-                    visible: netPanel.ipAddr !== ""
-                    UiText { text: "IP"; color: root.sumiHi; font.family: root.mono; font.pixelSize: 11; width: parent.width * 0.4 }
-                    UiText { text: netPanel.ipAddr; color: root.ink; font.family: root.mono; font.pixelSize: 11 }
-                }
-                Row {
-                    width: parent.width
-                    visible: netPanel.mode === "wifi" && netPanel.freq !== ""
-                    UiText { text: "Frequency"; color: root.sumiHi; font.family: root.mono; font.pixelSize: 11; width: parent.width * 0.4 }
-                    UiText { text: netPanel.freq; color: root.ink; font.family: root.mono; font.pixelSize: 11 }
-                }
-                Row {
-                    width: parent.width
-                    visible: netPanel.linkSpeed !== ""
-                    UiText { text: "Link speed"; color: root.sumiHi; font.family: root.mono; font.pixelSize: 11; width: parent.width * 0.4 }
-                    UiText { text: netPanel.linkSpeed; color: root.ink; font.family: root.mono; font.pixelSize: 11 }
-                }
-            }
 
-            Rectangle { width: parent.width; height: 1; color: root.sep }
+                Grid {
+                    width: parent.width
+                    columns: 4
+                    columnSpacing: 10
+                    rowSpacing: 5
 
-            Column {
-                width: parent.width
-                spacing: 4
+                    MetricLabel { text: "Ping" }
+                    MetricValue { text: panel.metric(network.pingMs, " ms", network.pingMs > 0 && network.pingMs < 10 ? 1 : 0) }
+                    MetricLabel { text: "Packet Loss" }
+                    MetricValue { text: network.packetLossPercent < 0 ? "Unavailable" : network.packetLossPercent + "%"; warning: network.packetLossPercent > 0 }
+                    MetricLabel { text: "Receiving" }
+                    MetricValue { text: network.formatRate(network.receiveRateBytes) }
+                    MetricLabel { text: "Sending" }
+                    MetricValue { text: network.formatRate(network.transmitRateBytes) }
+                    MetricLabel { text: "Downloaded" }
+                    MetricValue { text: network.formatBytes(network.receivedTotalBytes) }
+                    MetricLabel { text: "Uploaded" }
+                    MetricValue { text: network.formatBytes(network.transmittedTotalBytes) }
+                    MetricLabel { text: "IP Address" }
+                    MetricValue { text: network.ipAddress || "—" }
+                    MetricLabel { text: "Gateway" }
+                    MetricValue { text: network.gateway || "—" }
+                }
+
+                Rectangle { width: parent.width; height: 1; color: root.sep }
 
                 Item {
                     width: parent.width
-                    height: 24
-
-                    UiText {
+                    height: 27
+                    Text {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
                         text: "SPEED TEST"
-                        color: root.sumiHi
+                        color: root.sumi
                         font.family: root.mono
-                        font.pixelSize: 10
-                        font.letterSpacing: 1
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 1.3
                     }
-
-                    // action: a real button in the panel's hover idiom (network-row style)
                     Rectangle {
+                        width: runLabel.implicitWidth + 16
+                        height: 25
+                        radius: 6
                         anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 54
-                        height: 22
-                        radius: root.tileRadius
-                        color: speedTestMa.containsMouse ? root.fillHover : root.fillIdle
-                        border.color: speedTestMa.containsMouse ? root.seal : root.sep
+                        color: runMouse.containsMouse && runMouse.enabled ? root.seal : root.pill
+                        border.color: root.pillBorder
                         border.width: 1
-                        Behavior on color { ColorAnimation { duration: 120 } }
-
-                        UiText {
+                        Text {
+                            id: runLabel
                             anchors.centerIn: parent
-                            text: speedTest.running ? "stop" : "start"
-                            color: speedTestMa.enabled ? root.seal : root.sumi
+                            text: network.speedTestRunning ? "Running…"
+                                : network.speedTestAvailable ? "Run" : "Unavailable"
+                            color: runMouse.containsMouse && runMouse.enabled ? root.bg : root.ink
                             font.family: root.mono
-                            font.pixelSize: 11
+                            font.pixelSize: 9
                         }
-
                         MouseArea {
-                            id: speedTestMa
+                            id: runMouse
                             anchors.fill: parent
-                            enabled: speedTest.running || netPanel.mode !== "none"
                             hoverEnabled: true
+                            enabled: network.speedTestAvailable && network.connected
+                                && !network.speedTestRunning
                             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: {
-                                if (speedTest.running) {
-                                    speedTest.cancel()
-                                    netPanel.speedDetailsVisible = false
-                                } else {
-                                    netPanel.speedDetailsVisible = true
-                                    speedTest.start()
-                                }
-                            }
+                            onClicked: network.runSpeedTest()
                         }
                     }
                 }
-
-                Item {
-                    id: speedDetailsContainer
-                    width: parent.width
-                    height: netPanel.speedDetailsVisible ? speedDetails.implicitHeight : 0
-                    clip: true
-                    Behavior on height { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-
-                    Column {
-                        id: speedDetails
-                        width: parent.width
-                        spacing: 4
 
                 Row {
                     width: parent.width
-                    UiText { text: "Edge"; color: root.sumiHi; font.family: root.mono; font.pixelSize: 11; width: parent.width * 0.4 }
-                    UiText { text: netPanel.edgeText(); color: root.ink; font.family: root.mono; font.pixelSize: 11; width: parent.width * 0.6; elide: Text.ElideRight }
-                }
-                Item {
-                    width: parent.width; height: 16
-                    UiText {
-                        id: pingLabel
-                        anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                        text: "Ping"; color: root.sumiHi; font.family: root.mono; font.pixelSize: 11
-                        width: parent.width * 0.4
+                    visible: network.speedTestDownloadMbps >= 0
+                        || network.speedTestUploadMbps >= 0 || network.speedTestError !== ""
+                    spacing: 12
+                    Text {
+                        text: network.speedTestDownloadMbps >= 0
+                            ? "↓ " + network.speedTestDownloadMbps.toFixed(1) + " Mbps" : "↓ —"
+                        color: root.seal; font.family: root.mono; font.pixelSize: 10
                     }
-                    UiText {
-                        anchors.left: pingLabel.right; anchors.right: pingCheck.left; anchors.rightMargin: 6
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: speedTest.phase === "latency" ? "Testing…" : (netPanel.speedRunOk ? netPanel.formatPing(speedTest.pingMs) : "—")
-                        color: root.ink; font.family: root.mono; font.pixelSize: 11; elide: Text.ElideRight
+                    Text {
+                        text: network.speedTestUploadMbps >= 0
+                            ? "↑ " + network.speedTestUploadMbps.toFixed(1) + " Mbps" : "↑ —"
+                        color: root.indigo; font.family: root.mono; font.pixelSize: 10
                     }
-                    UiText {
-                        id: pingCheck
-                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        text: "✓"; visible: speedTest.pingMs > 0 && netPanel.speedRunOk
-                        color: root.green; font.family: root.mono; font.pixelSize: 11
-                    }
-                }
-                Item {
-                    width: parent.width; height: 16
-                    UiText {
-                        id: dlLabel
-                        anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                        text: "Download"; color: root.sumiHi; font.family: root.mono; font.pixelSize: 11
-                        width: parent.width * 0.4
-                    }
-                    UiText {
-                        anchors.left: dlLabel.right; anchors.right: dlCheck.left; anchors.rightMargin: 6
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: speedTest.phase === "download" ? "Testing…" : (netPanel.speedRunOk ? netPanel.formatMbps(speedTest.downloadMbps) : "—")
-                        color: (speedTest.downloadMbps > 0 && netPanel.speedRunOk) ? root.seal : root.ink
-                        font.family: root.mono; font.pixelSize: 11; elide: Text.ElideRight
-                    }
-                    UiText {
-                        id: dlCheck
-                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        text: "✓"; visible: speedTest.downloadMbps > 0 && netPanel.speedRunOk
-                        color: root.green; font.family: root.mono; font.pixelSize: 11
-                    }
-                }
-                Item {
-                    width: parent.width; height: 16
-                    UiText {
-                        id: ulLabel
-                        anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                        text: "Upload"; color: root.sumiHi; font.family: root.mono; font.pixelSize: 11
-                        width: parent.width * 0.4
-                    }
-                    UiText {
-                        anchors.left: ulLabel.right; anchors.right: ulCheck.left; anchors.rightMargin: 6
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: speedTest.phase === "upload" ? "Testing…" : (netPanel.speedRunOk ? netPanel.formatMbps(speedTest.uploadMbps) : "—")
-                        color: (speedTest.uploadMbps > 0 && netPanel.speedRunOk) ? root.indigo : root.ink
-                        font.family: root.mono; font.pixelSize: 11; elide: Text.ElideRight
-                    }
-                    UiText {
-                        id: ulCheck
-                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        text: "✓"; visible: speedTest.uploadMbps > 0 && netPanel.speedRunOk
-                        color: root.green; font.family: root.mono; font.pixelSize: 11
+                    Text {
+                        visible: network.speedTestError !== ""
+                        text: network.speedTestError
+                        color: root.sealRaw; font.family: root.mono; font.pixelSize: 9
+                        elide: Text.ElideRight
                     }
                 }
 
-                // animated height so the card grows/shrinks smoothly instead of snapping
-                Item {
+                Text {
+                    text: "DNS PROVIDER"
+                    color: root.sumi
+                    font.family: root.mono
+                    font.pixelSize: 9
+                    font.bold: true
+                    font.letterSpacing: 1.3
+                }
+
+                Row {
                     width: parent.width
-                    height: speedFooter.visible ? speedFooter.implicitHeight : 0
-                    clip: true
-                    Behavior on height { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-
-                    UiText {
-                        id: speedFooter
-                        width: parent.width
-                        visible: speedTest.phase === "success" && netPanel.lastTestStamp !== ""
-                        text: "done · " + netPanel.lastTestStamp
-                        color: root.green
-                        font.family: root.mono
-                        font.pixelSize: 10
-                        font.letterSpacing: 1
-                    }
-                }
-                    }
-                }
-            }
-
-            Rectangle { width: parent.width; height: 1; color: root.sep; visible: netPanel.hasWifi }
-
-            // ── wifi radio toggle ──
-            Item {
-                width: parent.width
-                height: 24
-                visible: netPanel.hasWifi
-                UiText {
-                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                    text: "Wi-Fi"
-                    color: root.ink; font.family: root.mono; font.pixelSize: 11
-                }
-                Rectangle {
-                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                    width: 50; height: 22; radius: 11
-                    color: !netPanel.wifiBlocked ? root.fillActive
-                                                 : wifiToggleMa.containsMouse ? root.fillHover
-                                                 : root.fillIdle
-                    border.color: (wifiToggleMa.containsMouse || !netPanel.wifiBlocked) ? root.seal : root.sep
-                    border.width: 1
-                    Behavior on color { ColorAnimation { duration: 120 } }
-                    UiText {
-                        anchors.centerIn: parent
-                        text: netPanel.wifiBlocked ? "OFF" : "ON"
-                        color: !netPanel.wifiBlocked ? root.seal : root.sumi
-                        font.family: root.mono; font.pixelSize: 10; font.weight: Font.Medium
-                    }
-                    MouseArea {
-                        id: wifiToggleMa
-                        anchors.fill: parent; hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: netPanel.toggleWifi()
-                    }
-                }
-            }
-
-            // ── Wi-Fi list tabs ──
-            Item {
-                width: parent.width
-                height: 32
-                visible: netPanel.hasWifi && !netPanel.wifiBlocked && !root.useNM
-
-                Rectangle {
-                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width; height: 28; radius: root.tileRadius
-                    color: root.fillIdle; border.color: root.sep; border.width: 1
-
-                    Row {
-                        id: wifiTabs
-                        anchors.fill: parent; anchors.margins: 2; spacing: 2
-                        Repeater {
-                            model: [ { id: "available", label: "Available" }, { id: "saved", label: "Saved" } ]
-                            delegate: Rectangle {
-                                required property var modelData
-                                width: (wifiTabs.width - wifiTabs.spacing) / 2; height: parent.height
-                                radius: root.tileRadius
-                                color: netPanel.wifiTab === modelData.id
-                                    ? root.fillActive : tabMa.containsMouse ? root.fillHover : "transparent"
-                                border.color: netPanel.wifiTab === modelData.id ? root.seal : "transparent"
-                                border.width: 1
-                                UiText {
-                                    anchors.centerIn: parent; text: modelData.label
-                                    color: netPanel.wifiTab === modelData.id ? root.seal : root.sumiHi
-                                    font.family: root.mono; font.pixelSize: 9
-                                }
-                                MouseArea {
-                                    id: tabMa
-                                    anchors.fill: parent; hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: netPanel.wifiTab = modelData.id
-                                }
+                    spacing: 5
+                    Repeater {
+                        model: panel.dnsProviders
+                        delegate: Rectangle {
+                            required property string modelData
+                            required property int index
+                            width: (content.width - 15) / 4
+                            height: 27
+                            radius: 6
+                            color: network.dnsMode === modelData || (panel.focusSection === "dns" && panel.dnsIndex === index)
+                                ? root.seal : root.pill
+                            border.color: root.pillBorder
+                            border.width: 1
+                            opacity: network.dnsBusy ? 0.55 : 1
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData
+                                color: parent.color === root.seal ? root.bg : root.ink
+                                font.family: root.mono
+                                font.pixelSize: 8
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                enabled: !network.dnsBusy
+                                cursorShape: Qt.PointingHandCursor
+                                onEntered: { panel.focusSection = "dns"; panel.dnsIndex = index }
+                                onClicked: panel.activateDns(modelData)
                             }
                         }
                     }
                 }
-            }
 
-            // ── available/saved network heading ──
-            Item {
-                width: parent.width
-                height: 16
-                visible: netPanel.hasWifi && !netPanel.wifiBlocked && !root.useNM
-                UiText {
-                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                    text: netPanel.wifiTab === "available" ? "AVAILABLE NETWORKS" : "SAVED NETWORKS"
-                    color: root.sumiHi; font.family: root.mono; font.pixelSize: 10; font.letterSpacing: 1
-                }
-                UiText {
-                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                    visible: netPanel.wifiTab === "available"
-                    text: netPanel.scanning ? "scanning…" : "rescan"
-                    color: rescanMa.containsMouse ? root.fillPrimaryHover : root.seal
-                    font.family: root.mono; font.pixelSize: 10
-                    Behavior on color { ColorAnimation { duration: 120 } }
-                    MouseArea { id: rescanMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: netPanel.scan() }
-                }
-            }
-
-            // scrollable network list
-            Flickable {
-                width: parent.width
-                height: Math.min(netList.implicitHeight, 180)
-                contentHeight: netList.implicitHeight
-                clip: true
-                visible: netPanel.hasWifi && !netPanel.wifiBlocked && !root.useNM
-                boundsBehavior: Flickable.StopAtBounds
-
-                Column {
-                    id: netList
+                Rectangle {
                     width: parent.width
-                    spacing: 4
-
-                    Repeater {
-                        model: netPanel.wifiTab === "available" ? netPanel.networks : netPanel.savedNetworks
-                        delegate: Rectangle {
-                            required property var modelData
-                            width: netList.width
-                            height: 30; radius: root.tileRadius
-                            color: modelData.conn ? root.fillActive
-                                   : nma.containsMouse ? root.fillHover : root.fillIdle
-                            border.color: (nma.containsMouse || modelData.conn) ? root.seal : root.sep
-                            border.width: 1
-                            Behavior on color { ColorAnimation { duration: 120 } }
-
-                            Row {
-                                anchors.left: parent.left; anchors.leftMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 6
-                                IconText {
-                                    text: modelData.sec === "open" ? "\uE898" : "\uE897"
-                                    font.pixelSize: 12
-                                    color: root.sumiHi
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                                UiText {
-                                    text: modelData.ssid
-                                    color: (nma.containsMouse || modelData.conn) ? root.seal : root.ink
-                                    font.family: root.mono; font.pixelSize: 11
-                                    font.weight: modelData.conn ? Font.Medium : Font.Normal
-                                    width: modelData.conn ? 116 : 170; elide: Text.ElideRight
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                                UiText {
-                                    visible: modelData.conn
-                                    text: "· Connected"
-                                    color: root.seal
-                                    font.family: root.mono; font.pixelSize: 9
-                                    anchors.verticalCenter: parent.verticalCenter
+                    height: customDnsOpen ? 66 : 0
+                    visible: customDnsOpen
+                    radius: 7
+                    color: root.pill
+                    border.color: network.validCustomDns(customDnsText) || customDnsText === ""
+                        ? root.pillBorder : root.sealRaw
+                    border.width: 1
+                    Column {
+                        anchors.fill: parent
+                        anchors.margins: 7
+                        spacing: 5
+                        TextInput {
+                            id: customDnsInput
+                            width: parent.width
+                            height: 22
+                            text: panel.customDnsText
+                            onTextChanged: panel.customDnsText = text
+                            color: root.ink
+                            selectionColor: root.seal
+                            font.family: root.mono
+                            font.pixelSize: 10
+                            clip: true
+                            Keys.onReturnPressed: panel.submitCustomDns()
+                            Text {
+                                visible: parent.text === ""
+                                text: "1.1.1.1 2606:4700:4700::1111"
+                                color: root.sumi
+                                font: parent.font
+                            }
+                        }
+                        Row {
+                            spacing: 10
+                            Text {
+                                text: "Apply"
+                                color: network.validCustomDns(customDnsText) ? root.seal : root.sumi
+                                font.family: root.mono; font.pixelSize: 9
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: network.validCustomDns(customDnsText)
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: panel.submitCustomDns()
                                 }
                             }
-
-                            UiText {
-                                anchors.right: parent.right; anchors.rightMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                visible: !modelData.conn && !(modelData.sig > 0)
-                                text: "saved"
-                                color: root.sumiHi; font.family: root.mono; font.pixelSize: 9
-                            }
-
-                            // Signal bars are shown only when the current scan has a signal.
-                            Row {
-                                anchors.right: parent.right; anchors.rightMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 2
-                                visible: modelData.sig > 0
-                                Repeater {
-                                    model: 4
-                                    delegate: Rectangle {
-                                        required property int index
-                                        width: 3; height: 4 + index * 2; radius: 1
-                                        anchors.bottom: parent.bottom
-                                        color: index < modelData.sig
-                                            ? (modelData.conn ? root.seal : root.ink)
-                                            : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.18)
+                            Text {
+                                text: "Cancel"; color: root.sumi
+                                font.family: root.mono; font.pixelSize: 9
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        panel.customDnsOpen = false
+                                        panel.customDnsText = ""
+                                        card.forceActiveFocus()
                                     }
                                 }
                             }
+                        }
+                    }
+                }
 
-                            MouseArea {
-                                id: nma
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: netPanel.connectTo(modelData.ssid, modelData.sec)
+                Item {
+                    width: parent.width
+                    height: 18
+                    Text {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "OTHER NETWORKS"
+                        color: root.sumi
+                        font.family: root.mono
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 1.3
+                    }
+                    Text {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: network.scanning ? "Scanning…" : network.nearbyNetworks.length + " found"
+                        color: root.sumi
+                        font.family: root.mono
+                        font.pixelSize: 8
+                    }
+                }
+
+                Text {
+                    width: parent.width
+                    visible: !network.wifiDevice || !network.wifiEnabled
+                        || network.nearbyNetworks.length === 0
+                    text: !network.wifiDevice ? "No Wi-Fi adapter"
+                        : !network.wifiEnabled ? "Wi-Fi is disabled"
+                        : network.scanning ? "Scanning nearby networks…" : "No other networks found"
+                    color: root.sumi
+                    font.family: root.mono
+                    font.pixelSize: 10
+                    horizontalAlignment: Text.AlignHCenter
+                    topPadding: 8
+                    bottomPadding: 8
+                }
+
+                ListView {
+                    id: networkList
+                    width: parent.width
+                    height: Math.min(2, count) * 37
+                        + (panel.passwordSsid !== "" ? 43 : 0)
+                    model: network.nearbyNetworks
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    spacing: 0
+                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                    delegate: Rectangle {
+                        id: networkRow
+                        required property var modelData
+                        required property int index
+                        width: networkList.width
+                        height: panel.passwordSsid === modelData.ssid ? 80 : 37
+                        radius: 7
+                        color: index === panel.selectedIndex || rowHover.hovered
+                            ? root.pill : "transparent"
+                        border.color: index === panel.selectedIndex
+                            ? root.pillBorder : "transparent"
+                        border.width: 1
+
+                        HoverHandler {
+                            id: rowHover
+                            onHoveredChanged: if (hovered) {
+                                panel.selectedIndex = networkRow.index
+                                panel.focusSection = "wifi"
+                            }
+                        }
+
+                        Row {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            height: 37
+                            anchors.margins: 6
+                            spacing: 7
+                            IconText {
+                                width: 20
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: IconMap.icon(panel.wifiIcon(networkRow.modelData.signal))
+                                color: root.seal
+                                font.pixelSize: 15
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+                            Text {
+                                width: parent.width - 70
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: networkRow.modelData.ssid
+                                color: root.ink
+                                font.family: root.mono
+                                font.pixelSize: 10
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                width: 16
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: networkRow.modelData.secured ? "" : ""
+                                color: root.sumi
+                                font.family: root.mono
+                                font.pixelSize: 10
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            height: 37
+                            enabled: panel.passwordSsid === ""
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: panel.activateNetwork(networkRow.modelData)
+                        }
+
+                        Row {
+                            visible: panel.passwordSsid === networkRow.modelData.ssid
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.margins: 7
+                            height: 30
+                            spacing: 6
+
+                            Rectangle {
+                                width: parent.width - 74
+                                height: 27
+                                radius: 6
+                                color: root.bg
+                                border.color: root.pillBorder
+                                border.width: 1
+                                TextInput {
+                                    id: passwordInput
+                                    anchors.fill: parent
+                                    anchors.margins: 5
+                                    text: panel.passwordText
+                                    onTextChanged: panel.passwordText = text
+                                    echoMode: panel.revealPassword ? TextInput.Normal : TextInput.Password
+                                    color: root.ink
+                                    selectionColor: root.seal
+                                    font.family: root.mono
+                                    font.pixelSize: 10
+                                    clip: true
+                                    Keys.onReturnPressed: panel.submitPassword()
+                                }
+                            }
+                            Text {
+                                width: 18
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: panel.revealPassword ? "" : ""
+                                color: root.sumi
+                                font.family: root.mono
+                                font.pixelSize: 10
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: panel.revealPassword = !panel.revealPassword
+                                }
+                            }
+                            Text {
+                                width: 38
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "Join"
+                                color: panel.passwordText !== "" ? root.seal : root.sumi
+                                font.family: root.mono
+                                font.pixelSize: 9
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: panel.passwordText !== ""
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: panel.submitPassword()
+                                }
                             }
                         }
                     }
-
-                    UiText {
-                        visible: !netPanel.scanning
-                            && (netPanel.wifiTab === "available" ? netPanel.networks.length : netPanel.savedNetworks.length) === 0
-                        width: netList.width; horizontalAlignment: Text.AlignHCenter
-                        text: netPanel.wifiTab === "available" ? "No networks found" : "No saved networks"
-                        color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.3)
-                        font.family: root.mono; font.pixelSize: 11
-                    }
-                }
-            }
-
-            // NetworkManager (Omarchy 4.0): the iwctl scan/connect don't apply here →
-            // show an nmtui shortcut instead of an empty list
-            Rectangle {
-                width: parent.width
-                height: 52; radius: 6
-                visible: root.useNM && netPanel.hasWifi
-                color: nmMa.containsMouse ? root.fillHover : root.fillIdle
-                border.color: nmMa.containsMouse ? root.seal : root.sep; border.width: 1
-                Behavior on color { ColorAnimation { duration: 120 } }
-                Column {
-                    anchors.centerIn: parent; spacing: 3; width: parent.width - 24
-                    UiText {
-                        width: parent.width; horizontalAlignment: Text.AlignHCenter
-                        text: "Managed by NetworkManager"
-                        color: root.ink; font.family: root.mono; font.pixelSize: 11
-                    }
-                    UiText {
-                        width: parent.width; horizontalAlignment: Text.AlignHCenter
-                        text: "click to open nmtui"
-                        color: root.seal; font.family: root.mono; font.pixelSize: 10
-                    }
-                }
-                MouseArea {
-                    id: nmMa
-                    anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    onClicked: { root.networkVisible = false; wifiRunner.running = false; wifiRunner.running = true }
-                }
-            }
-
-            Rectangle { width: parent.width; height: 1; color: root.sep }
-
-            // ── button ──
-            Rectangle {
-                width: parent.width
-                height: 28; radius: root.tileRadius
-                color: netSetMa.containsMouse ? root.fillPrimaryHover : root.seal
-                Behavior on color { ColorAnimation { duration: 120 } }
-                UiText { anchors.centerIn: parent; text: "Network settings"; color: root.paper; font.family: root.mono; font.pixelSize: 11 }
-                MouseArea {
-                    id: netSetMa
-                    anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    onClicked: { root.networkVisible = false; wifiRunner.running = false; wifiRunner.running = true }
                 }
             }
         }
     }
 
-    Process {
-        id: netData
-        command: ["bash", "-c",
-            "IFACE=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i==\"dev\"){print $(i+1); exit}}'); " +
-            "if [ -z \"$IFACE\" ]; then echo NONE; exit; fi; " +
-            "IPADDR=$(ip -o -4 addr show dev \"$IFACE\" 2>/dev/null | awk '{split($4,a,\"/\"); print a[1]; exit}'); " +
-            "if [ -d \"/sys/class/net/$IFACE/wireless\" ]; then " +
-            "  LINK=$(iw dev \"$IFACE\" link 2>/dev/null); " +
-            "  SSID=$(printf '%s\\n' \"$LINK\" | sed -n 's/^\\s*SSID: //p' | head -1); " +
-            "  SIG=$(printf '%s\\n' \"$LINK\" | awk '/signal:/ {print int($2); exit}'); " +
-            "  FRQ=$(printf '%s\\n' \"$LINK\" | awk '/freq:/ {print $2 \" MHz\"; exit}'); " +
-            "  QUAL=$(awk -v s=\"$SIG\" 'BEGIN{q=int((s+110)*100/70);if(q<0)q=0;if(q>100)q=100;print q}'); " +
-            "  printf 'WIFI\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$SSID\" \"$QUAL\" \"$IFACE\" \"$IPADDR\" \"$FRQ\"; " +
-            "else printf 'ETHERNET\\t%s\\t%s\\n' \"$IFACE\" \"$IPADDR\"; fi"
-        ]
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var parts = this.text.trim().split("\t")
-                if (parts[0] === "WIFI") {
-                    netPanel.mode = "wifi"; netPanel.ssid = parts[1] || ""
-                    netPanel.signal = parseInt(parts[2]) || 0; netPanel.iface = parts[3] || ""
-                    netPanel.ipAddr = parts[4] || ""; netPanel.freq = parts[5] || ""
-                } else if (parts[0] === "ETHERNET") {
-                    netPanel.mode = "ethernet"; netPanel.iface = parts[1] || ""; netPanel.ipAddr = parts[2] || ""
-                    netPanel.ssid = ""; netPanel.freq = ""
-                } else {
-                    netPanel.mode = "none"; netPanel.iface = ""; netPanel.ipAddr = ""; netPanel.ssid = ""
-                }
-            }
-        }
+    component MetricLabel: Text {
+        width: 72
+        height: 16
+        verticalAlignment: Text.AlignVCenter
+        color: root.sumi
+        font.family: root.mono
+        font.pixelSize: 8
+        elide: Text.ElideRight
     }
 
-    Process { id: wifiRunner; command: ["bash", "-c", root.launchWifiCmd] }
-
-    // detect wifi device presence
-    Process {
-        id: devProbe
-        command: ["bash", "-c", "for d in /sys/class/net/*/wireless; do [ -e \"$d\" ] || continue; basename \"$(dirname \"$d\")\"; break; done 2>/dev/null"]
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var d = this.text.trim()
-                netPanel.wdev = d
-                netPanel.hasWifi = d !== ""
-                if (netPanel.hasWifi) netPanel.scan()
-            }
-        }
-    }
-
-    // scan + list available networks (and known networks)
-    Process {
-        id: scanProc
-        command: ["bash", "-c",
-            "DEV=$(for d in /sys/class/net/*/wireless; do [ -e \"$d\" ] || continue; basename \"$(dirname \"$d\")\"; break; done); " +
-            "[ -z \"$DEV\" ] && exit; " +
-            "iwctl station \"$DEV\" scan >/dev/null 2>&1; sleep 1.5; " +
-            "iwctl known-networks list 2>/dev/null | sed 's/\\x1b\\[[0-9;]*m//g; s/\\r//g' | " +
-            "  awk '/^[[:space:]]*-+[[:space:]]*$/ {s++; next} s>=2 && NF>0 { sub(/^[[:space:]]+/,\"\"); sub(/[[:space:]][[:space:]]+.*$/,\"\"); if(length) print \"KNOWN\\t\" $0 }'; " +
-            "iwctl station \"$DEV\" get-networks 2>/dev/null | sed 's/\\x1b\\[[0-9;]*m//g; s/\\r//g' | " +
-            "  awk '" +
-            "    /^[[:space:]]*-+[[:space:]]*$/ { seps++; next } " +
-            "    seps>=2 && NF>0 { " +
-            "      line=$0; conn=0; " +
-            "      if (line ~ /^[[:space:]]*>/) conn=1; " +
-            "      sub(/^[[:space:]]*>?[[:space:]]*/, \"\", line); " +
-            "      if (match(line, /[[:space:]]+(open|psk|8021x|wep)[[:space:]]+\\*+[[:space:]]*$/)) { " +
-            "        tail=substr(line, RSTART); ssid=substr(line, 1, RSTART-1); " +
-            "        gsub(/[[:space:]]+$/, \"\", ssid); " +
-            "        n=split(tail, a, /[[:space:]]+/); sec=\"\"; sig=0; " +
-            "        for(i=1;i<=n;i++){ if(a[i] ~ /^(open|psk|8021x|wep)$/) sec=a[i]; if(a[i] ~ /^\\*+$/) sig=length(a[i]) } " +
-            "        print \"NET\\t\" conn \"\\t\" ssid \"\\t\" sec \"\\t\" sig " +
-            "      } " +
-            "    }'"
-        ]
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var lines = this.text.trim().split("\n")
-                var nets = [], kn = []
-                for (var i = 0; i < lines.length; i++) {
-                    var p = lines[i].split("\t")
-                    if (p[0] === "KNOWN" && p[1]) {
-                        kn.push(p[1].trim())
-                    } else if (p[0] === "NET" && p.length >= 5) {
-                        nets.push({ conn: p[1] === "1", ssid: p[2], sec: p[3], sig: parseInt(p[4]) || 0 })
-                    }
-                }
-                // connected first, then by signal
-                nets.sort(function(a, b) { return (b.conn - a.conn) || (b.sig - a.sig) })
-                var saved = []
-                for (var j = 0; j < kn.length; ++j) {
-                    var match = null
-                    for (var k = 0; k < nets.length; ++k) {
-                        if (nets[k].ssid === kn[j]) { match = nets[k]; break }
-                    }
-                    saved.push({
-                        ssid: kn[j],
-                        conn: !!(match && match.conn) || (netPanel.mode === "wifi" && netPanel.ssid === kn[j]),
-                        sec: match ? match.sec : "known",
-                        sig: match ? match.sig : 0
-                    })
-                }
-                saved.sort(function(a, b) { return (b.conn - a.conn) || a.ssid.localeCompare(b.ssid) })
-                netPanel.networks = nets
-                netPanel.known = kn
-                netPanel.savedNetworks = saved
-                netPanel.scanning = false
-                scanWatchdog.stop()
-            }
-        }
-    }
-
-    Process { id: connectProc; command: ["bash", "-c", "true"] }
-
-    Timer { id: rescanTimer; interval: 1500; onTriggered: { netData.running = false; netData.running = true; netPanel.scan() } }
-    // safety: if a scan hangs, don't block future rescans forever
-    Timer { id: scanWatchdog; interval: 8000; onTriggered: netPanel.scanning = false }
-
-    // ── wifi radio (rfkill) ──
-    Process {
-        id: rfkillState
-        command: ["bash", "-c", "rfkill list wifi 2>/dev/null | grep -qi 'Soft blocked: yes' && echo BLOCKED || echo OK"]
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: { netPanel.wifiBlocked = this.text.trim() === "BLOCKED" }
-        }
-    }
-    Process { id: rfkillToggle; command: ["bash", "-c", "true"] }
-
-    // negotiated link speed: ethernet from /sys, wifi from iw bitrate
-    Process {
-        id: speedProc
-        command: ["bash", "-c",
-            "IFACE=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i==\"dev\"){print $(i+1); exit}}'); " +
-            "[ -z \"$IFACE\" ] && exit; " +
-            "if [ -d /sys/class/net/$IFACE/wireless ]; then " +
-            "  R=$(iw dev \"$IFACE\" link 2>/dev/null | sed -n 's/.*tx bitrate: //p' | awk '{print $1\" \"$2; exit}'); " +
-            "  [ -n \"$R\" ] && echo \"W:$R\"; " +
-            "else " +
-            "  S=$(cat /sys/class/net/$IFACE/speed 2>/dev/null); " +
-            "  [ -n \"$S\" ] && echo \"E:$S\"; " +
-            "fi"]
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var t = this.text.trim()
-                if (t.indexOf("E:") === 0) {
-                    var mb = parseInt(t.slice(2)) || 0
-                    netPanel.linkSpeed = mb >= 1000 ? (mb / 1000).toFixed(1).replace(/\.0$/, "") + " Gbit/s"
-                                       : (mb > 0 ? mb + " Mbit/s" : "")
-                } else if (t.indexOf("W:") === 0) {
-                    netPanel.linkSpeed = t.slice(2)   // already e.g. "866.7 MBit/s"
-                } else {
-                    netPanel.linkSpeed = ""
-                }
-            }
-        }
-    }
-
-    onVisibleChanged: {
-        if (visible) {
-            rfkillState.running = false; rfkillState.running = true
-            netData.running = false; netData.running = true
-            devProbe.running = false; devProbe.running = true
-            speedProc.running = false; speedProc.running = true
-        } else if (speedTest.running) {
-            speedTest.cancel()
-        }
+    component MetricValue: Text {
+        property bool warning: false
+        width: 85
+        height: 16
+        verticalAlignment: Text.AlignVCenter
+        color: warning ? root.sealRaw : root.ink
+        font.family: root.mono
+        font.pixelSize: 9
+        font.weight: Font.Medium
+        elide: Text.ElideMiddle
     }
 }

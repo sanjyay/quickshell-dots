@@ -55,7 +55,6 @@ is intentionally deferred.
 | `wallpaper-switcher` source literals | Preview rollback, command validation and provider behavior | Existing temp-home command-spy test extended to session cancel/confirm |
 | `install-source-resolution` literal installer fragments | Local-source selection, ownership metadata and installed verification | Extract a side-effect-free source-resolution function or run installer planning with all lifecycle commands shimmed |
 | `codex-usage-static` QML/Python field names | Stable normalized quota fields | Keep Python unit fixtures; add a QML cache-consumer model test |
-| `app-launcher-scan` fixtures | Desktop directory precedence, hidden-entry filtering, duplicate-name handling, icon lookup and atomic `apps.json` schema | Behavioral Python fixtures now protect the extracted helper; live launcher focus and launching still require Wayland validation |
 
 Pure parser/filter tests (`clipboard-privacy`, `omarchy-menu-model`, emoji/menu
 helper tests) already exercise behavior with fixtures or temporary homes and are

@@ -24,7 +24,6 @@ providers whose semantics differ.
 | CAVA | Separate consumers in MPRIS panel and particle animation; merge only after live duplication proof |
 | Camera | `helpers/camera-switch-monitor.py` owns the long-running input monitor; `CameraSwitchMonitor.qml` is the stable protocol adapter. Synthetic event tests cover press/release interpretation without opening real input devices |
 | Theme/font | One-shot reads refreshed by the installed theme hook |
-| Launcher applications | `helpers/app-launcher-scan.py` owns desktop-file discovery, filtering, icon resolution and atomic cache generation; `AppLauncherPanel.qml` owns cache consumption, UI filtering, selection and launch actions |
 
 All `Process`, `Timer`, systemd timer, and long-running helper declarations are
 considered provider ownership. Future provider consolidation must preserve

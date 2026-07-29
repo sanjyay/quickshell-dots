@@ -35,6 +35,7 @@ Item {
         id: stateFile
         path: Quickshell.env("HOME") + "/.cache/qs-shell/update-available.json"
         watchChanges: true
+        printErrors: false
         onFileChanged: stateFile.reload()
         onLoaded: {
             try {

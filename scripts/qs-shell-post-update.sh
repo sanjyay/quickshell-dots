@@ -66,43 +66,12 @@ systemctl --user daemon-reload >/dev/null 2>&1 || true
 systemctl --user enable --now qs-shell-update-check.timer >/dev/null 2>&1 || true
 systemctl --user try-restart qs-shell-update-check.timer >/dev/null 2>&1 || true
 
-# ── opt-in components: refresh only if the user installed them ──
-if [ -x "$bin/claude-usage" ]; then
-  put "$repo/scripts/claude-usage" "$bin/claude-usage" 755 || rc=1
-  put "$repo/systemd/claude-usage.service" "$units/claude-usage.service" 644 || rc=1
-  put "$repo/systemd/claude-usage.timer"   "$units/claude-usage.timer"   644 || rc=1
-fi
-if [ -x "$bin/codex-usage" ]; then
-  put "$repo/scripts/codex-usage" "$bin/codex-usage" 755 || rc=1
-  put "$repo/systemd/codex-usage.service" "$units/codex-usage.service" 644 || rc=1
-  put "$repo/systemd/codex-usage.timer"   "$units/codex-usage.timer"   644 || rc=1
-fi
-ai_backend_installed=0
-if [ -x "$bin/claude-usage" ] || [ -x "$bin/codex-usage" ] || [ -x "$bin/opencode-usage" ]; then
-  ai_backend_installed=1
-fi
-opencode_available=0
-if command -v opencode >/dev/null 2>&1 || [ -e "$HOME/.local/share/opencode/opencode.db" ]; then
-  opencode_available=1
-fi
-if [ -x "$bin/opencode-usage" ] || { [ "$ai_backend_installed" -eq 1 ] && [ "$opencode_available" -eq 1 ]; }; then
-  put "$repo/scripts/opencode-usage" "$bin/opencode-usage" 755 || rc=1
-  put "$repo/systemd/opencode-usage.service" "$units/opencode-usage.service" 644 || rc=1
-  put "$repo/systemd/opencode-usage.timer"   "$units/opencode-usage.timer"   644 || rc=1
-fi
-
-if [ "$ai_backend_installed" -eq 1 ]; then
-  ai_timers=""
-  [ -f "$units/claude-usage.timer" ] && ai_timers="$ai_timers claude-usage.timer"
-  [ -f "$units/codex-usage.timer" ] && ai_timers="$ai_timers codex-usage.timer"
-  [ -f "$units/opencode-usage.timer" ] && ai_timers="$ai_timers opencode-usage.timer"
-  systemctl --user daemon-reload >/dev/null 2>&1 || true
-  if [ -n "$ai_timers" ]; then
-    # shellcheck disable=SC2086
-    systemctl --user enable --now $ai_timers >/dev/null 2>&1 || true
-    # shellcheck disable=SC2086
-    systemctl --user try-restart $ai_timers >/dev/null 2>&1 || true
-  fi
-fi
+# Quattro AI usage is collected by the plugin-owned QML service. Remove any
+# classic per-provider units left by older Rise installations.
+for legacy_ai_unit in claude-usage codex-usage opencode-usage; do
+  systemctl --user disable --now "$legacy_ai_unit.timer" >/dev/null 2>&1 || true
+  rm -f "$units/$legacy_ai_unit.service" "$units/$legacy_ai_unit.timer"
+done
+systemctl --user daemon-reload >/dev/null 2>&1 || true
 
 exit "$rc"

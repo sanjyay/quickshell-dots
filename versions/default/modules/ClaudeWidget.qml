@@ -79,7 +79,7 @@ Item {
     readonly property int  pct5hRemaining: Math.max(0, 100 - pct5h)
     readonly property bool selFresh: isOpenCode ? ocFresh : (isCodex ? cxFresh : clFresh)
     readonly property bool selSignal: isOpenCode ? ocSignal : (isCodex ? cxSignal : clSignal)
-    readonly property bool barHasData: isCodex ? (cxHas || cxActive) : selSignal
+    readonly property bool barHasData: isOpenCode ? ocHas : (isCodex ? cxHas : clHas)
     readonly property bool blocked:  (isCodex || isOpenCode) ? false : clBlocked
 
     // The widget toggle controls visibility. Signal still drives the usage fill/tooltip,
@@ -103,7 +103,7 @@ Item {
                     if (cxCreditsAvailable) lines.push("credits remaining: " + cxCredits)
                     if (cxTokens) lines.push(cxTokens + " tokens" + (cxRate ? "  · " + cxRate : ""))
             } else {
-                lines.push("no data yet - run codex or install the AI backend")
+                lines.push(root.aiCxMessage || "Codex usage has not been collected")
             }
             return lines.join("\n")
         }
@@ -134,7 +134,11 @@ Item {
             if (ocToday > 0) lines.push("today: " + (ocToday / 1e6).toFixed(2) + "M tok")
             if (ocModel) lines.push(ocModel)
         }
-        return lines.length ? lines.join("\n") : "AI usage"
+        if (!lines.length) {
+            var message = isOpenCode ? root.aiOcMessage : root.aiClMessage
+            return message || "AI usage has not been collected"
+        }
+        return lines.join("\n")
     }
 
     // keep rendered until the collapse animation finishes
@@ -302,8 +306,6 @@ Item {
         }
     }
 
-    TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
-
     Rectangle {
         visible: rootMod.debugLayout
         anchors.fill: parent
@@ -332,12 +334,10 @@ Item {
         onEntered: {
             if (shown) {
                 root.refreshAiUsage()
-                tip.show()
             }
             if (rootMod.debugLayout) console.log("ClaudeWidget hover entered outer=" + rootMod.width + "x" + rootMod.height)
         }
         onExited: {
-            tip.hide()
             if (rootMod.debugLayout) console.log("ClaudeWidget hover exited outer=" + rootMod.width + "x" + rootMod.height)
         }
         onPressed: function(mouse) {
@@ -350,7 +350,6 @@ Item {
         }
         onClicked: function(mouse) {
             if (rootMod.debugLayout) console.log("ClaudeWidget click local=" + mouse.x + "," + mouse.y)
-            tip.hide()
             root.aiTool = "codex"
             root.refreshAiUsage(true)
             root.aiUsageVisible = !root.aiUsageVisible

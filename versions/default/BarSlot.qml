@@ -83,10 +83,6 @@ PanelWindow {
         onHoveredChanged: if (hovered && !barSlot.root.anyPopupVisible) barSlot.root.activatePopupScreen(barSlot.screen)
     }
 
-    // keep Hyprland awake while the idle-inhibitor toggle is on (carried over
-    // from the legacy single-bar implementation)
-    IdleInhibitor { window: barSlot; enabled: barSlot.root.idleInhibited }
-
     // if unlock ends mid-drag (ESC / ipc lock / click backdrop), kill the drag so the
     // ghost doesn't stay frozen + the source widget doesn't stay dimmed
     Connections {

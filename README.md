@@ -102,6 +102,8 @@ iwctl, classic hypridle hooks, and `qs-mode` are not part of the current bar.
 - [docs/architecture.md](docs/architecture.md) for the active runtime layout.
 - [docs/QUATTRO-MIGRATION.md](docs/QUATTRO-MIGRATION.md) for the feature and
   backend migration matrix.
+- [SECURITY.md](SECURITY.md) for supported versions and private vulnerability
+  reporting.
 
 ## License
 

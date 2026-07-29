@@ -25,7 +25,7 @@ apply_font() {
 }
 
 case "$action" in
-  open-app-launcher) exec qs -c bar ipc call -- launcher open ;;
+  open-app-launcher) exec omarchy-shell launcher open ;;
   open-about) exec omarchy-launch-about ;;
 
   learn-omarchy) exec omarchy-launch-webapp 'https://learn.omacom.io/2/the-omarchy-manual' ;;

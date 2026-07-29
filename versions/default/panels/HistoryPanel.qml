@@ -32,6 +32,8 @@ PanelWindow {
     property bool clipboardLoaded: false
     property bool screenshotsLoaded: false
     property bool recordingsLoaded: false
+    readonly property string historyPath: Quickshell.env("HOME")
+        + "/.local/state/omarchy/clipboard-history.json"
     readonly property bool inputDebug: Quickshell.env("QS_CLIPBOARD_INPUT_DEBUG") === "1"
     readonly property var visibleItems: filteredItems()
     readonly property var selectedItem: visibleItems.length > 0
@@ -121,9 +123,17 @@ PanelWindow {
             root.clipboardVisible = false
             return
         }
-        copyProc.command = [Quickshell.env("HOME") + "/.local/bin/qs-clipboard", "copy", row.id]
-        copyProc.running = false
-        copyProc.running = true
+        if (row.kind === "image") {
+            Quickshell.execDetached([
+                Quickshell.env("OMARCHY_PATH") + "/bin/omarchy-clipboard-paste-file",
+                row.mimeType, row.imagePath
+            ])
+        } else {
+            Quickshell.execDetached([
+                Quickshell.env("OMARCHY_PATH") + "/bin/omarchy-clipboard-paste-text",
+                "--shift-insert", "--history-index", String(row.nativeHistoryIndex)
+            ])
+        }
         root.clipboardVisible = false
     }
 
@@ -140,7 +150,16 @@ PanelWindow {
         pendingSelectionIndex = selectedIndex
         removeProc.command = row.kind === "recording" || row.kind === "screenshot"
             ? ["bash", "-c", "gio trash -- \"$1\" 2>/dev/null || trash-put -- \"$1\" 2>/dev/null", "history-remove", row.filePath]
-            : [Quickshell.env("HOME") + "/.local/bin/qs-clipboard", "delete", row.id]
+            : ["python3", "-c", [
+                "import json,os,sys,tempfile",
+                "p=sys.argv[1]; i=int(sys.argv[2])",
+                "data=json.load(open(p,encoding='utf-8'))",
+                "data.pop(i)",
+                "fd,tmp=tempfile.mkstemp(prefix='.clipboard-history.',dir=os.path.dirname(p),text=True)",
+                "f=os.fdopen(fd,'w',encoding='utf-8')",
+                "json.dump(data,f,ensure_ascii=False,indent=2); f.write('\\n'); f.close()",
+                "os.replace(tmp,p)"
+            ].join(";"), panel.historyPath, String(row.nativeHistoryIndex)]
         removeProc.running = false
         removeProc.running = true
         statusText = "Removing history entry…"
@@ -150,7 +169,10 @@ PanelWindow {
     function editSelectedImage() {
         var row = selectedItem
         if (!row || (row.kind !== "image" && row.kind !== "screenshot") || !row.imagePath) return
-        editProc.command = [Quickshell.env("HOME") + "/.local/bin/qs-clipboard", "edit", row.imagePath]
+        editProc.command = ["satty", "--filename", row.imagePath,
+            "--output-filename", row.imagePath,
+            "--actions-on-enter", "save-to-clipboard",
+            "--save-after-copy", "--copy-command", "wl-copy"]
         editProc.running = false
         editProc.running = true
         root.clipboardVisible = false
@@ -158,49 +180,48 @@ PanelWindow {
 
     function parse(text) {
         try {
-            var raw = []
-            var lines = String(text || "").trim().split("\n")
-            for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-                if (!lines[lineIndex].trim()) continue
-                var response = JSON.parse(lines[lineIndex])
-                if (response.item) raw.push(response.item)
-                else if (response.items) raw = raw.concat(response.items)
-            }
+            var raw = JSON.parse(String(text || "[]"))
+            if (!Array.isArray(raw)) raw = []
 
             var out = []
+            var fallbackNow = Date.now() / 1000
             for (var i = 0; i < raw.length; i++) {
                 var x = raw[i] || {}
-                var previewType = String(x.preview_type || "").toLowerCase()
-                var isImage = previewType === "file"
-                var isText = previewType === "text" || (!previewType && !!x.text)
-                var preview = String(x.preview || "")
-                var fullText = isText ? (preview || String(x.text || "")) : ""
-                var mimeType = String(x.mime || x.mime_type || "")
-                var timestamp = String(x.subtext || "")
+                var previewType = String(x.type || "").toLowerCase()
+                var isImage = previewType === "image" && !!x.path
+                var isText = previewType === "text" && typeof x.text === "string"
+                var fullText = isText ? String(x.text || "") : ""
+                var mimeType = String(x.mime || "")
+                var timestamp = String(x.capturedAt || "")
                 var parsedTimestamp = Date.parse(timestamp)
-                var eventTime = Number(x.timestamp || x.created_at)
-                if (!isFinite(eventTime) || eventTime <= 0)
-                    eventTime = isNaN(parsedTimestamp) ? (raw.length - i) : parsedTimestamp / 1000
+                // Quattro's native store is newest-first but most text entries
+                // have no timestamp. Give that ordering realistic separation so
+                // real screenshot/recording mtimes are not buried behind it.
+                var eventTime = isNaN(parsedTimestamp)
+                    ? fallbackNow - i * 60 : parsedTimestamp / 1000
                 var label = isImage ? "Image clipboard entry"
                     : (fullText ? fullText.replace(/\s+/g, " ").trim().slice(0, 120) : "Clipboard entry")
                 var metadata = [timestamp, mimeType].filter(function(value) { return value.length > 0 }).join(" · ")
                 out.push({
-                    id: String(x.identifier || ""),
+                    id: "native:" + i,
                     kind: isImage ? "image" : (isText ? "text" : "other"),
                     entryType: previewType || "other",
                     label: label,
                     detail: metadata || String(x.provider || "clipboard"),
                     fullText: fullText,
                     previewText: isText ? fullText : "",
-                    imagePath: isImage ? preview : "",
+                    imagePath: isImage ? String(x.path || "") : "",
                     mimeType: mimeType,
+                    nativeHistoryIndex: i,
                     timestamp: timestamp,
                     sortKey: eventTime,
                     searchKeywords: (label + " " + fullText + " " + metadata + " " + mimeType + " " + previewType).toLowerCase(),
                     icon: isImage ? "" : (isText ? "" : "󰋼")
                 })
             }
-            clipboardItems = out.filter(function(item) { return item.id.length > 0 })
+            clipboardItems = out.filter(function(item) {
+                return item.kind === "text" || item.kind === "image"
+            })
             clipboardLoaded = true
             finishRefresh()
         } catch (e) {
@@ -547,7 +568,7 @@ PanelWindow {
 
     Process {
         id: queryProc
-        command: [Quickshell.env("HOME") + "/.local/bin/qs-clipboard", "query", "120"]
+        command: ["jq", "-c", ".", panel.historyPath]
         stdout: StdioCollector { onStreamFinished: panel.parse(this.text) }
     }
     Process {

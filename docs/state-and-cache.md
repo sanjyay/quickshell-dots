@@ -7,7 +7,6 @@
 | `~/.cache/quickshell_barorder` | Widget group ordering with permutation validation, legacy migration, and atomic writes |
 | `~/.cache/quickshell_barsplits` | Bar split positions, written atomically |
 | `~/.cache/qs-rise-notifications.json` | Compact `{ "recent": [...] }` history; `NotificationManager` queues snapshots through `qs-state-write`, which validates JSON and atomically replaces the private file |
-| `~/.cache/quickshell/app-launcher/apps.json` | Version-1 `{ generatedAt, apps }` JSON written atomically by `helpers/app-launcher-scan.py`; each app preserves name, exec, icon, desktop file, categories, keywords, and mtime |
 | `~/.cache/quickshell-scan-*` | Generated theme, wallpaper, screenshot, and video scan data |
 | `~/.cache/quickshell-*-thumbs` | Generated picker thumbnails |
 | `~/.cache/quickshell-theme-switcher/` | Generated theme preview cache |

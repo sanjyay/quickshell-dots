@@ -1,8 +1,0 @@
-[Unit]
-Description=OpenCode local usage (SQLite, feeds the Quickshell AI usage widget)
-
-[Service]
-Type=oneshot
-ExecStart=%h/.local/bin/opencode-usage
-StandardOutput=journal
-StandardError=journal

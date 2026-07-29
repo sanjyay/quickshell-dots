@@ -1,13 +1,14 @@
 import QtQuick
-import Quickshell
-import Quickshell.Io
 
 Item {
     id: rootMod
     required property var root
 
-    // "stay awake" mode active when hypridle is NOT running
-    property bool awake: false
+    readonly property var idleService: root.idleService
+    readonly property bool awake: idleService ? idleService.stayAwake === true : false
+    readonly property string tooltipText: awake
+        ? "Stay awake: ON · click to allow idle locking"
+        : "Stay awake: OFF · click to prevent idle locking"
 
     visible: awake
     implicitWidth: awake ? 16 : 0
@@ -15,45 +16,31 @@ Item {
     width: implicitWidth
     height: implicitHeight
 
-
-    readonly property string tooltipText: "Idle lock"
+    Component.onCompleted: root.idleWidgetInstances++
+    Component.onDestruction: root.idleWidgetInstances = Math.max(0, root.idleWidgetInstances - 1)
 
     Text {
         anchors.centerIn: parent
-        text: "\uF0F4"   // coffee (Nerd Font / JetBrainsMono)
+        text: "\uF0F4"
         color: root.seal
         font.family: root.mono
         font.pixelSize: 15
     }
 
-    Process {
-        id: idleProc
-        command: ["bash", "-c", "pgrep -x hypridle >/dev/null && echo ON || echo OFF"]
-        running: false
-        stdout: StdioCollector {
-            // hypridle ON → normal idle; OFF → stay-awake mode (show icon)
-            onStreamFinished: { rootMod.awake = this.text.trim() === "OFF" }
-        }
-    }
-
-    Timer {
-        interval: 2000; running: true; repeat: true; triggeredOnStart: true
-        onTriggered: { idleProc.running = false; idleProc.running = true }
-    }
-
-    Process { id: toggleProc; command: ["bash", "-c", "omarchy-toggle-idle"] }
-
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
 
     BarWidgetButton {
         anchors.fill: parent
-        hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
         onEntered: tip.show()
-        onExited:  { tip.hide() }
+        onExited: tip.hide()
         onClicked: {
             tip.hide()
-            toggleProc.running = false; toggleProc.running = true
-            Qt.callLater(function() { idleProc.running = false; idleProc.running = true })
+            // Same contract as Omarchy's stock StayAwake indicator: the
+            // backend is called once, then this widget observes stayAwake.
+            if (rootMod.idleService)
+                rootMod.idleService.setIdleEnabled(rootMod.awake)
         }
     }
 }

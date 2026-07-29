@@ -33,6 +33,9 @@ PanelWindow {
     readonly property int    clToday:     root.aiClToday
     readonly property bool   clFresh:     root.aiClFresh
     readonly property bool   clHas:       root.aiClHas
+    readonly property string clStatus:    root.aiClStatus
+    readonly property string clMessage:   root.aiClMessage
+    readonly property string clCollectedAt: root.aiClCollectedAt
 
     readonly property int    cxPct5h:     root.aiCxPct5h
     readonly property int    cxPct7d:     root.aiCxPct7d
@@ -49,6 +52,9 @@ PanelWindow {
     readonly property int    cxToday:     root.aiCxToday
     readonly property bool   cxFresh:     root.aiCxFresh
     readonly property bool   cxHas:       root.aiCxHas
+    readonly property string cxStatus:    root.aiCxStatus
+    readonly property string cxMessage:   root.aiCxMessage
+    readonly property string cxCollectedAt: root.aiCxCollectedAt
 
     readonly property int    ocPct5h:     root.aiOcPct5h
     readonly property int    ocPct7d:     root.aiOcPct7d
@@ -59,10 +65,30 @@ PanelWindow {
     readonly property int    ocToday:     root.aiOcToday
     readonly property bool   ocFresh:     root.aiOcFresh
     readonly property bool   ocHas:       root.aiOcHas
+    readonly property string ocStatus:    root.aiOcStatus
+    readonly property string ocMessage:   root.aiOcMessage
+    readonly property string ocCollectedAt: root.aiOcCollectedAt
     readonly property var    ocModels:    root.aiOcModels
     readonly property bool   showClaude:  root.aiTool === "claude"
     readonly property bool   showCodex:   root.aiTool === "codex"
     readonly property bool   showOpenCode: root.aiTool === "opencode"
+
+    function statusLabel(status, fresh) {
+        if (status === "ok") return fresh ? "live" : "stale"
+        if (status === "never-collected") return "not collected"
+        if (status === "unavailable") return "unavailable"
+        if (status === "unauthenticated") return "sign in required"
+        if (status === "command-failed") return "failed"
+        if (status === "parse-failed") return "parse failed"
+        if (status === "timed-out") return "timed out"
+        return status
+    }
+
+    function collectedLabel(value) {
+        var parsed = Date.parse(String(value || ""))
+        if (isNaN(parsed)) return ""
+        return new Date(parsed).toLocaleString(Qt.locale(), "MMM d, h:mm AP")
+    }
 
     property real reveal: root.aiUsageVisible ? 1 : 0
     Behavior on reveal {
@@ -241,6 +267,22 @@ PanelWindow {
                     }
                     UiText {
                         anchors.right: parent.right
+                        anchors.rightMargin: 24
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.aiUsage.collectorRunning ? "…" : "↻"
+                        color: refreshMa.containsMouse ? root.seal : root.sumi
+                        font.pixelSize: 13
+                        MouseArea {
+                            id: refreshMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: !root.aiUsage.collectorRunning
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.forceAiUsageRefresh(false)
+                        }
+                    }
+                    UiText {
+                        anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         text: "✕"
                         color: closeMa.containsMouse ? root.seal : root.sumi
@@ -304,7 +346,7 @@ PanelWindow {
                     }
                     UiText {
                         anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        text: aiPanel.clFresh ? "live" : "stale"
+                        text: aiPanel.statusLabel(aiPanel.clStatus, aiPanel.clFresh)
                         color: aiPanel.clFresh ? root.sumi : root.sealRaw
                         font.family: root.mono; font.pixelSize: 10
                     }
@@ -312,7 +354,7 @@ PanelWindow {
                 UiText {
                     visible: aiPanel.showClaude && !aiPanel.clHas
                     width: parent.width
-                    text: "no data — run claude"
+                    text: aiPanel.clMessage || "Claude has no usage data"
                     color: root.sumiHi; font.family: root.mono; font.pixelSize: 11
                 }
                 UsageRow { visible: aiPanel.showClaude && aiPanel.clHas; label: "5h"; pct: aiPanel.clPct5h; dim: !aiPanel.clFresh }
@@ -322,6 +364,7 @@ PanelWindow {
                 DetailRow { visible: aiPanel.showClaude && aiPanel.clHas && aiPanel.clTokens !== ""; k: "Tokens"; v: aiPanel.clTokens }
                 DetailRow { visible: aiPanel.showClaude && aiPanel.clHas && aiPanel.clRate !== "";   k: "Rate"; v: aiPanel.clRate }
                 DetailRow { visible: aiPanel.showClaude && aiPanel.clHas && aiPanel.clToday > 0; k: "Today"; v: (aiPanel.clToday / 1e6).toFixed(2) + "M tok" }
+                DetailRow { visible: aiPanel.showClaude && aiPanel.clCollectedAt !== ""; k: "Last checked"; v: aiPanel.collectedLabel(aiPanel.clCollectedAt) }
 
                 Rectangle { visible: false; width: parent.width; height: 1; color: root.sep }
 
@@ -337,25 +380,26 @@ PanelWindow {
                     }
                     UiText {
                         anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        text: aiPanel.cxState
-                        color: aiPanel.cxState === "live" ? root.sumi : root.sealRaw
+                        text: aiPanel.statusLabel(aiPanel.cxStatus, aiPanel.cxFresh)
+                        color: aiPanel.cxFresh ? root.sumi : root.sealRaw
                         font.family: root.mono; font.pixelSize: 10
                     }
                 }
                 UiText {
                     visible: aiPanel.showCodex && !aiPanel.cxHas
                     width: parent.width
-                    text: "no data — run codex"
+                    text: aiPanel.cxMessage || "Codex has no usage data"
                     color: root.sumiHi; font.family: root.mono; font.pixelSize: 11
                 }
-                UsageRow { visible: aiPanel.showCodex && aiPanel.cxHasWeekly; label: "weekly remaining"; pct: 100 - aiPanel.cxPct7d; dim: aiPanel.cxState !== "live" }
-                UsageRow { visible: aiPanel.showCodex && aiPanel.cxHas5h; label: "5h remaining"; pct: 100 - aiPanel.cxPct5h; dim: aiPanel.cxState !== "live" }
+                UsageRow { visible: aiPanel.showCodex && aiPanel.cxHasWeekly; label: "weekly remaining"; pct: 100 - aiPanel.cxPct7d; dim: !aiPanel.cxFresh }
+                UsageRow { visible: aiPanel.showCodex && aiPanel.cxHas5h; label: "5h remaining"; pct: 100 - aiPanel.cxPct5h; dim: !aiPanel.cxFresh }
                 DetailRow { visible: aiPanel.showCodex && aiPanel.cxHasWeekly; k: "weekly resets"; v: root.aiFmtResetAt(aiPanel.cxReset7dTs) || "—" }
                 DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas5h; k: "5h resets"; v: root.aiFmtResetAt(aiPanel.cxReset5hTs) || "—" }
                 DetailRow { visible: aiPanel.showCodex && aiPanel.cxCreditsAvailable; k: "Credits remaining"; v: aiPanel.cxCredits }
                 DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas && aiPanel.cxTokens !== ""; k: "Tokens"; v: aiPanel.cxTokens }
                 DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas && aiPanel.cxRate !== "";   k: "Rate"; v: aiPanel.cxRate }
                 DetailRow { visible: aiPanel.showCodex && aiPanel.cxHas && aiPanel.cxToday > 0; k: "Today"; v: (aiPanel.cxToday / 1e6).toFixed(2) + "M tok" }
+                DetailRow { visible: aiPanel.showCodex && aiPanel.cxCollectedAt !== ""; k: "Last checked"; v: aiPanel.collectedLabel(aiPanel.cxCollectedAt) }
 
                 Rectangle { visible: false; width: parent.width; height: 1; color: root.sep }
 
@@ -371,7 +415,7 @@ PanelWindow {
                     }
                     UiText {
                         anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        text: aiPanel.ocFresh ? "live" : "stale"
+                        text: aiPanel.statusLabel(aiPanel.ocStatus, aiPanel.ocFresh)
                         color: aiPanel.ocFresh ? root.sumi : root.sealRaw
                         font.family: root.mono; font.pixelSize: 10
                     }
@@ -379,7 +423,7 @@ PanelWindow {
                 UiText {
                     visible: aiPanel.showOpenCode && !aiPanel.ocHas
                     width: parent.width
-                    text: "no data — run opencode"
+                    text: aiPanel.ocMessage || "OpenCode has no usage data"
                     color: root.sumiHi; font.family: root.mono; font.pixelSize: 11
                 }
                 UsageRow { visible: aiPanel.showOpenCode && aiPanel.ocHas; label: "5h"; pct: aiPanel.ocPct5h; dim: !aiPanel.ocFresh }
@@ -388,6 +432,7 @@ PanelWindow {
                 DetailRow { visible: aiPanel.showOpenCode && aiPanel.ocHas && aiPanel.ocRate !== "";   k: "Rate"; v: aiPanel.ocRate }
                 DetailRow { visible: aiPanel.showOpenCode && aiPanel.ocHas && aiPanel.ocToday > 0; k: "Today"; v: (aiPanel.ocToday / 1e6).toFixed(2) + "M tok" }
                 DetailRow { visible: aiPanel.showOpenCode && aiPanel.ocHas && aiPanel.ocModel !== ""; k: "Latest"; v: aiPanel.ocModel }
+                DetailRow { visible: aiPanel.showOpenCode && aiPanel.ocCollectedAt !== ""; k: "Last checked"; v: aiPanel.collectedLabel(aiPanel.ocCollectedAt) }
 
                 Item {
                     visible: aiPanel.showOpenCode && aiPanel.ocHas && aiPanel.ocModels.length > 0
@@ -424,6 +469,6 @@ PanelWindow {
         }
     }
 
-    // Usage data + polling live in Theme.qml (shared with the bar pill); this panel
-    // only renders from root.ai* and bumps the refresh cadence via root.aiUsageVisible.
+    // Collection and parsing live in AiUsageService; this panel and the compact
+    // widget render the same normalized root.ai* compatibility properties.
 }

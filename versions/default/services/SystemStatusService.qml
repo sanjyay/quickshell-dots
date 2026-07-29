@@ -5,7 +5,6 @@ QtObject {
     id: service
 
     property bool notificationSilenced: false
-    property bool idleAwake: false
     property bool privacyMicMuted: false
     property int privacyMicActiveApps: 0
     property bool screenRecording: false
@@ -27,8 +26,6 @@ QtObject {
 
     function refreshNotificationSilence() { restart(notificationSilenceReadProc) }
     function toggleNotificationSilence() { restart(notificationSilenceToggleProc) }
-    function refreshIdleState() { restart(idleStateReadProc) }
-    function toggleIdleState() { restart(idleStateToggleProc) }
     function refreshPrivacyMic() { restart(privacyMicReadProc) }
     function togglePrivacyMic() { restart(privacyMicToggleProc) }
     function refreshScreenRecording() { restart(screenRecordingReadProc) }
@@ -64,21 +61,6 @@ QtObject {
     property Timer notificationSilenceTimer: Timer {
         interval: 2000; running: true; repeat: true; triggeredOnStart: true
         onTriggered: service.refreshNotificationSilence()
-    }
-
-    property Process idleStateReadProc: Process {
-        command: ["bash", "-c", "pgrep -x hypridle >/dev/null && echo ON || echo OFF"]
-        stdout: StdioCollector {
-            onStreamFinished: service.idleAwake = this.text.trim() === "OFF"
-        }
-    }
-    property Process idleStateToggleProc: Process {
-        command: ["bash", "-c", "omarchy-toggle-idle"]
-        onRunningChanged: if (!running) service.refreshIdleState()
-    }
-    property Timer idleStateTimer: Timer {
-        interval: 2000; running: true; repeat: true; triggeredOnStart: true
-        onTriggered: service.refreshIdleState()
     }
 
     property Process privacyMicReadProc: Process {

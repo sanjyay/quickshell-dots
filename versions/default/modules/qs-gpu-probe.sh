@@ -2,122 +2,80 @@
 set -u
 
 debug=0
-[ "${1:-}" = "--debug" ] && debug=1
+[[ "${1:-}" == "--debug" ]] && debug=1
+drm_root="${QS_GPU_DRM_ROOT:-/sys/class/drm}"
 
-emit_debug() {
-  [ "$debug" = 1 ] && printf 'DEBUG %s\n' "$*"
+log() { [[ "$debug" == 1 ]] && printf 'qs-gpu-probe: %s\n' "$*" >&2 || true; }
+number_or_null() {
+  local value="${1:-}"
+  [[ "$value" =~ ^-?[0-9]+([.][0-9]+)?$ ]] && printf '%s' "$value" || printf 'null'
+}
+emit() {
+  local status="$1" provider="$2" device="$3" name="$4"
+  local temp="$5" util="$6" used="$7" total="$8" clock="$9" power="${10}"
+  jq -cn \
+    --arg status "$status" --arg provider "$provider" --arg device "$device" --arg name "$name" \
+    --argjson temperatureC "$(number_or_null "$temp")" \
+    --argjson usagePercent "$(number_or_null "$util")" \
+    --argjson vramUsedMiB "$(number_or_null "$used")" \
+    --argjson vramTotalMiB "$(number_or_null "$total")" \
+    --argjson clockMHz "$(number_or_null "$clock")" \
+    --argjson powerWatts "$(number_or_null "$power")" \
+    --arg collectedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{schemaVersion:1,status:$status,provider:$provider,device:$device,name:$name,
+      temperatureC:$temperatureC,usagePercent:$usagePercent,vramUsedMiB:$vramUsedMiB,
+      vramTotalMiB:$vramTotalMiB,clockMHz:$clockMHz,powerWatts:$powerWatts,
+      collectedAt:$collectedAt,errorCode:null,message:null}'
 }
 
-to_c() {
-  local v="${1:-}"
-  [ -n "$v" ] || return 1
-  case "$v" in *[!0-9-]*) return 1;; esac
-  [ "$v" -gt 1000 ] 2>/dev/null && v=$((v / 1000))
-  printf '%s\n' "$v"
-}
-
-bytes_to_mib() {
-  local v="${1:-}"
-  [ -n "$v" ] || return 1
-  case "$v" in *[!0-9]*) return 1;; esac
-  printf '%s\n' $((v / 1024 / 1024))
-}
-
-first_temp_for_device() {
-  local dev="$1" f name label v
-  for f in "$dev"/hwmon/hwmon*/temp*_input; do
-    [ -r "$f" ] || continue
-    name="$(cat "${f%/*}/name" 2>/dev/null || true)"
-    label="$(cat "${f%_input}_label" 2>/dev/null || true)"
-    v="$(cat "$f" 2>/dev/null || true)"
-    v="$(to_c "$v" 2>/dev/null || true)"
-    [ -n "$v" ] || continue
-    emit_debug "temp_source=$f name=$name label=$label value_c=$v"
-    printf '%s\n' "$v"
-    return 0
-  done
-  return 1
-}
-
-probe_nvidia() {
-  command -v nvidia-smi >/dev/null 2>&1 || return 1
-  local line temp used total util clock power
-  line="$(nvidia-smi --query-gpu=temperature.gpu,memory.used,memory.total,utilization.gpu --format=csv,noheader,nounits 2>/dev/null | head -1 || true)"
-  [ -n "$line" ] || return 1
-  IFS=',' read -r temp used total util <<EOF
-$line
-EOF
-  temp="$(printf '%s' "$temp" | tr -dc '0-9')"
-  used="$(printf '%s' "$used" | tr -dc '0-9')"
-  total="$(printf '%s' "$total" | tr -dc '0-9')"
-  util="$(printf '%s' "$util" | tr -dc '0-9')"
-  clock="$(nvidia-smi --query-gpu=clocks.gr --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -dc '0-9' || true)"
-  power="$(nvidia-smi --query-gpu=power.draw --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -dc '0-9.' || true)"
-  clock="$(printf '%s' "$clock" | tr -dc '0-9')"
-  power="$(printf '%s' "$power" | tr -dc '0-9.')"
-  [ -n "$temp" ] || return 1
-  emit_debug "vendor=nvidia source=nvidia-smi raw=$line"
-  printf 'GPU nvidia %s %s %s %s %s %s\n' "${util:---}" "${temp:---}" "${used:---}" "${total:---}" "${clock:---}" "${power:---}"
-  return 0
-}
-
-probe_drm() {
-  local card dev vendor vendor_name util temp used total clock power f value
-  for card in /sys/class/drm/card*; do
-    dev="$card/device"
-    [ -d "$dev" ] || continue
-    [ -r "$dev/vendor" ] || continue
-    vendor="$(cat "$dev/vendor" 2>/dev/null || true)"
-    vendor_name=""
-    case "$vendor" in
-      0x1002) vendor_name="amd" ;;
-      0x10de) vendor_name="nvidia" ;;
-      0x8086) vendor_name="intel" ;;
-      *) vendor_name="unknown" ;;
-    esac
-    [ "$vendor_name" != "unknown" ] || continue
-
-    util="--"; temp="--"; used="--"; total="--"; clock="--"; power="--"
-    if [ -r "$dev/gpu_busy_percent" ]; then
-      util="$(cat "$dev/gpu_busy_percent" 2>/dev/null | tr -dc '0-9' || true)"
-      [ -n "$util" ] || util="--"
-    fi
-    temp="$(first_temp_for_device "$dev" 2>/dev/null || true)"
-    [ -n "$temp" ] || temp="--"
-
-    if [ "$vendor_name" = "amd" ]; then
-      if [ -r "$dev/mem_info_vram_used" ] && [ -r "$dev/mem_info_vram_total" ]; then
-        used="$(bytes_to_mib "$(cat "$dev/mem_info_vram_used" 2>/dev/null)" 2>/dev/null || true)"
-        total="$(bytes_to_mib "$(cat "$dev/mem_info_vram_total" 2>/dev/null)" 2>/dev/null || true)"
-        [ -n "$used" ] || used="--"
-        [ -n "$total" ] || total="--"
-      fi
-      for f in "$dev"/pp_dpm_sclk; do
-        [ -r "$f" ] || continue
-        value="$(awk '/\*/ {for(i=1;i<=NF;i++) if($i ~ /Mhz$/) {gsub(/Mhz/, "", $i); print $i; exit}}' "$f" 2>/dev/null || true)"
-        [ -n "$value" ] && clock="$value"
-      done
-    elif [ -r "$dev/gt_cur_freq_mhz" ]; then
-      clock="$(cat "$dev/gt_cur_freq_mhz" 2>/dev/null | tr -dc '0-9' || true)"
-      [ -n "$clock" ] || clock="--"
-    fi
-
-    for f in "$dev"/hwmon/hwmon*/power*_average; do
-      [ -r "$f" ] || continue
-      value="$(cat "$f" 2>/dev/null || true)"
-      case "$value" in ""|*[!0-9]*) continue;; esac
-      power="$(awk -v v="$value" 'BEGIN{printf "%.1f",v/1000000}')"
-      break
+nvidia_smi="${QS_GPU_NVIDIA_SMI:-$(command -v nvidia-smi 2>/dev/null || true)}"
+if [[ -n "$nvidia_smi" && -x "$nvidia_smi" ]]; then
+  line="$("$nvidia_smi" --query-gpu=name,temperature.gpu,utilization.gpu,memory.used,memory.total,clocks.gr,power.draw --format=csv,noheader,nounits 2>/dev/null | head -n1 || true)"
+  if [[ -n "$line" ]]; then
+    IFS=',' read -r name temp util used total clock power <<<"$line"
+    for var in name temp util used total clock power; do
+      printf -v "$var" '%s' "$(printf '%s' "${!var}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     done
+    device="nvidia0"
+    for card in "$drm_root"/card[0-9]*; do
+      [[ -r "$card/device/vendor" ]] || continue
+      [[ "$(<"$card/device/vendor")" == "0x10de" ]] && { device="${card##*/}"; break; }
+    done
+    log "selected provider=nvidia device=$device source=$nvidia_smi"
+    emit ok nvidia "$device" "$name" "$temp" "$util" "$used" "$total" "$clock" "$power"
+    exit 0
+  fi
+fi
 
-    emit_debug "vendor=$vendor_name source=$dev util=$util temp=$temp vram_used_mib=$used vram_total_mib=$total clock_mhz=$clock power_w=$power"
-    printf 'GPU %s %s %s %s %s %s %s\n' "$vendor_name" "$util" "$temp" "$used" "$total" "$clock" "$power"
-    return 0
+for card in "$drm_root"/card[0-9]*; do
+  dev="$card/device"
+  [[ -r "$dev/vendor" ]] || continue
+  vendor="$(<"$dev/vendor")"
+  case "$vendor" in 0x1002) provider=amd;; 0x10de) provider=nvidia;; 0x8086) provider=intel;; *) continue;; esac
+  util= temp= used= total= clock= power=
+  [[ -r "$dev/gpu_busy_percent" ]] && util="$(tr -dc '0-9' <"$dev/gpu_busy_percent")"
+  for f in "$dev"/hwmon/hwmon*/temp*_input; do
+    [[ -r "$f" ]] || continue
+    temp="$(tr -dc '0-9' <"$f")"; [[ "$temp" -gt 1000 ]] 2>/dev/null && temp=$((temp / 1000))
+    break
   done
-  return 1
-}
+  if [[ -r "$dev/mem_info_vram_used" && -r "$dev/mem_info_vram_total" ]]; then
+    used=$(( $(<"$dev/mem_info_vram_used") / 1024 / 1024 ))
+    total=$(( $(<"$dev/mem_info_vram_total") / 1024 / 1024 ))
+  fi
+  if [[ -r "$dev/gt_cur_freq_mhz" ]]; then clock="$(tr -dc '0-9' <"$dev/gt_cur_freq_mhz")"; fi
+  for f in "$dev"/hwmon/hwmon*/power*_average; do
+    [[ -r "$f" ]] || continue
+    power="$(awk -v v="$(cat "$f")" 'BEGIN{printf "%.1f",v/1000000}')"; break
+  done
+  [[ -n "$util$temp$used$total$clock$power" ]] || { log "skipping unreadable ${card##*/} ($provider)"; continue; }
+  log "selected provider=$provider device=${card##*/} source=sysfs"
+  emit ok "$provider" "${card##*/}" "$provider GPU" "$temp" "$util" "$used" "$total" "$clock" "$power"
+  exit 0
+done
 
-probe_nvidia || probe_drm || {
-  emit_debug "vendor=none source=unavailable"
-  printf 'GPU none -- -- -- -- -- --\n'
-}
+jq -cn --arg collectedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  '{schemaVersion:1,status:"unavailable",provider:null,device:null,name:null,
+    temperatureC:null,usagePercent:null,vramUsedMiB:null,vramTotalMiB:null,
+    clockMHz:null,powerWatts:null,collectedAt:$collectedAt,
+    errorCode:"no-readable-gpu",message:"No GPU with readable metrics was found"}'

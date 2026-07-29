@@ -24,13 +24,3 @@ scripts/ensure-hypr-launcher-binding.sh	quickshell-bin/ensure-hypr-launcher-bind
 scripts/ensure-hypr-switcher-blur-rules.sh	quickshell-bin/ensure-hypr-switcher-blur-rules.sh	755	mandatory
 systemd/qs-shell-update-check.service	user-unit/qs-shell-update-check.service	644	mandatory
 systemd/qs-shell-update-check.timer	user-unit/qs-shell-update-check.timer	644	mandatory
-scripts/qs_usage_cache.py	local-bin/qs_usage_cache.py	644	optional-ai
-scripts/claude-usage	local-bin/claude-usage	755	optional-ai-claude
-systemd/claude-usage.service	user-unit/claude-usage.service	644	optional-ai-claude
-systemd/claude-usage.timer	user-unit/claude-usage.timer	644	optional-ai-claude
-scripts/codex-usage	local-bin/codex-usage	755	optional-ai-codex
-systemd/codex-usage.service	user-unit/codex-usage.service	644	optional-ai-codex
-systemd/codex-usage.timer	user-unit/codex-usage.timer	644	optional-ai-codex
-scripts/opencode-usage	local-bin/opencode-usage	755	optional-ai-opencode
-systemd/opencode-usage.service	user-unit/opencode-usage.service	644	optional-ai-opencode
-systemd/opencode-usage.timer	user-unit/opencode-usage.timer	644	optional-ai-opencode
