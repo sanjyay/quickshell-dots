@@ -152,24 +152,49 @@ PanelWindow {
             Item {
                 width: parent.width
                 height: 30
+                readonly property int shownVolume: outputVolumeMa.pressed
+                    ? outputVolumeMa.liveVolume : volPanel.volume
+                readonly property bool shownMuted: volPanel.muted && !outputVolumeMa.pressed
                 UiText {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.top: parent.top
-                    text: volPanel.muted ? "Muted" : volPanel.volume + "%"
-                    color: volPanel.muted
+                    text: parent.shownMuted ? "Muted" : parent.shownVolume + "%"
+                    color: parent.shownMuted
                         ? Qt.rgba(root.seal.r, root.seal.g, root.seal.b, 0.4)
                         : root.seal
                     font.family: root.mono; font.pixelSize: 11; font.weight: Font.Medium
                 }
                 Rectangle {
+                    id: outputVolumeTrack
                     anchors.bottom: parent.bottom
                     width: parent.width; height: 8; radius: 4
                     color: root.fillActive
                     Rectangle {
-                        width: parent.width * (volPanel.muted ? 0 : Math.min(volPanel.volume / 100, 1))
+                        width: parent.width * (outputVolumeTrack.parent.shownMuted
+                            ? 0 : Math.min(outputVolumeTrack.parent.shownVolume / 100, 1))
                         height: parent.height; radius: 4
                         color: root.seal
                         Behavior on width { NumberAnimation { duration: 300 } }
+                    }
+                    MouseArea {
+                        id: outputVolumeMa
+                        anchors.fill: parent
+                        anchors.topMargin: -10
+                        anchors.bottomMargin: -6
+                        cursorShape: Qt.PointingHandCursor
+                        preventStealing: true
+                        property int liveVolume: volPanel.volume
+                        function setFromX(x) {
+                            liveVolume = Math.max(0, Math.min(100,
+                                Math.round(x / outputVolumeTrack.width * 100)))
+                        }
+                        onPressed: function(mouse) { setFromX(mouse.x) }
+                        onPositionChanged: function(mouse) {
+                            if (pressed) setFromX(mouse.x)
+                        }
+                        onReleased: {
+                            volPanel.run("pamixer --set-volume " + liveVolume + " --unmute")
+                        }
                     }
                 }
             }

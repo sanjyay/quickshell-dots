@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../IconMap.js" as IconMap
 
 Item {
     id: rootMod
@@ -39,13 +40,13 @@ Item {
         anchors.centerIn: parent
         spacing: 5
 
-        UiText {
+        IconText {
             anchors.verticalCenter: parent.verticalCenter
-            text: rootMod.muted ? "\uf6a9" : (rootMod.volume < 50 ? "\uf027" : "\uf028")
+            text: IconMap.icon(rootMod.muted
+                ? "volume_off" : (rootMod.volume < 50 ? "volume_down" : "volume_up"))
             color: rootMod.muted
                 ? Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.25)
                 : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.6)
-            font.family: root.mono
             font.pixelSize: 13
         }
 
