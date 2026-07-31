@@ -63,6 +63,7 @@ Item {
             gpu: rise && rise.gpuDiagnostics ? rise.gpuDiagnostics() : {},
             idle: rise && rise.idleDiagnostics ? rise.idleDiagnostics() : {},
             network: rise && rise.networkDiagnostics ? rise.networkDiagnostics() : {},
+            history: rise && rise.historyDiagnostics ? rise.historyDiagnostics() : {},
             generation: generation,
             timestamp: Date.now()
         }

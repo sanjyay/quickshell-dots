@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import "../modules"
+import "HistoryModel.js" as HistoryModel
 
 PanelWindow {
     id: panel
@@ -32,12 +33,33 @@ PanelWindow {
     property bool clipboardLoaded: false
     property bool screenshotsLoaded: false
     property bool recordingsLoaded: false
+    property int insertionSequence: 0
+    property double historyFileMtimeMs: 0
+    property double lastRefreshAtMs: 0
+    property string modelSignature: ""
+    property string screenshotWatchSignature: ""
+    property string lastErrorCode: ""
+    property var previewById: ({})
+    property var previewAttemptsById: ({})
+    property string previewJobId: ""
+    property string previewJobPath: ""
+    property string previewJobOutput: ""
+    property int previewRetryCount: 0
+    readonly property string previewHelperPath: Qt.resolvedUrl("../../../scripts/history-recording-preview.sh").toString().replace(/^file:\/\//, "")
+    readonly property int previewJobsRunning: previewProc.running ? 1 : 0
     readonly property string historyPath: Quickshell.env("HOME")
         + "/.local/state/omarchy/clipboard-history.json"
     readonly property bool inputDebug: Quickshell.env("QS_CLIPBOARD_INPUT_DEBUG") === "1"
     readonly property var visibleItems: filteredItems()
+    readonly property int fanStartIndex: Math.max(0, Math.min(selectedIndex - 4,
+        Math.max(0, visibleItems.length - 9)))
+    readonly property var fanItems: visibleItems.slice(fanStartIndex,
+        Math.min(visibleItems.length, fanStartIndex + 9))
     readonly property var selectedItem: visibleItems.length > 0
         ? visibleItems[Math.max(0, Math.min(selectedIndex, visibleItems.length - 1))] : null
+
+    Component.onCompleted: root.historyDiagnosticsProvider = panel
+    Component.onDestruction: if (root.historyDiagnosticsProvider === panel) root.historyDiagnosticsProvider = null
 
     function inputDebugLog(message) {
         if (inputDebug) console.log("Clipboard input: " + message)
@@ -71,31 +93,87 @@ PanelWindow {
         clipboardLoaded = false
         screenshotsLoaded = false
         recordingsLoaded = false
-        queryProc.running = false
-        queryProc.running = true
+        if (queryProc.running) historyChangeTimer.restart()
+        else queryProc.running = true
         screenshotProc.running = false
         screenshotProc.running = true
         recordingProc.running = false
         recordingProc.running = true
     }
 
+    function refreshRecordings() {
+        recordingsLoaded = false
+        recordingProc.running = false
+        recordingProc.running = true
+    }
+
+    function retryPreview(row) {
+        if (!row || row.type !== "recording" || row.previewState !== "permanent-failure") return
+        var states = Object.assign({}, previewById)
+        var attempts = Object.assign({}, previewAttemptsById)
+        states[row.id] = { state: "not-requested", path: row.previewPath,
+            completedAtMs: row.eventCompletedAtMs }
+        delete attempts[row.id]
+        previewById = states
+        previewAttemptsById = attempts
+        refresh()
+    }
+
     function imageSource(item) {
         if (!item || (item.kind !== "image" && item.kind !== "screenshot" && item.kind !== "recording") || !item.imagePath) return ""
         if (item.imagePath.indexOf("file://") === 0) return item.imagePath
-        return "file://" + encodeURI(item.imagePath)
+        return "file://" + encodeURI(item.imagePath) + (item.previewState === "ready" ? "?v=" + item.eventCompletedAtMs : "")
+    }
+
+    function textEntropy(value) {
+        var counts = {}
+        for (var i = 0; i < value.length; i++) counts[value[i]] = (counts[value[i]] || 0) + 1
+        var entropy = 0
+        Object.keys(counts).forEach(function(key) {
+            var probability = counts[key] / value.length
+            entropy -= probability * Math.log(probability) / Math.log(2)
+        })
+        return entropy
+    }
+
+    function isSensitiveClipboardText(text) {
+        var value = String(text || "").trim()
+        if (!value) return false
+        var currentUser = String(Quickshell.env("USER") || "").trim().toLowerCase()
+        if (currentUser && value.toLowerCase() === currentUser) return true
+        if (/\b[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+\b/i.test(value)) return true
+        if (/\b(?:password|passwd|passphrase|pwd|username|user\s*name|login|account\s*(?:id|name)|auth(?:entication)?\s*token|access[_ -]?token|refresh[_ -]?token|bearer|api[_ -]?key|client[_ -]?secret|secret|otp|one[_ -]?time[_ -]?(?:password|code)|verification[_ -]?code|recovery[_ -]?code)\b\s*(?:=|:|is)\s*\S{3,}/i.test(value)) return true
+        if (/-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/.test(value)) return true
+        if (/^\s*(?:authorization|proxy-authorization)\s*:\s*\S+/im.test(value)) return true
+        if (/\b[a-z][a-z0-9+.-]*:\/\/[^\s/:]+:[^\s/@]+@/i.test(value)) return true
+        if (/\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\b/.test(value)) return true
+        if (/\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|sk-(?:proj-)?[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16})\b/.test(value)) return true
+        if (/^\d{4,8}$/.test(value)) return true
+        if (/^[A-Za-z0-9_+/.=-]{20,}$/.test(value)) {
+            var classes = (/[a-z]/.test(value) ? 1 : 0) + (/[A-Z]/.test(value) ? 1 : 0)
+                + (/\d/.test(value) ? 1 : 0) + (/[^A-Za-z0-9]/.test(value) ? 1 : 0)
+            if (classes >= 3 && textEntropy(value) >= 3.5) return true
+        }
+        return false
     }
 
     function finishRefresh() {
         if (!clipboardLoaded || !screenshotsLoaded || !recordingsLoaded) return
         var screenshotsBySecond = {}
-        screenshotItems.forEach(function(item) { screenshotsBySecond[Math.floor(item.sortKey)] = true })
+        screenshotItems.forEach(function(item) { screenshotsBySecond[Math.floor(item.sortTimestampMs / 1000)] = true })
         var uniqueClipboardItems = clipboardItems.filter(function(item) {
-            return item.kind !== "image" || !screenshotsBySecond[Math.floor(item.sortKey)]
+            return item.kind !== "image" || !screenshotsBySecond[Math.floor(item.sortTimestampMs / 1000)]
         })
-        items = recordingItems.concat(screenshotItems, uniqueClipboardItems).sort(function(a, b) {
-            if (a.sortKey !== b.sortKey) return b.sortKey - a.sortKey
-            return a.id < b.id ? 1 : (a.id > b.id ? -1 : 0)
-        })
+        var merged = HistoryModel.reconcile(items, recordingItems.concat(screenshotItems, uniqueClipboardItems))
+        var sorted = HistoryModel.sorted(merged)
+        var signature = sorted.map(function(row) {
+            return row.id + ":" + row.sortTimestampMs + ":" + row.state + ":" + row.previewState
+        }).join("|")
+        if (signature !== modelSignature) {
+            modelSignature = signature
+            items = sorted
+        }
+        lastRefreshAtMs = Date.now()
         statusText = ""
         if (pendingSelectionIndex >= 0) {
             var nextIndex = pendingSelectionIndex
@@ -106,6 +184,50 @@ PanelWindow {
         } else {
             setSelection(0)
         }
+        Qt.callLater(panel.requestNextPreview)
+    }
+
+    function requestNextPreview() {
+        if (previewProc.running) return
+        for (var i = 0; i < items.length; i++) {
+            var row = items[i]
+            if (row.type !== "recording" || row.state !== "recording-complete"
+                    || row.previewState === "ready" || row.previewState === "generating"
+                    || row.previewState === "permanent-failure"
+                    || !row.sourcePath) continue
+            previewJobId = row.id
+            previewJobPath = row.sourcePath
+            var output = row.previewPath
+            previewJobOutput = output
+            var states = Object.assign({}, previewById)
+            states[row.id] = { state: "generating", path: output, completedAtMs: row.eventCompletedAtMs }
+            previewById = states
+            previewProc.command = [previewHelperPath, row.sourcePath, output]
+            previewProc.running = true
+            refreshRecordings()
+            return
+        }
+    }
+
+    function diagnosticsObject() {
+        var sanitized = []
+        var recordingCount = 0
+        var activeCount = 0
+        var valid = true
+        for (var i = 0; i < items.length; i++) {
+            var row = items[i]
+            if (row.type === "recording") recordingCount++
+            if (row.state === "recording-active" || row.state === "recording-finalizing") activeCount++
+            if (i > 0 && HistoryModel.compare(items[i - 1], row) > 0) valid = false
+            sanitized.push({ type: row.type, sortTimestampMs: row.sortTimestampMs,
+                index: i, state: row.state, previewState: row.previewState })
+        }
+        return { eventCount: items.length, recordingCount: recordingCount,
+            activeRecordingCount: activeCount, latestEvent: sanitized.length ? sanitized[0] : null,
+            orderingValid: valid, previewJobsRunning: previewJobsRunning,
+            previewRetryCount: previewRetryCount, watcherActive: liveRefreshTimer.running,
+            lastRefreshAt: lastRefreshAtMs > 0 ? new Date(lastRefreshAtMs).toISOString() : null,
+            lastErrorCode: lastErrorCode || null, ordering: sanitized }
     }
 
     function activate(index) {
@@ -178,46 +300,60 @@ PanelWindow {
         root.clipboardVisible = false
     }
 
-    function parse(text) {
+    function parse(text, fileMtimeMs) {
         try {
-            var raw = JSON.parse(String(text || "[]"))
+            var payload = JSON.parse(String(text || "{}"))
+            var raw = Array.isArray(payload) ? payload : (Array.isArray(payload.data) ? payload.data : [])
+            historyFileMtimeMs = HistoryModel.finiteMs(fileMtimeMs || payload.mtimeMs || historyFileMtimeMs || Date.now())
             if (!Array.isArray(raw)) raw = []
 
             var out = []
-            var fallbackNow = Date.now() / 1000
             for (var i = 0; i < raw.length; i++) {
                 var x = raw[i] || {}
                 var previewType = String(x.type || "").toLowerCase()
                 var isImage = previewType === "image" && !!x.path
                 var isText = previewType === "text" && typeof x.text === "string"
                 var fullText = isText ? String(x.text || "") : ""
+                if (isText && isSensitiveClipboardText(fullText)) continue
                 var mimeType = String(x.mime || "")
                 var timestamp = String(x.capturedAt || "")
                 var parsedTimestamp = Date.parse(timestamp)
                 // Quattro's native store is newest-first but most text entries
                 // have no timestamp. Give that ordering realistic separation so
                 // real screenshot/recording mtimes are not buried behind it.
-                var eventTime = isNaN(parsedTimestamp)
-                    ? fallbackNow - i * 60 : parsedTimestamp / 1000
+                var parsedMs = isNaN(parsedTimestamp) ? 0 : parsedTimestamp
+                // Native text history has no per-entry timestamp. Anchor its
+                // newest-first order to the history file mtime, with enough
+                // separation that hundreds of legacy rows do not masquerade
+                // as events from the same second and bury real media events.
+                var eventTimeMs = HistoryModel.finiteMs(parsedMs) || Math.max(1, historyFileMtimeMs - i * 60000)
                 var label = isImage ? "Image clipboard entry"
                     : (fullText ? fullText.replace(/\s+/g, " ").trim().slice(0, 120) : "Clipboard entry")
                 var metadata = [timestamp, mimeType].filter(function(value) { return value.length > 0 }).join(" · ")
-                out.push({
-                    id: "native:" + i,
-                    kind: isImage ? "image" : (isText ? "text" : "other"),
+                out.push(HistoryModel.event({
+                    id: "native:" + i + ":" + eventTimeMs,
+                    type: isImage ? "image" : (isText ? "text" : "other"),
                     entryType: previewType || "other",
-                    label: label,
-                    detail: metadata || String(x.provider || "clipboard"),
+                    source: "omarchy-clipboard",
+                    sourcePath: isImage ? String(x.path || "") : "",
+                    eventStartedAtMs: eventTimeMs,
+                    eventCompletedAtMs: eventTimeMs,
+                    sortTimestampMs: eventTimeMs,
+                    insertionSequence: raw.length - i,
+                    state: "complete",
+                    previewState: isImage ? "ready" : "not-requested",
+                    previewPath: isImage ? String(x.path || "") : "",
+                    title: label,
+                    subtitle: metadata || String(x.provider || "clipboard"),
                     fullText: fullText,
                     previewText: isText ? fullText : "",
-                    imagePath: isImage ? String(x.path || "") : "",
                     mimeType: mimeType,
                     nativeHistoryIndex: i,
                     timestamp: timestamp,
-                    sortKey: eventTime,
+                    timestampFallback: parsedMs > 0 ? "" : "history-file-mtime-plus-native-order",
                     searchKeywords: (label + " " + fullText + " " + metadata + " " + mimeType + " " + previewType).toLowerCase(),
                     icon: isImage ? "" : (isText ? "" : "󰋼")
-                })
+                }))
             }
             clipboardItems = out.filter(function(item) {
                 return item.kind === "text" || item.kind === "image"
@@ -249,30 +385,47 @@ PanelWindow {
         var lines = String(text || "").trim().split("\n")
         for (var i = 0; i < lines.length; i++) {
             var fields = lines[i].split("\t")
-            var eventTime = Number(fields.shift())
+            var eventTimeMs = HistoryModel.finiteMs(fields.shift())
+            var size = Number(fields.shift()) || 0
+            var mediaState = fields.shift() || "complete"
             var path = fields.join("\t").trim()
             if (!path) continue
             var name = path.split("/").pop()
             var stem = name.replace(/\.[^.]+$/, "")
             var prefix = kind === "recording" ? /^screenrecording-/ : /^screenshot-/
             var stamp = stem.replace(prefix, "").replace("_", "  ")
-            out.push({
-                id: kind + ":" + path,
-                kind: kind,
+            var captureTimeMs = kind === "recording" ? HistoryModel.recordingStartMs(name) : 0
+            var startedAtMs = captureTimeMs || eventTimeMs
+            var id = HistoryModel.eventId(kind, path, startedAtMs)
+            var preview = previewById[id] || {}
+            var completed = mediaState === "active" ? 0 : eventTimeMs
+            var previewPath = kind === "recording"
+                ? Quickshell.env("HOME") + "/.cache/quickshell-history-thumbs/" + stem + ".jpg" : path
+            var previewState = kind === "recording"
+                ? (mediaState === "active" ? "waiting-for-final-file" : String(preview.state || "not-requested")) : "ready"
+            out.push(HistoryModel.event({
+                id: id,
+                type: kind,
                 entryType: kind,
-                label: stem.replace(prefix, kind === "recording" ? "Screen recording · " : "Screenshot · "),
-                detail: stamp,
+                source: kind === "recording" ? "omarchy-screenrecord" : "omarchy-screenshot",
+                sourcePath: path,
+                eventStartedAtMs: startedAtMs,
+                eventCompletedAtMs: completed,
+                sortTimestampMs: startedAtMs,
+                insertionSequence: ++insertionSequence,
+                state: kind === "recording" ? (mediaState === "active" ? "recording-active" : "recording-complete") : "complete",
+                previewState: previewState,
+                previewPath: previewPath,
+                title: stem.replace(prefix, kind === "recording" ? "Screen recording · " : "Screenshot · "),
+                subtitle: stamp,
                 fullText: "",
                 previewText: "",
-                imagePath: kind === "recording"
-                    ? Quickshell.env("HOME") + "/.cache/quickshell-history-thumbs/" + stem + ".jpg" : path,
-                filePath: path,
                 mimeType: kind === "recording" ? "video" : "image/png",
                 timestamp: stamp,
-                sortKey: isFinite(eventTime) && eventTime > 0 ? eventTime : i,
+                timestampFallback: captureTimeMs > 0 ? "" : "file-mtime",
                 searchKeywords: (name + " " + (kind === "recording" ? "screen recording video " : "screenshot image ") + stamp).toLowerCase(),
                 icon: kind === "recording" ? "" : ""
-            })
+            }))
         }
         return out
     }
@@ -322,6 +475,29 @@ PanelWindow {
         onTriggered: if (root.clipboardVisible && panel.visible) fanFocus.forceActiveFocus()
     }
     Timer { id: searchResetTimer; interval: 1200; onTriggered: { panel.query = ""; panel.preserveSelection() } }
+    Timer {
+        id: liveRefreshTimer
+        interval: panel.recordingItems.some(function(row) { return row.state === "recording-active" }) ? 750 : 2000
+        repeat: true
+        running: panel.visible
+        onTriggered: {
+            panel.refreshRecordings()
+            if (!screenshotWatchProc.running) screenshotWatchProc.running = true
+        }
+    }
+    Timer {
+        id: historyChangeTimer
+        interval: 80
+        repeat: false
+        onTriggered: {
+            if (queryProc.running) {
+                restart()
+                return
+            }
+            queryProc.running = true
+        }
+    }
+    Timer { id: previewRetryTimer; interval: 1000; repeat: false; onTriggered: panel.requestNextPreview() }
 
     Rectangle {
         id: blurSurface
@@ -357,12 +533,13 @@ PanelWindow {
         }
 
         Repeater {
-            model: panel.visibleItems
+            model: panel.fanItems
             delegate: Rectangle {
                 id: historyCard
                 required property int index
                 required property var modelData
-                readonly property int relativeIndex: index - panel.selectedIndex
+                readonly property int absoluteIndex: panel.fanStartIndex + index
+                readonly property int relativeIndex: absoluteIndex - panel.selectedIndex
                 readonly property int distance: Math.abs(relativeIndex)
                 readonly property bool selected: relativeIndex === 0
 
@@ -461,13 +638,14 @@ PanelWindow {
                     anchors.margins: 16
                     anchors.topMargin: 70
                     visible: historyCard.visible && (modelData.kind === "image"
-                        || modelData.kind === "screenshot" || modelData.kind === "recording")
+                        || modelData.kind === "screenshot"
+                        || (modelData.kind === "recording" && modelData.previewState === "ready"))
                     source: visible ? panel.imageSource(modelData) : ""
                     sourceSize.width: 512
                     sourceSize.height: 512
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
-                    cache: true
+                    cache: false
                 }
 
                 Flickable {
@@ -496,8 +674,9 @@ PanelWindow {
                 Column {
                     anchors.centerIn: parent
                     visible: modelData.kind === "other"
-                        || ((modelData.kind === "image" || modelData.kind === "screenshot"
-                             || modelData.kind === "recording") && cardMedia.status === Image.Error)
+                        || (modelData.kind === "recording" && modelData.previewState !== "ready")
+                        || ((modelData.kind === "image" || modelData.kind === "screenshot")
+                            && cardMedia.status === Image.Error)
                     spacing: 8
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -508,7 +687,12 @@ PanelWindow {
                     }
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: modelData.kind === "recording" ? "Preview unavailable" : "Clipboard item"
+                        text: modelData.kind !== "recording" ? "Clipboard item"
+                            : (modelData.state === "recording-active" ? "Recording in progress"
+                            : (modelData.previewState === "generating" ? "Generating preview…"
+                            : (modelData.previewState === "retryable-failure" ? "Preview retry scheduled"
+                            : (modelData.previewState === "permanent-failure" ? "Preview unavailable · double-click to retry"
+                            : "Finalizing recording…"))))
                         color: root.sumi
                         font.family: root.mono
                         font.pixelSize: 9
@@ -548,8 +732,12 @@ PanelWindow {
                 }
                 TapHandler {
                     acceptedButtons: Qt.LeftButton
-                    onTapped: panel.setSelection(index)
-                    onDoubleTapped: panel.activate(index)
+                    onTapped: panel.setSelection(historyCard.absoluteIndex)
+                    onDoubleTapped: {
+                        if (modelData.kind === "recording" && modelData.previewState === "permanent-failure")
+                            panel.retryPreview(modelData)
+                        else panel.activate(historyCard.absoluteIndex)
+                    }
                 }
             }
         }
@@ -575,8 +763,39 @@ PanelWindow {
 
     Process {
         id: queryProc
-        command: ["jq", "-c", ".", panel.historyPath]
-        stdout: StdioCollector { onStreamFinished: panel.parse(this.text) }
+        command: ["bash", "-c", [
+            "p=\"$1\"; m=$(stat -c %Y -- \"$p\" 2>/dev/null || echo 0);",
+            "jq -c --argjson mtimeMs \"$((m * 1000))\"",
+            "'{mtimeMs:$mtimeMs,data:(if type == \"array\" then .[0:120] else [] end)}' \"$p\""
+        ].join(" "), "history-query", panel.historyPath]
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: panel.parse(this.text)
+        }
+    }
+    FileView {
+        id: historyFileWatcher
+        path: panel.historyPath
+        watchChanges: true
+        onFileChanged: {
+            reload()
+            if (panel.visible) historyChangeTimer.restart()
+        }
+    }
+    Process {
+        id: screenshotWatchProc
+        command: ["bash", "-c", [
+            "D=\"${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$(xdg-user-dir PICTURES 2>/dev/null)}}\";",
+            "case \"$D\" in \"\"|\"$HOME\") D=\"$HOME/Pictures\";; esac; stat -c %y -- \"$D\" 2>/dev/null || true"
+        ].join(" ")]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var next = this.text.trim()
+                if (panel.screenshotWatchSignature && next && next !== panel.screenshotWatchSignature && !screenshotProc.running)
+                    screenshotProc.running = true
+                panel.screenshotWatchSignature = next
+            }
+        }
     }
     Process {
         id: screenshotProc
@@ -584,7 +803,7 @@ PanelWindow {
             "D=\"${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$(xdg-user-dir PICTURES 2>/dev/null)}}\";",
             "case \"$D\" in \"\"|\"$HOME\") D=\"$HOME/Pictures\";; esac;",
             "find \"$D\" -maxdepth 1 -type f -iname 'screenshot-*.png'",
-            "-printf '%T@\\t%p\\n' 2>/dev/null | sort -rn | head -120"
+            "-printf '%T@\\t%s\\tcomplete\\t%p\\n' 2>/dev/null | sort -rn | head -120"
         ].join(" ")]
         stdout: StdioCollector { waitForEnd: true; onStreamFinished: panel.parseScreenshots(this.text) }
     }
@@ -593,16 +812,14 @@ PanelWindow {
         command: ["bash", "-c", [
             "D=\"${OMARCHY_SCREENRECORD_DIR:-${XDG_VIDEOS_DIR:-$(xdg-user-dir VIDEOS 2>/dev/null)}}\";",
             "case \"$D\" in \"\"|\"$HOME\") D=\"$HOME/Videos\";; esac;",
-            "C=\"$HOME/.cache/quickshell-history-thumbs\"; mkdir -p \"$C\";",
+            "active=; if pgrep -f '^gpu-screen-recorder' >/dev/null 2>&1; then active=$(cat /tmp/omarchy-screenrecord-filename 2>/dev/null || true); fi;",
             "find \"$D\" -maxdepth 1 -type f",
             "\\( -iname 'screenrecording-*.mp4' -o -iname 'screenrecording-*.mkv'",
             "-o -iname 'screenrecording-*.webm' -o -iname 'screenrecording-*.mov' \\)",
-            "-printf '%T@\\t%p\\n' 2>/dev/null | sort -rn | head -24 |",
-            "while IFS=$'\\t' read -r ts f; do",
-            "b=$(basename \"$f\"); o=\"$C/${b%.*}.jpg\";",
-            "if [ ! -f \"$o\" ] && command -v ffmpegthumbnailer >/dev/null 2>&1; then",
-            "ffmpegthumbnailer -i \"$f\" -o \"$o\" -s 640 -q 7 >/dev/null 2>&1 || true; fi;",
-            "printf '%s\\t%s\\n' \"$ts\" \"$f\";",
+            "-printf '%T@\\t%s\\t%p\\n' 2>/dev/null | sort -rn | head -24 |",
+            "while IFS=$'\\t' read -r ts size f; do",
+            "state=complete; [ -n \"$active\" ] && [ \"$f\" = \"$active\" ] && state=active;",
+            "printf '%s\\t%s\\t%s\\t%s\\n' \"$ts\" \"$size\" \"$state\" \"$f\";",
             "done"
         ].join(" ")]
         stdout: StdioCollector { waitForEnd: true; onStreamFinished: panel.parseRecordings(this.text) }
@@ -610,6 +827,33 @@ PanelWindow {
     Process { id: copyProc }
     Process { id: removeProc; onExited: function(code) { if (code === 0) panel.refresh() } }
     Process { id: editProc }
+    Process {
+        id: previewProc
+        onExited: function(code) {
+            var states = Object.assign({}, panel.previewById)
+            var attempts = Object.assign({}, panel.previewAttemptsById)
+            var count = Number(attempts[panel.previewJobId] || 0) + (code === 0 ? 0 : 1)
+            attempts[panel.previewJobId] = count
+            panel.previewAttemptsById = attempts
+            if (code === 0) {
+                states[panel.previewJobId] = { state: "ready",
+                    path: panel.previewJobOutput, completedAtMs: Date.now() }
+                panel.lastErrorCode = ""
+            } else {
+                panel.previewRetryCount++
+                states[panel.previewJobId] = { state: count >= 3 ? "permanent-failure" : "retryable-failure",
+                    path: panel.previewJobOutput, completedAtMs: Date.now() }
+                panel.lastErrorCode = code === 10 ? "recording-file-unavailable"
+                    : (code === 11 ? "recording-not-finalized" : "preview-generation-failed")
+            }
+            panel.previewById = states
+            panel.previewJobId = ""
+            panel.previewJobPath = ""
+            panel.previewJobOutput = ""
+            panel.refreshRecordings()
+            if (code !== 0 && count < 3) previewRetryTimer.restart()
+        }
+    }
     Timer { id: refreshTimer; interval: 180; repeat: false; onTriggered: panel.refresh() }
 
     onVisibleChanged: if (visible) {

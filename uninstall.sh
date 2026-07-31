@@ -44,9 +44,22 @@ if [[ -f "$BINDINGS" ]]; then
   temp="$(mktemp "${TMPDIR:-/tmp}/quickshell-rise.bindings.XXXXXX")"
   trap 'rm -f -- "${temp:-}"' EXIT
   awk -v begin="$BLOCK_BEGIN" -v end="$BLOCK_END" '
-    $0 == begin { managed=1; next }
-    $0 == end { managed=0; next }
-    !managed { print }
+    $0 == begin {
+      begin_line=$0
+      unbind_line=""; bind_line=""; end_line=""
+      if ((getline unbind_line) > 0 &&
+          (getline bind_line) > 0 &&
+          (getline end_line) > 0 &&
+          unbind_line == "hl.unbind(\"SUPER + CTRL + V\")" &&
+          bind_line == "o.bind(\"SUPER + CTRL + V\", \"Quickshell Rise clipboard history\", \"omarchy-shell quickshell-rise-clipboard toggle\")" &&
+          end_line == end) next
+      print begin_line
+      if (unbind_line != "") print unbind_line
+      if (bind_line != "") print bind_line
+      if (end_line != "") print end_line
+      next
+    }
+    { print }
   ' "$BINDINGS" >"$temp"
   if have lua; then lua -e "assert(loadfile('$temp'))"; fi
   install -m 644 "$temp" "$BINDINGS"
@@ -72,6 +85,7 @@ if [[ -f "$IDLE_WRAPPER" ]] &&
 fi
 rm -f -- "$HOME/.cache/quickshell/app-launcher/apps.json"
 rmdir -- "$HOME/.cache/quickshell/app-launcher" 2>/dev/null || true
+rm -rf -- "$HOME/.cache/quickshell-history-thumbs"
 holiday_cache="${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-rise/holidays"
 rm -rf -- "$holiday_cache"
 rmdir -- "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-rise" 2>/dev/null || true
@@ -124,7 +138,7 @@ done
 systemctl --user daemon-reload >/dev/null 2>&1 || true
 
 if have omarchy-shell && omarchy-shell shell ping >/dev/null 2>&1; then
-  omarchy plugin rescan >/dev/null
+  omarchy-shell shell rescanPlugins >/dev/null
   omarchy-shell shell ping >/dev/null
 fi
 if have hyprctl; then hyprctl reload >/dev/null; fi

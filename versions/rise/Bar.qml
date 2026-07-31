@@ -206,6 +206,10 @@ Item {
         }
     }
 
+    function historyDiagnostics() {
+        return theme.historyDiagnosticsProvider ? theme.historyDiagnosticsProvider.diagnosticsObject() : {}
+    }
+
     function debugBarGeometry() {
         var geometry = []
         for (var i = 0; i < barScreens.length; i++) {
@@ -293,6 +297,7 @@ Item {
             else theme.openClipboard()
         }
         function state(): string { return theme.clipboardVisible ? "open" : "closed" }
+        function diagnostics(): string { return JSON.stringify(root.historyDiagnostics()) }
         function ping(): void { }
     }
 

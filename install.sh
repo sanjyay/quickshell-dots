@@ -109,7 +109,7 @@ rollback() {
     rm -f -- "$UNIT_DIR/$HOLIDAY_UPDATE_UNIT.timer"
     systemctl --user daemon-reload >/dev/null 2>&1 || true
   fi
-  omarchy plugin rescan >/dev/null 2>&1 || warn "plugin rescan failed during rollback"
+  omarchy-shell shell rescanPlugins >/dev/null 2>&1 || warn "plugin rescan failed during rollback"
   omarchy bar use "$previous_bar" >/dev/null 2>&1 || omarchy bar use omarchy.bar >/dev/null 2>&1 || true
   hyprctl reload >/dev/null 2>&1 || warn "Hyprland reload failed during rollback"
   cleanup
@@ -211,7 +211,7 @@ for _ in {1..40}; do
   fi
   sleep 0.05
 done
-omarchy plugin rescan >/dev/null
+omarchy-shell shell rescanPlugins >/dev/null
 # The shell's rescan IPC starts an asynchronous unload -> clearComponentCache
 # -> filesystem scan cycle. An already-known ID is not proof that this cycle
 # has completed, so allow it to settle before selecting the bar again.
@@ -283,6 +283,10 @@ done
 cmp -s "$repo_root/versions/default/panels/HistoryPanel.qml" \
   "$TARGET/versions/default/panels/HistoryPanel.qml" ||
   die "installed Rise clipboard history panel differs from staged source"
+for history_file in versions/default/panels/HistoryModel.js scripts/history-recording-preview.sh; do
+  cmp -s "$repo_root/$history_file" "$TARGET/$history_file" ||
+    die "installed Rise history runtime differs from staged source: $history_file"
+done
 
 info "Installing the Quattro Lua binding block"
 bindings_temp="$temp_root/bindings.new"

@@ -454,6 +454,7 @@ Item {
     }
 
     property bool clipboardVisible: false
+    property var historyDiagnosticsProvider: null
     onClipboardVisibleChanged: popupOpened("clipboardVisible")
     function openClipboard() { activateFocusedPopupScreen(); clipboardVisible = true }
 
