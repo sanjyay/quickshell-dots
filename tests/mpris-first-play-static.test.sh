@@ -16,6 +16,12 @@ require 'return p\.playbackState === MprisPlaybackState\.Playing' "$selector"
 forbid 'playbackState === MprisPlaybackState\.Playing && hasTrack\(p\)' "$selector"
 require 'readonly property bool volumeWidgetVisible: modVolume && mprisPlaying' "$theme"
 require 'showNowPlaying: root\.modMpris && active && trackLabel\.length > 0' "$widget"
+require 'RowLayout \{' "$widget"
+require 'Layout\.fillWidth: true' "$widget"
+require 'Layout\.minimumWidth: 0' "$widget"
+require 'Layout\.preferredWidth: 16' "$widget"
+require 'GradientStop \{ position: 0\.97; color: "white" \}' "$widget"
+forbid 'titleWidth' "$widget"
 
 # Retain the existing stale-proxy and paused-player safeguards.
 require 'if \(isProxy\(p\)\) return false' "$selector"

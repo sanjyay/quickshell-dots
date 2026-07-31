@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Effects
+import QtQuick.Layouts
 import Quickshell
 import Quickshell.Services.Mpris
 
@@ -13,9 +14,9 @@ Item {
     readonly property var  player:  sel.player
     readonly property bool active:  sel.active
     readonly property bool playing: sel.playing
-    // Inline transport controls were removed; give their former width to the
-    // existing metadata marquee without changing the pill's overall footprint.
-    readonly property int titleWidth: compact ? 80 : 119
+    // Preserve the existing outer footprint while allowing the inner layout
+    // to distribute every available pixel between metadata and equalizer.
+    readonly property int pillWidth: compact ? 118 : 157
 
     onActiveChanged: {
         root.mprisActive = active
@@ -78,7 +79,7 @@ Item {
     // stale MPRIS entries remain filtered by MprisSelect.
     readonly property bool showNowPlaying: root.modMpris && active && trackLabel.length > 0
     visible: implicitWidth > 0.5
-    implicitWidth: showNowPlaying ? row.implicitWidth + 18 : 0
+    implicitWidth: showNowPlaying ? pillWidth : 0
     implicitHeight: 28
     width: implicitWidth
     height: implicitHeight
@@ -92,7 +93,7 @@ Item {
 
     Rectangle {
         x: 0; anchors.verticalCenter: parent.verticalCenter
-        width: Math.round(row.implicitWidth) + 18
+        width: parent.width
         height: root.pillH
         radius: root.pillRadius
         color: root.pill
@@ -101,37 +102,39 @@ Item {
         PillShadow { theme: root }
     }
 
-    Row {
-        id: row
-        visible: rootMod.active
-        anchors.centerIn: parent
-        spacing: 4
-
-        // hidden alpha-mask source for the marquee fade — defined BEFORE the masked
-        // item so the layer.effect can resolve the id; visible:false → no Row layout.
-        Item {
-            id: marqueeFadeMask
-            width: rootMod.titleWidth; height: 28
-            visible: false
-            layer.enabled: true
-            Rectangle {
-                anchors.fill: parent
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0.0;  color: "white" }
-                    GradientStop { position: 0.92; color: "white" }
-                    GradientStop { position: 1.0;  color: "transparent" }
-                }
+    // Hidden alpha-mask source for the marquee fade. Its width follows the
+    // real responsive viewport rather than a fixed metadata width.
+    Item {
+        id: marqueeFadeMask
+        width: marqueeClip.width
+        height: 28
+        visible: false
+        layer.enabled: true
+        Rectangle {
+            anchors.fill: parent
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.0;  color: "white" }
+                GradientStop { position: 0.97; color: "white" }
+                GradientStop { position: 1.0;  color: "transparent" }
             }
         }
+    }
+
+    RowLayout {
+        id: row
+        visible: rootMod.active
+        anchors.fill: parent
+        anchors.leftMargin: 9
+        anchors.rightMargin: 9
+        spacing: 4
 
         // ── marquee title ──
         Item {
             id: marqueeClip
-            implicitWidth: rootMod.titleWidth
-            width: rootMod.titleWidth
-            height: 28
-            anchors.verticalCenter: parent.verticalCenter
+            Layout.fillWidth: true
+            Layout.minimumWidth: 0
+            Layout.fillHeight: true
             // alpha-mask fade of the right edge: the scrolling title dissolves into
             // the real pixels behind it (no fixed colour → no seam on the translucent
             // pill). layer.enabled also clips to bounds like the old clip:true.
@@ -164,6 +167,8 @@ Item {
                     marqueeAnim.start()
             }
 
+            onWidthChanged: resetMarquee()
+
             Connections {
                 target: rootMod
                 function onPlayingChanged() { marqueeClip.resetMarquee() }
@@ -188,10 +193,11 @@ Item {
         // ── equalizer canvas ──
         Canvas {
             id: eqCanvas
-            implicitWidth: 16
-            width: 16
-            height: 14
-            anchors.verticalCenter: parent.verticalCenter
+            Layout.minimumWidth: 16
+            Layout.preferredWidth: 16
+            Layout.maximumWidth: 16
+            Layout.preferredHeight: 14
+            Layout.alignment: Qt.AlignVCenter
 
             property color tint: root.seal
             onTintChanged: requestPaint()

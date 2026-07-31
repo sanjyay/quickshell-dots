@@ -789,7 +789,18 @@ Item {
 
     function aiFmtResetAt(ts) {
         if (!(ts > 0)) return ""
-        return new Date(ts * 1000).toLocaleString(Qt.locale(), "MMM d, yyyy h:mm AP")
+        return formatDisplayDateTime(ts * 1000, true)
+    }
+
+    function formatDisplayDateTime(value, includeTime) {
+        var date = value instanceof Date ? value : new Date(Number(value))
+        if (isNaN(date.getTime())) return ""
+        function pad(number) { return number < 10 ? "0" + number : String(number) }
+        var formatted = pad(date.getDate()) + "-" + pad(date.getMonth() + 1)
+            + "-" + date.getFullYear()
+        return includeTime === true
+            ? formatted + " · " + pad(date.getHours()) + ":" + pad(date.getMinutes())
+            : formatted
     }
 
     function refreshAiUsage(selectedOnly, skipBackendKick) {

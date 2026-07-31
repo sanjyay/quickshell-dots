@@ -11,6 +11,8 @@ grep -Fq 'omarchy-shell shell listPlugins' "$install"
 grep -Fq 'omarchy-shell shell listShellConfig' "$install"
 [[ "$(grep -Fc 'omarchy-shell shell rescanPlugins' "$install")" == 2 ]]
 grep -Fq 'omarchy-shell shell rescanPlugins' "$uninstall"
+grep -Fq 'quickshell-rise-owned-mpv-screenrecord-action' "$install"
+grep -Fq 'quickshell-rise-owned-mpv-screenrecord-action' "$uninstall"
 ! grep -Fq 'omarchy plugin rescan' "$install"
 ! grep -Fq 'omarchy plugin rescan' "$uninstall"
 grep -Fq 'omarchy-shell quickshell-rise-health ping' "$install"

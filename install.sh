@@ -16,6 +16,9 @@ LOOKNFEEL="$HOME/.config/hypr/looknfeel.lua"
 BLUR_BLOCK_BEGIN="-- BEGIN QUICKSHELL-RISE HISTORY BLUR"
 BLUR_BLOCK_END="-- END QUICKSHELL-RISE HISTORY BLUR"
 LEGACY_IDLE_WRAPPER="$HOME/.local/bin/quickshell-rise-idle-toggle"
+MPV_WRAPPER="$HOME/.local/bin/mpv"
+LEGACY_SCREENRECORD_WRAPPER="$HOME/.local/bin/omarchy-capture-screenrecording"
+LEGACY_SCREENRECORD_SHIM_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/quickshell-rise/screenrecord-bin"
 UNIT_DIR="$HOME/.config/systemd/user"
 HOLIDAY_UPDATE_UNIT="quickshell-rise-holiday-annual-update"
 
@@ -94,6 +97,10 @@ rollback() {
     install -m 644 "$backup_looknfeel" "$LOOKNFEEL"
   else
     rm -f -- "$LOOKNFEEL"
+  fi
+  if [[ -f "$MPV_WRAPPER" ]] &&
+     grep -Fq 'quickshell-rise-owned-mpv-screenrecord-action' "$MPV_WRAPPER"; then
+    rm -f -- "$MPV_WRAPPER"
   fi
   systemctl --user disable --now "$HOLIDAY_UPDATE_UNIT.timer" >/dev/null 2>&1 || true
   if (( had_holiday_service )); then
@@ -177,6 +184,10 @@ jq -e '.ok == true and .provider.id == "tn-recurring-fixed" and
 omarchy plugin validate "$stage"
 [[ -x "$stage/scripts/ai-usage-collector" ]] ||
   die "repository is incomplete: scripts/ai-usage-collector is missing or not executable"
+if [[ -e "$MPV_WRAPPER" ]] &&
+   ! grep -Fq 'quickshell-rise-owned-mpv-screenrecord-action' "$MPV_WRAPPER"; then
+  die "refusing to replace non-Rise MPV wrapper: $MPV_WRAPPER"
+fi
 
 mkdir -p -- "$PLUGINS_DIR" "$STATE_HOME" "$(dirname -- "$BINDINGS")"
 if [[ -e "$TARGET" ]]; then
@@ -491,6 +502,20 @@ for provider in codex claude opencode; do
 done
 cmp -s "$repo_root/scripts/ai-usage-collector" "$TARGET/scripts/ai-usage-collector" ||
   die "installed AI usage collector differs from repository source"
+
+info "Installing the Omakut screen-recording notification action"
+mkdir -p -- "$(dirname -- "$MPV_WRAPPER")"
+install -m 755 "$TARGET/scripts/quickshell-rise-mpv" "$MPV_WRAPPER"
+if [[ -f "$LEGACY_SCREENRECORD_WRAPPER" ]] &&
+   grep -Fq 'quickshell-rise-owned-screenrecord-capture' "$LEGACY_SCREENRECORD_WRAPPER"; then
+  rm -f -- "$LEGACY_SCREENRECORD_WRAPPER"
+fi
+if [[ -f "$LEGACY_SCREENRECORD_SHIM_DIR/omarchy-notification-send" ]] &&
+   grep -Fq 'quickshell-rise-owned-screenrecord-notification' \
+     "$LEGACY_SCREENRECORD_SHIM_DIR/omarchy-notification-send"; then
+  rm -f -- "$LEGACY_SCREENRECORD_SHIM_DIR/omarchy-notification-send"
+fi
+rmdir -- "$LEGACY_SCREENRECORD_SHIM_DIR" 2>/dev/null || true
 
 info "Installing the annual verified holiday update timer"
 mkdir -p -- "$UNIT_DIR"

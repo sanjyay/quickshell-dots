@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# quickshell-rise-owned-mpv-screenrecord-action
+
+parent_command=$(ps -o args= -p "$PPID" 2>/dev/null || true)
+target=${1:-}
+target_name=${target##*/}
+
+if [[ $parent_command == *omarchy-capture-screenrecording* &&
+      $target_name == screenrecording-*.mp4 && -f $target ]]; then
+  exec omacut "$target"
+fi
+
+exec /usr/bin/mpv "$@"

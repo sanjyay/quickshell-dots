@@ -327,6 +327,7 @@ PanelWindow {
                 // separation that hundreds of legacy rows do not masquerade
                 // as events from the same second and bury real media events.
                 var eventTimeMs = HistoryModel.finiteMs(parsedMs) || Math.max(1, historyFileMtimeMs - i * 60000)
+                var displayTimestamp = root.formatDisplayDateTime(eventTimeMs, true)
                 var label = isImage ? "Image clipboard entry"
                     : (fullText ? fullText.replace(/\s+/g, " ").trim().slice(0, 120) : "Clipboard entry")
                 var metadata = [timestamp, mimeType].filter(function(value) { return value.length > 0 }).join(" · ")
@@ -349,7 +350,7 @@ PanelWindow {
                     previewText: isText ? fullText : "",
                     mimeType: mimeType,
                     nativeHistoryIndex: i,
-                    timestamp: timestamp,
+                    timestamp: displayTimestamp,
                     timestampFallback: parsedMs > 0 ? "" : "history-file-mtime-plus-native-order",
                     searchKeywords: (label + " " + fullText + " " + metadata + " " + mimeType + " " + previewType).toLowerCase(),
                     icon: isImage ? "" : (isText ? "" : "󰋼")
@@ -421,7 +422,7 @@ PanelWindow {
                 fullText: "",
                 previewText: "",
                 mimeType: kind === "recording" ? "video" : "image/png",
-                timestamp: stamp,
+                timestamp: root.formatDisplayDateTime(startedAtMs, true),
                 timestampFallback: captureTimeMs > 0 ? "" : "file-mtime",
                 searchKeywords: (name + " " + (kind === "recording" ? "screen recording video " : "screenshot image ") + stamp).toLowerCase(),
                 icon: kind === "recording" ? "" : ""
@@ -708,6 +709,7 @@ PanelWindow {
                     spacing: 5
                     Text {
                         width: parent.width
+                        visible: modelData.kind !== "recording" && modelData.kind !== "screenshot"
                         text: modelData.kind === "image" ? "Copied image" : modelData.label
                         color: root.ink
                         font.family: root.mono

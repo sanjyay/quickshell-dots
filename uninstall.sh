@@ -13,6 +13,9 @@ LOOKNFEEL="$HOME/.config/hypr/looknfeel.lua"
 BLUR_BLOCK_BEGIN="-- BEGIN QUICKSHELL-RISE HISTORY BLUR"
 BLUR_BLOCK_END="-- END QUICKSHELL-RISE HISTORY BLUR"
 IDLE_WRAPPER="$HOME/.local/bin/quickshell-rise-idle-toggle"
+MPV_WRAPPER="$HOME/.local/bin/mpv"
+LEGACY_SCREENRECORD_WRAPPER="$HOME/.local/bin/omarchy-capture-screenrecording"
+LEGACY_SCREENRECORD_SHIM_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/quickshell-rise/screenrecord-bin"
 
 info() { printf '==> %s\n' "$*"; }
 warn() { printf '!! %s\n' "$*" >&2; }
@@ -83,6 +86,20 @@ if [[ -f "$IDLE_WRAPPER" ]] &&
    grep -Fq 'quickshell-rise-owned-idle-toggle' "$IDLE_WRAPPER"; then
   rm -f -- "$IDLE_WRAPPER"
 fi
+if [[ -f "$MPV_WRAPPER" ]] &&
+   grep -Fq 'quickshell-rise-owned-mpv-screenrecord-action' "$MPV_WRAPPER"; then
+  rm -f -- "$MPV_WRAPPER"
+fi
+if [[ -f "$LEGACY_SCREENRECORD_WRAPPER" ]] &&
+   grep -Fq 'quickshell-rise-owned-screenrecord-capture' "$LEGACY_SCREENRECORD_WRAPPER"; then
+  rm -f -- "$LEGACY_SCREENRECORD_WRAPPER"
+fi
+if [[ -f "$LEGACY_SCREENRECORD_SHIM_DIR/omarchy-notification-send" ]] &&
+   grep -Fq 'quickshell-rise-owned-screenrecord-notification' \
+     "$LEGACY_SCREENRECORD_SHIM_DIR/omarchy-notification-send"; then
+  rm -f -- "$LEGACY_SCREENRECORD_SHIM_DIR/omarchy-notification-send"
+fi
+rmdir -- "$LEGACY_SCREENRECORD_SHIM_DIR" 2>/dev/null || true
 rm -f -- "$HOME/.cache/quickshell/app-launcher/apps.json"
 rmdir -- "$HOME/.cache/quickshell/app-launcher" 2>/dev/null || true
 rm -rf -- "$HOME/.cache/quickshell-history-thumbs"

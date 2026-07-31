@@ -87,7 +87,7 @@ PanelWindow {
     function collectedLabel(value) {
         var parsed = Date.parse(String(value || ""))
         if (isNaN(parsed)) return ""
-        return new Date(parsed).toLocaleString(Qt.locale(), "MMM d, h:mm AP")
+        return root.formatDisplayDateTime(parsed, true)
     }
 
     property real reveal: root.aiUsageVisible ? 1 : 0

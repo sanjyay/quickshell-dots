@@ -126,11 +126,25 @@ Scope {
         return preview.slice(0, -suffix.length) + ".mp4"
     }
 
+    function openScreenRecording(entry) {
+        if (String(entry.summary || "").trim() !== "Screen recording saved") return false
+        var inferredPath = screenRecordingPath(entry)
+        Quickshell.execDetached(["bash", "-c", [
+            "candidate=$1;",
+            "if [[ -z $candidate || ! -f $candidate ]]; then candidate=$(cat /tmp/omarchy-screenrecord-filename 2>/dev/null || true); fi;",
+            "if [[ -z $candidate || ! -f $candidate ]]; then",
+            "D=\"${OMARCHY_SCREENRECORD_DIR:-${XDG_VIDEOS_DIR:-$(xdg-user-dir VIDEOS 2>/dev/null)}}\";",
+            "case \"$D\" in \"\"|\"$HOME\") D=\"$HOME/Videos\";; esac;",
+            "candidate=$(find \"$D\" -maxdepth 1 -type f -iname 'screenrecording-*.mp4' -printf '%T@\\t%p\\n' 2>/dev/null | sort -rn | head -1 | cut -f2-);",
+            "fi;",
+            "[[ -n $candidate && -f $candidate ]] && exec omacut \"$candidate\""
+        ].join(" "), "rise-open-screen-recording", inferredPath])
+        return true
+    }
+
     function invoke(entry, identifier) {
         if (!entry.notification) return
-        var recordingPath = screenRecordingPath(entry)
-        if ((!identifier || identifier === "default") && recordingPath !== "") {
-            Quickshell.execDetached(["omacut", recordingPath])
+        if ((!identifier || identifier === "default") && openScreenRecording(entry)) {
             entry.notification.dismiss()
             close(entry.key, false)
             return
