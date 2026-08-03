@@ -59,7 +59,11 @@ Item {
             fatalError: fatal,
             screens: screenCount,
             windows: windowCount,
-            degradedFeatures: [],
+            degradedFeatures: astra && astra.capabilityDiagnostics
+                ? Object.keys(astra.capabilityDiagnostics().capabilities || {}).filter(function(name) {
+                    return astra.capabilityDiagnostics().capabilities[name].available !== true
+                }) : [],
+            capabilities: astra && astra.capabilityDiagnostics ? astra.capabilityDiagnostics() : {},
             gpu: astra && astra.gpuDiagnostics ? astra.gpuDiagnostics() : {},
             idle: astra && astra.idleDiagnostics ? astra.idleDiagnostics() : {},
             network: astra && astra.networkDiagnostics ? astra.networkDiagnostics() : {},
@@ -125,6 +129,9 @@ Item {
                 status: "unavailable",
                 records: []
             })
+        }
+        function capabilityDiagnostics(): string {
+            return JSON.stringify(root.astra ? root.astra.capabilityDiagnostics() : {})
         }
     }
 

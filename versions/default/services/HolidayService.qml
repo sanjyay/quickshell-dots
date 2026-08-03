@@ -9,6 +9,7 @@ QtObject {
     id: service
 
     property bool enabled: true
+    property var capabilities: null
     property bool showInGrid: true
     property bool panelVisible: false
     property int displayedYear: 0
@@ -67,7 +68,8 @@ QtObject {
         return value.indexOf("file://") === 0 ? value.substring(7) : value
     }
     readonly property bool configuredCountryValid: countrySelectionMode === "manual"
-        && countryEntry(configuredCountryCode) !== null
+        && (countryEntry(configuredCountryCode) !== null
+            || (!runtimeAvailable && /^[A-Z]{2}$/.test(configuredCountryCode)))
     readonly property string effectiveCountryCode: countrySelectionMode === "manual"
         ? (configuredCountryValid ? configuredCountryCode : "")
         : detectedCountryCode
@@ -82,6 +84,14 @@ QtObject {
         return entry ? entry.name : ""
     }
     readonly property bool hasSubdivisions: subdivisions.length > 0
+    readonly property bool runtimeAvailable: capabilities && capabilities.node
+        && capabilities.dateHolidays
+    readonly property string unavailableMessage: !capabilities || !capabilities.probed
+        ? "Checking optional holiday support…"
+        : (!capabilities.node ? "Node.js is unavailable; holiday dates are disabled."
+        : (!capabilities.dateHolidays
+            ? "Optional date-holidays data is not installed. Run astra-setup-extras --holidays."
+            : ""))
 
     function countryEntry(code) {
         var wanted = String(code || "").toUpperCase()
@@ -241,6 +251,13 @@ QtObject {
 
     function requestCountries() {
         if (!enabled) return
+        if (!runtimeAvailable) {
+            countryStatus = capabilities && capabilities.probed ? "unavailable" : "loading"
+            status = capabilities && capabilities.probed ? "degraded" : "idle"
+            errorCode = capabilities && capabilities.probed ? "dependency-unavailable" : ""
+            errorMessage = unavailableMessage
+            return
+        }
         countryRequestToken++
         if (countryProcess.running) {
             countryQueued = true
@@ -357,6 +374,17 @@ QtObject {
             return
         }
         if (!stateLoaded || !panelVisible || displayedYear < 1900) return
+        if (!runtimeAvailable) {
+            holidayQueued = false
+            clearHolidayModel()
+            var fallbackIndex = {}
+            appendIndianBankClosures(fallbackIndex)
+            holidaysByDate = fallbackIndex
+            status = capabilities && capabilities.probed ? "degraded" : "idle"
+            errorCode = capabilities && capabilities.probed ? "dependency-unavailable" : ""
+            errorMessage = unavailableMessage
+            return
+        }
         if (countryStatus !== "ready") {
             requestCountries()
             return
@@ -489,6 +517,10 @@ QtObject {
     }
     onDisplayedYearChanged: { clearHolidayModel(); scheduleRefresh() }
     onEnabledChanged: scheduleRefresh()
+    onRuntimeAvailableChanged: {
+        if (panelVisible) requestCountries()
+        scheduleRefresh()
+    }
 
     property FileView stateFile: FileView {
         path: service.statePath

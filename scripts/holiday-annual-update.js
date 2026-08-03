@@ -9,7 +9,7 @@ const path = require("path");
 const provider = require("./regional-holiday-provider.js");
 
 const DEFAULT_URL =
-  "https://raw.githubusercontent.com/sanjyay/quickshell-dots/main/data/holidays/{country}/{subdivision}/{year}.json";
+  "https://raw.githubusercontent.com/sanjyay/quickshell-astra/main/data/holidays/{country}/{subdivision}/{year}.json";
 const MAX_BYTES = 1024 * 1024;
 
 function parseArgs(argv) {

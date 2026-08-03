@@ -5,6 +5,8 @@ import Quickshell.Io
 Item {
     id: rootMod
     required property var root
+    readonly property string helperPath: Qt.resolvedUrl("../../../scripts/qs-notification-silence.sh")
+        .toString().replace(/^file:\/\//, "")
 
     property bool silenced: false
     onSilencedChanged: root.notifSilenced = silenced   // mirror for the swarm reactor
@@ -27,7 +29,7 @@ Item {
 
     Process {
         id: dndProc
-        command: ["bash", "-c", "qs-notification-silence status"]
+        command: [rootMod.helperPath, "status"]
         running: false
         stdout: StdioCollector {
             onStreamFinished: { rootMod.silenced = this.text.trim() === "ON" }
@@ -39,7 +41,7 @@ Item {
         onTriggered: { dndProc.running = false; dndProc.running = true }
     }
 
-    Process { id: toggleProc; command: ["bash", "-c", "qs-notification-silence toggle"] }
+    Process { id: toggleProc; command: [rootMod.helperPath, "toggle"] }
 
     TooltipMixin { id: tip; root: rootMod.root; owner: rootMod; text: rootMod.tooltipText }
 

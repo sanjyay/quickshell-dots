@@ -9,6 +9,10 @@ import "../models/OmarchyMenuModel.js" as MenuModel
 PanelWindow {
     id: menuPanel
     required property var root
+    readonly property string menuDataHelperPath: Qt.resolvedUrl("../../../scripts/qs-menu-data.sh")
+        .toString().replace(/^file:\/\//, "")
+    readonly property string menuActionHelperPath: Qt.resolvedUrl("../../../scripts/qs-menu-action.sh")
+        .toString().replace(/^file:\/\//, "")
 
     screen: root.activePopupScreen
     color: "transparent"
@@ -90,7 +94,7 @@ PanelWindow {
         if (!source || dataProc.running || dynamicRows[source] !== undefined) return
         pendingDynamicSource = source
         dynamicResultReceived = false
-        dataProc.command = [Quickshell.env("HOME") + "/.local/bin/qs-menu-data", source]
+        dataProc.command = [menuDataHelperPath, source]
         dataProc.running = false
         dataProc.running = true
     }
@@ -269,7 +273,7 @@ PanelWindow {
         }
         root.menuVisible = false
         var value = String(entry.dynamicValue || "")
-        actionProc.command = value ? ["qs-menu-action", action, value] : ["qs-menu-action", action]
+        actionProc.command = value ? [menuActionHelperPath, action, value] : [menuActionHelperPath, action]
         actionProc.running = false
         actionProc.running = true
     }
@@ -544,7 +548,7 @@ PanelWindow {
         var action = pendingAction
         pendingAction = ""
         root.menuVisible = false
-        actionProc.command = ["qs-menu-action", action]
+        actionProc.command = [menuActionHelperPath, action]
         actionProc.running = false; actionProc.running = true
     }
 

@@ -17,6 +17,9 @@ Item {
 
     property var cameraSwitch: null
     property var calendarHolidayConfig: ({})
+    readonly property var runtimeCapabilities: capabilityService
+
+    RuntimeCapabilities { id: capabilityService }
 
     Component.onCompleted: {
         console.log("Theme.qml completed cameraSwitch=" + (cameraSwitch ? cameraSwitch.monitorVersion : "null"))
@@ -574,6 +577,7 @@ Item {
 
     HolidayService {
         id: holidayService
+        capabilities: capabilityService
         enabled: theme.holidayConfigValue("enabled", true) === true
         defaultCountryMode: String(theme.holidayConfigValue("countryMode",
             String(theme.holidayConfigValue("country", "auto")).toLowerCase() === "auto" ? "auto" : "manual"))

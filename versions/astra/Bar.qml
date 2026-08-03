@@ -210,6 +210,12 @@ Item {
         return theme.historyDiagnosticsProvider ? theme.historyDiagnosticsProvider.diagnosticsObject() : {}
     }
 
+    function capabilityDiagnostics() {
+        return theme.runtimeCapabilities ? theme.runtimeCapabilities.diagnosticsObject() : {
+            probed: false, probeCount: 0, capabilities: {}
+        }
+    }
+
     function debugBarGeometry() {
         var geometry = []
         for (var i = 0; i < barScreens.length; i++) {

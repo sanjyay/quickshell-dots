@@ -6,7 +6,9 @@ QtObject {
 
     required property string path
     property bool validateJson: false
-    property var writerCommand: ["qs-state-write"]
+    readonly property string bundledWriterPath: Qt.resolvedUrl("../../../scripts/qs-state-write")
+        .toString().replace(/^file:\/\//, "")
+    property var writerCommand: [bundledWriterPath]
     property string pending: ""
     property string inFlight: ""
 

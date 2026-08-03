@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+REPO_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd -P)
+# shellcheck source=scripts/astra-extras-common
+source "$SCRIPT_DIR/astra-extras-common"
+
+dry_run=0 holidays=0 bindings=0 timer=0
+usage() { printf '%s\n' 'Usage: astra-setup-extras [--dry-run] (--holidays|--bindings|--timer|--all)'; }
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) dry_run=1 ;;
+    --holidays) holidays=1 ;;
+    --bindings) bindings=1 ;;
+    --timer) timer=1 ;;
+    --all) holidays=1; bindings=1; timer=1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+  esac
+done
+(( holidays || bindings || timer )) || { usage >&2; exit 2; }
+
+say() { printf 'quickshell-astra extras: %s\n' "$*"; }
+run() { if (( dry_run )); then printf 'DRY-RUN:'; printf ' %q' "$@"; printf '\n'; else "$@"; fi; }
+
+if (( holidays )); then
+  command -v node >/dev/null 2>&1 || { say 'node is required for --holidays' >&2; exit 3; }
+  command -v npm >/dev/null 2>&1 || { say 'npm is required for --holidays' >&2; exit 3; }
+  runtime=$(astra_runtime_dir)
+  say "install pinned date-holidays runtime in $runtime"
+  run install -d -m 700 "$runtime"
+  run install -m 600 "$REPO_ROOT/package.json" "$REPO_ROOT/package-lock.json" "$runtime/"
+  if (( dry_run )); then
+    say "would run npm ci --prefix $runtime"
+  else
+    npm --prefix "$runtime" ci --omit=dev --ignore-scripts --no-audit --no-fund
+    rm -rf -- "$runtime/node_modules/.bin"
+    node "$SCRIPT_DIR/holiday-helper.js" dependency-status | grep -q '"available":true' || exit 4
+  fi
+fi
+
+if (( bindings )); then
+  command -v lua >/dev/null 2>&1 || { say 'lua is required for --bindings' >&2; exit 3; }
+  binding_file=$(astra_bindings_file)
+  temp=$(mktemp "${TMPDIR:-/tmp}/astra-bindings.XXXXXX")
+  trap 'rm -f -- "${temp:-}"' EXIT
+  if [[ -f "$binding_file" ]]; then astra_filter_binding_blocks "$binding_file" "$temp"; else : >"$temp"; fi
+  astra_append_binding_block "$temp"
+  lua -e "assert(loadfile('$temp'))"
+  if (( dry_run )); then
+    say "would replace Astra/Rise managed block in $binding_file"
+  else
+    install -d -m 700 "$(dirname -- "$binding_file")"
+    install -m 600 "$temp" "$binding_file"
+  fi
+  rm -f -- "$temp"; trap - EXIT
+fi
+
+if (( timer )); then
+  unit_dir=$(astra_unit_dir)
+  say "install Astra holiday timer in $unit_dir"
+  run install -d -m 700 "$unit_dir"
+  run install -m 600 "$REPO_ROOT/systemd/quickshell-astra-holiday-annual-update.service" "$unit_dir/"
+  run install -m 600 "$REPO_ROOT/systemd/quickshell-astra-holiday-annual-update.timer" "$unit_dir/"
+  if (( ! dry_run )); then
+    if command -v systemctl >/dev/null 2>&1 && systemctl --user daemon-reload >/dev/null 2>&1; then
+      systemctl --user enable --now quickshell-astra-holiday-annual-update.timer >/dev/null 2>&1 ||
+        say 'user systemd is unavailable; units were installed but not enabled'
+    else
+      say 'user systemd is unavailable; units were installed but not enabled'
+    fi
+  fi
+fi

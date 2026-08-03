@@ -8,6 +8,8 @@ import "../modules"
 PanelWindow {
     id: panel
     required property var root
+    readonly property string themeHelperPath: Qt.resolvedUrl("../../../scripts/qs-theme-switcher")
+        .toString().replace(/^file:\/\//, "")
 
     screen: root.activePopupScreen
     color: "transparent"
@@ -254,7 +256,7 @@ PanelWindow {
 
     Process {
         id: cacheListProc
-        command: ["qs-theme-switcher", "cache"]
+        command: [panel.themeHelperPath, "cache"]
         running: true
         stdout: StdioCollector {
             onStreamFinished: {
@@ -267,7 +269,7 @@ PanelWindow {
 
     Process {
         id: cacheCurrentProc
-        command: ["qs-theme-switcher", "current"]
+        command: [panel.themeHelperPath, "current"]
         running: true
         stdout: StdioCollector {
             onStreamFinished: {
@@ -280,7 +282,7 @@ PanelWindow {
 
     Process {
         id: currentProc
-        command: ["qs-theme-switcher", "current"]
+        command: [panel.themeHelperPath, "current"]
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
@@ -297,7 +299,7 @@ PanelWindow {
 
     Process {
         id: listProc
-        command: ["qs-theme-switcher", "list"]
+        command: [panel.themeHelperPath, "list"]
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
@@ -314,7 +316,7 @@ PanelWindow {
 
     Process {
         id: watchListProc
-        command: ["qs-theme-switcher", "list"]
+        command: [panel.themeHelperPath, "list"]
         running: false
         stdout: StdioCollector {
             onStreamFinished: panel.refreshIfChanged(String(this.text || ""))

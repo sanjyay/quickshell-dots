@@ -139,10 +139,32 @@ same date. The closure ring is not shown for other countries. Online banking
 and individual branch, service, exchange, or payment-system availability are
 outside this marker’s scope.
 
+## Native base and optional runtime
+
+The native Git plugin installer does not run npm. Without `date-holidays`, the
+calendar still opens and navigates normally, bundled calculations such as
+Indian second/fourth-Saturday bank closures remain available when India is the
+configured country, and the holiday settings area explains the degraded state.
+Astra caches the dependency result and does not repeatedly launch a helper
+known to fail.
+
+Install the exact lockfile-pinned dependency explicitly with:
+
+```bash
+scripts/astra-setup-extras --holidays
+```
+
+It is stored at
+`${XDG_DATA_HOME:-~/.local/share}/quickshell-astra/runtime/`, never in a global
+npm prefix or the Git-managed plugin. The helper resolves checkout-local
+`node_modules` first for development/full installs, then this Astra-owned XDG
+runtime. It never sets global `NODE_PATH`.
+
 ## Offline data and cache
 
-The installer uses npm once to install pinned `date-holidays` data inside the
-plugin. Runtime calendar use makes no network requests. Country metadata,
+The full installer uses npm once to install pinned `date-holidays` data inside
+its staged plugin, while native extras use the XDG runtime above. Runtime
+calendar use makes no network requests. Country metadata,
 subdivision metadata, and holiday results are cached at:
 
 ```text

@@ -8,6 +8,8 @@ import "../modules"
 PanelWindow {
     id: panel
     required property var root
+    readonly property string captureHelperPath: Qt.resolvedUrl("../../../scripts/qs-capture.sh")
+        .toString().replace(/^file:\/\//, "")
     screen: root.activePopupScreen; color: "transparent"
     anchors { top: true; bottom: true; left: true; right: true }
     exclusionMode: ExclusionMode.Ignore; WlrLayershell.layer: WlrLayer.Overlay
@@ -100,7 +102,7 @@ PanelWindow {
             var action = panel.pendingAction
             panel.pendingAction = ""
             if (action === "") return
-            proc.command = [Quickshell.env("HOME") + "/.local/bin/qs-capture", action]
+            proc.command = [captureHelperPath, action]
             proc.running = false
             proc.running = true
         }

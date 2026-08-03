@@ -8,6 +8,8 @@ import "../modules"
 PanelWindow {
     id: panel
     required property var root
+    readonly property string wallpaperHelperPath: Qt.resolvedUrl("../../../scripts/qs-wallpaper-switcher")
+        .toString().replace(/^file:\/\//, "")
     screen: root.activePopupScreen
     color: "transparent"
     anchors { top: true; bottom: true; left: true; right: true }
@@ -129,10 +131,10 @@ PanelWindow {
     }
 
     Timer { id: applyTimer; interval: 160; onTriggered: panel.applyLatest() }
-    Process { id: listProc; command: ["qs-wallpaper-switcher", "list"]; stdout: StdioCollector { onStreamFinished: { panel.listText = String(text || ""); panel.listFinished = true; panel.finishRefresh() } } }
-    Process { id: currentProc; command: ["qs-wallpaper-switcher", "current"]; stdout: StdioCollector { onStreamFinished: { panel.currentText = String(text || ""); panel.currentFinished = true; panel.finishRefresh() } } }
+    Process { id: listProc; command: [panel.wallpaperHelperPath, "list"]; stdout: StdioCollector { onStreamFinished: { panel.listText = String(text || ""); panel.listFinished = true; panel.finishRefresh() } } }
+    Process { id: currentProc; command: [panel.wallpaperHelperPath, "current"]; stdout: StdioCollector { onStreamFinished: { panel.currentText = String(text || ""); panel.currentFinished = true; panel.finishRefresh() } } }
     Process {
-        id: verifyProc; command: ["qs-wallpaper-switcher", "current"]
+        id: verifyProc; command: [panel.wallpaperHelperPath, "current"]
         stdout: StdioCollector { onStreamFinished: {
             if (panel.cancelInFlight) {
                 panel.applyInFlight = false

@@ -4,7 +4,7 @@ set -Eeuo pipefail
 PLUGIN_ID="io.github.sanjyay.quickshell-astra"
 LEGACY_PLUGIN_ID="io.github.sanjyay.quickshell-rise"
 SCHEMA_VERSION=1
-REPO_URL="${QS_ASTRA_REPO_URL:-https://github.com/sanjyay/quickshell-dots.git}"
+REPO_URL="${QS_ASTRA_REPO_URL:-https://github.com/sanjyay/quickshell-astra.git}"
 STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-astra"
 STATE_FILE="$STATE_HOME/install-state.json"
 LEGACY_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-rise"

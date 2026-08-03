@@ -8,6 +8,8 @@ import "../modules"
 PanelWindow {
     id: panel
     required property var root
+    readonly property string emojiHelperPath: Qt.resolvedUrl("../../../scripts/qs-emoji.sh")
+        .toString().replace(/^file:\/\//, "")
 
     screen: root.activePopupScreen
     color: "transparent"
@@ -90,7 +92,7 @@ PanelWindow {
 
     function refresh() {
         acceptQueryResults = true
-        queryProc.command = [Quickshell.env("HOME") + "/.local/bin/qs-emoji", "query", query.trim(), "180"]
+        queryProc.command = [emojiHelperPath, "query", query.trim(), "180"]
         queryProc.running = false
         queryProc.running = true
         statusText = ""
@@ -139,7 +141,7 @@ PanelWindow {
         setSelection(index)
         var item = selectedItem
         if (!item) return
-        selectProc.command = [Quickshell.env("HOME") + "/.local/bin/qs-emoji", "select", item.emoji]
+        selectProc.command = [emojiHelperPath, "select", item.emoji]
         root.emojiPickerVisible = false
         pasteTimer.restart()
     }

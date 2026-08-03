@@ -13,8 +13,8 @@ if [ -n "$SRC" ] && [ ! -d "$SRC/versions/default" ]; then
   printf '%s\n' "QS-Shell: recorded source '$SRC' is unavailable; falling back to the deploy clone" >&2
   SRC=""
 fi
-if [ -z "$SRC" ] && [ -d "$HOME/.local/share/quickshell-dots/versions/default" ]; then
-  SRC="$HOME/.local/share/quickshell-dots"
+if [ -z "$SRC" ] && [ -d "$HOME/.local/share/quickshell-astra/repository/versions/default" ]; then
+  SRC="$HOME/.local/share/quickshell-astra/repository"
 fi
 
 note() { notify-send -a "QS-Shell" "$@" 2>/dev/null || true; }

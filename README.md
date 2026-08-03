@@ -26,7 +26,40 @@ classic standalone `qs -c bar` usage.
 - A read-only idle widget that observes Omarchy's native stay-awake state and
   only toggles when clicked.
 
-## Install, update, uninstall
+## Native Git plugin installation
+
+In Omarchy/Shibumi, choose **Add plugin → From Git** and enter:
+
+```text
+https://github.com/sanjyay/quickshell-astra
+```
+
+Where the installed Omarchy version exposes the equivalent CLI, the relevant
+commands are:
+
+```bash
+omarchy plugin add https://github.com/sanjyay/quickshell-astra
+omarchy plugin enable io.github.sanjyay.quickshell-astra
+omarchy bar use io.github.sanjyay.quickshell-astra
+```
+
+Inspect `omarchy plugin list --json` and the current bar first: the add flow may
+already enable the plugin, and not every command is necessary on every Omarchy
+release. This base path does not run `install.sh`, npm, edit Hyprland, or
+install/enable a systemd timer. The bar and core features construct without
+those extras; optional command-backed features degrade independently.
+
+To opt into the pinned holiday runtime, Astra clipboard binding, and annual
+holiday timer after native installation:
+
+```bash
+~/.config/omarchy/plugins/io.github.sanjyay.quickshell-astra/scripts/astra-setup-extras --all
+```
+
+Use `--dry-run`, `--holidays`, `--bindings`, or `--timer` for individual
+parts. `scripts/astra-remove-extras` removes only these Astra-owned additions.
+
+## Full local installation
 
 Install from a local checkout:
 
@@ -48,8 +81,10 @@ Remove Astra with:
 ```
 
 The installer stages the plugin atomically, installs the managed Hyprland
-binding block, switches Omarchy to the Astra bar, and runs health checks. If a
-step fails, the previous bar, shell config, and bindings are restored.
+binding and supporting pieces, performs Rise migration, switches Omarchy to the
+Astra bar, and runs health checks. If a step fails, the previous bar, shell
+config, and bindings are restored. This remains the complete transactional
+installation path.
 
 Installation state is recorded in:
 
@@ -95,7 +130,8 @@ omarchy plugin validate .
 
 ## Requirements
 
-You need `git`, `jq`, `lua`, `hyprctl`, `node`, `npm`, and the Omarchy Quattro runtime.
+The native base needs Omarchy Quattro and its normal core desktop commands. The
+full installer additionally requires `git`, `jq`, `lua`, `hyprctl`, `node`, and `npm`.
 Optional features such as Tailscale, power profiles, camera state, and the AI
 provider CLIs only affect their own widgets.
 
@@ -109,6 +145,26 @@ troubleshooting, attribution, and limitations.
 
 Legacy standalone pieces such as Elephant, Waybar, Mako, SwayOSD, Impala,
 iwctl, classic hypridle hooks, and `qs-mode` are not part of the current bar.
+
+## Installation compatibility
+
+| Feature | Native base | Native + extras | Full `./install.sh` |
+| --- | --- | --- | --- |
+| Astra bar, workspaces, launcher, clock, audio, core panels | Yes | Yes | Yes |
+| Bundled Indian bank-closure calculation | Yes | Yes | Yes |
+| `date-holidays` country/region dates | Degraded | Yes | Yes |
+| Astra `SUPER+CTRL+V` managed Lua binding | No automatic edit | Optional | Yes |
+| Annual verified holiday updater timer | No | Optional | Yes |
+| Transactional activation, migration, and rollback | Native Omarchy lifecycle | Native lifecycle | Astra installer |
+
+## Shibumi compatibility boundary
+
+Astra is a standard external full-bar plugin. Shibumi plugins compatible with
+the standard Omarchy bar contract may work through the external-bar adapter.
+Advanced Shibumi-only layout editing requires the complete Shibumi host facade
+and is outside this task. Installing Astra does not add an Astra card beside
+V1, V2, and Omarchy Bar on Shibumi's Quick page; that behavior belongs to the
+Shibumi-Shell repository. Astra does not vendor or imitate private Shibumi APIs.
 
 ## Further reading
 

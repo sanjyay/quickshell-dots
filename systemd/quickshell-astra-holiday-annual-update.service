@@ -1,6 +1,6 @@
 [Unit]
 Description=Quickshell Astra annual verified holiday data update
-Documentation=https://github.com/sanjyay/quickshell-dots/blob/main/docs/holidays.md
+Documentation=https://github.com/sanjyay/quickshell-astra/blob/main/docs/holidays.md
 
 [Service]
 Type=oneshot

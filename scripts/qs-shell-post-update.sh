@@ -11,7 +11,7 @@
 # update. Opt-in AI backends are refreshed only when installed or discoverable.
 set -uo pipefail
 
-repo="${1:-${QS_SHELL_REPO:-$HOME/.local/share/quickshell-dots}}"
+repo="${1:-${QS_SHELL_REPO:-$HOME/.local/share/quickshell-astra/repository}}"
 bin="$HOME/.local/bin"
 qsbin="$HOME/.config/quickshell/bin"
 units="$HOME/.config/systemd/user"

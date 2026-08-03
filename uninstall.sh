@@ -169,6 +169,7 @@ for unit in claude-usage codex-usage opencode-usage qs-shell-update-check \
   rm -f -- "$HOME/.config/systemd/user/$unit.service" "$HOME/.config/systemd/user/$unit.timer"
 done
 rm -rf -- "${XDG_DATA_HOME:-$HOME/.local/share}/quickshell-astra/holidays"
+rm -rf -- "${XDG_DATA_HOME:-$HOME/.local/share}/quickshell-astra/runtime"
 rm -rf -- "${XDG_DATA_HOME:-$HOME/.local/share}/quickshell-rise/holidays"
 rmdir -- "${XDG_DATA_HOME:-$HOME/.local/share}/quickshell-astra" 2>/dev/null || true
 for legacy_ai_script in claude-usage codex-usage opencode-usage; do

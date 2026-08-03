@@ -5,14 +5,16 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const childProcess = require("child_process");
-const Holidays = require("date-holidays");
-const dataset = require("date-holidays/package.json");
 const regionalProvider = require("./regional-holiday-provider.js");
+
+let Holidays = null;
+let dataset = null;
+let holidayCatalog = null;
+let holidayRuntimePath = "";
 
 const SCHEMA_VERSION = 5;
 const PROJECT = "quickshell-astra";
 const VALID_TYPES = new Set(["public"]);
-const holidayCatalog = new Holidays();
 
 class HelperError extends Error {
   constructor(code, message, details = {}) {
@@ -24,6 +26,45 @@ class HelperError extends Error {
 
 function fail(code, message, details) {
   throw new HelperError(code, message, details);
+}
+
+function dataHome(env = process.env) {
+  return env.XDG_DATA_HOME || path.join(env.HOME || os.homedir(), ".local", "share");
+}
+
+function holidayRuntimeCandidates(env = process.env) {
+  return [path.resolve(__dirname, ".."), path.join(dataHome(env), PROJECT, "runtime")];
+}
+
+function loadHolidayRuntime(env = process.env) {
+  if (Holidays && dataset && holidayCatalog)
+    return { Holidays, dataset, holidayCatalog, runtimePath: holidayRuntimePath };
+  const searched = holidayRuntimeCandidates(env);
+  for (const base of searched) {
+    try {
+      const packageFile = require.resolve("date-holidays/package.json", { paths: [base] });
+      Holidays = require(require.resolve("date-holidays", { paths: [base] }));
+      dataset = require(packageFile);
+      holidayCatalog = new Holidays();
+      holidayRuntimePath = path.dirname(path.dirname(packageFile));
+      return { Holidays, dataset, holidayCatalog, runtimePath: holidayRuntimePath };
+    } catch (_) {}
+  }
+  fail("dependency-unavailable",
+    "date-holidays is not installed; run scripts/astra-setup-extras --holidays",
+    { dependency: "date-holidays", searched });
+}
+
+function dependencyStatus(env = process.env) {
+  try {
+    const runtime = loadHolidayRuntime(env);
+    return { available: true, dependency: "date-holidays", version: runtime.dataset.version,
+      runtimePath: runtime.runtimePath };
+  } catch (error) {
+    return { available: false, dependency: "date-holidays", version: null,
+      error: { code: error.code || "dependency-unavailable", message: error.message,
+        details: error.details || {} } };
+  }
 }
 
 function normalizeCountry(value) {
@@ -159,6 +200,7 @@ function resolveCountry(options = {}) {
 }
 
 function validateSupport(country, subdivision) {
+  loadHolidayRuntime();
   const countries = holidayCatalog.getCountries();
   if (!countries[country]) fail("unsupported-country", `date-holidays does not support ${country}`, { country });
   if (subdivision) {
@@ -189,6 +231,7 @@ function normalizeHolidayRows(rows, types) {
 }
 
 function countries() {
+  loadHolidayRuntime();
   const output = Object.entries(holidayCatalog.getCountries())
     .filter(([code, name]) => /^[A-Z]{2}$/.test(code) && String(name || "").trim())
     .map(([code, name]) => ({ code, name: String(name).trim() }));
@@ -197,6 +240,7 @@ function countries() {
 }
 
 function subdivisions(countryValue) {
+  loadHolidayRuntime();
   const country = normalizeCountry(countryValue);
   validateSupport(country, "");
   const values = holidayCatalog.getStates(country) || {};
@@ -228,6 +272,7 @@ function officialComparisonIdentity(row) {
 }
 
 function classifyHolidays(country, subdivision, year, options = {}) {
+  loadHolidayRuntime(options.env);
   validateSupport(country, subdivision);
   const factory = options.factory || ((...args) => new Holidays(...args));
   const nationalRows = normalizeHolidayRows(factory(country).getHolidays(year), ["public"]);
@@ -431,6 +476,7 @@ function mergeRegionalProvider(country, subdivision, base, selectedProvider) {
 }
 
 function getHolidays(options = {}) {
+  loadHolidayRuntime(options.env);
   const resolution = resolveCountry({
     override: options.country || "auto",
     timezone: options.timezone,
@@ -515,6 +561,7 @@ function parseArgs(argv) {
 function main(argv) {
   const command = argv.shift();
   if (command === "state-write") return writeStateFromStdin(argv);
+  if (command === "dependency-status") return dependencyStatus();
   const args = parseArgs(argv);
   if (command === "countries") {
     if (args._.length) fail("invalid-arguments", "countries accepts no positional arguments");
@@ -550,7 +597,7 @@ function main(argv) {
     override: args.country || "auto", timezone: args.timezone, territory: args.territory
   });
   if (command !== "get" && command !== "holidays")
-    fail("invalid-command", "expected countries, subdivisions, detect, get, holidays, or state-write");
+    fail("invalid-command", "expected dependency-status, countries, subdivisions, detect, get, holidays, or state-write");
   const positionalCountry = args._[0];
   const positionalYear = args._[1];
   const positionalSubdivision = args._[2];
@@ -587,6 +634,7 @@ if (require.main === module) {
 module.exports = {
   HelperError, cacheKey, cachePath, cachedMetadata, canonicalTimezone, categoryKey, classifyHolidays,
   countries, detectTimezone, generate, getHolidays, holidayIdentity, officialComparisonIdentity, localeTerritory,
+  dependencyStatus, holidayRuntimeCandidates, loadHolidayRuntime,
   metadataCachePath, normalizeHolidayRows, mergeRegionalProvider, parseZoneTable, readCache,
   resolveCountry, subdivisions,
   validIanaZone, writeJsonAtomic, writeStateFromStdin

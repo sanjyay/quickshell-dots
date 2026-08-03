@@ -21,7 +21,7 @@ Do not open a public issue, discussion, or pull request for a suspected
 vulnerability.
 
 Report it privately with
-[GitHub Security Advisories](https://github.com/sanjyay/quickshell-dots/security/advisories/new).
+[GitHub Security Advisories](https://github.com/sanjyay/quickshell-astra/security/advisories/new).
 If GitHub private reporting is unavailable, contact the repository owner
 through their GitHub profile and ask for a private reporting channel. Do not
 include sensitive details in that initial public contact.

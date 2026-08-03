@@ -14,7 +14,8 @@
 | User helpers | `~/.local/bin/` | Individually installed project entrypoints |
 | Updater helpers | `~/.config/quickshell/bin/` | Project-owned updater/helper scripts |
 | User units | `~/.config/systemd/user/` | Individually owned services/timers |
-| Persistent updater checkout | `~/.local/share/quickshell-dots/` | Derived deployment source |
+| Persistent updater checkout | `~/.local/share/quickshell-astra/repository/` | Derived deployment source |
+| Optional holiday runtime | `${XDG_DATA_HOME:-~/.local/share}/quickshell-astra/runtime/` | Astra-owned npm payload installed only on request |
 | History recording thumbnails | `~/.cache/quickshell-history-thumbs/` | Generated project cache removed on uninstall |
 
 `install.sh` uses a local checkout when its directory contains `versions/`;

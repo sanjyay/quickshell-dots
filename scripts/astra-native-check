@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+ROOT=${1:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)}
+errors=0 warnings=0
+ok() { printf 'ok: %s\n' "$*"; }
+warn() { printf 'warning: %s\n' "$*" >&2; warnings=$((warnings + 1)); }
+fail() { printf 'error: %s\n' "$*" >&2; errors=$((errors + 1)); }
+
+[[ -d "$ROOT" ]] || { printf 'error: plugin path does not exist: %s\n' "$ROOT" >&2; exit 2; }
+ROOT=$(cd -- "$ROOT" && pwd -P)
+manifest="$ROOT/manifest.json"
+
+if ! command -v jq >/dev/null 2>&1; then fail 'jq is required to validate manifest.json';
+elif [[ ! -f "$manifest" ]]; then fail 'manifest.json is missing';
+elif jq -e '.schemaVersion == 1 and .id == "io.github.sanjyay.quickshell-astra" and
+  (.kinds == ["bar"]) and .entryPoints.bar == "runtime/Bar.qml"' "$manifest" >/dev/null; then
+  ok 'manifest ID, kind, and bar entry point are valid'
+else fail 'manifest ID, kind, or bar entry point is invalid'; fi
+
+entry=$(jq -r '.entryPoints.bar // empty' "$manifest" 2>/dev/null || true)
+[[ -n "$entry" && -f "$ROOT/$entry" ]] && ok 'entryPoints.bar exists' || fail 'entryPoints.bar does not exist'
+
+if [[ -d "$ROOT/.git" ]]; then
+  if git -C "$ROOT" ls-files -s | awk '$1 == "120000" { found=1 } END { exit !found }'; then
+    fail 'tracked plugin payload contains unsafe symlinks'
+  else ok 'tracked plugin payload contains no symlinks'; fi
+elif find "$ROOT" -type l -print -quit | grep -q .; then fail 'plugin payload contains unsafe symlinks';
+else ok 'plugin payload contains no symlinks'; fi
+
+if grep -RIl --exclude-dir=.git --exclude-dir=tests --exclude-dir=node_modules -- \
+    '/home/[[:alnum:]_.-]\+/' "$ROOT" | grep -q .; then
+  fail 'personal absolute /home path found'
+else ok 'no personal absolute /home paths found'; fi
+
+for helper in scripts/holiday-helper.js scripts/astra-setup-extras scripts/astra-remove-extras \
+  scripts/astra-native-check scripts/ai-usage-collector scripts/history-recording-preview.sh \
+  scripts/qs-capture.sh scripts/qs-emoji.sh scripts/qs-menu-action.sh scripts/qs-menu-data.sh \
+  scripts/qs-notification-silence.sh scripts/qs-state-write scripts/qs-theme-switcher \
+  scripts/qs-wallpaper-switcher versions/default/modules/qs-gpu-probe.sh; do
+  [[ -x "$ROOT/$helper" ]] || fail "$helper is missing or not executable"
+done
+
+for required in runtime/Bar.qml versions/astra/Bar.qml versions/default/Theme.qml \
+  versions/default/services/RuntimeCapabilities.qml scripts/regional-holiday-provider.js \
+  data/holidays/IN/TN/2026.json data/holidays/IN/TN/recurring.json package.json package-lock.json; do
+  [[ -f "$ROOT/$required" ]] || fail "required payload is missing: $required"
+done
+
+while IFS=: read -r file line import_path; do
+  [[ "$import_path" == .* ]] || continue
+  resolved=$(cd -- "$(dirname -- "$file")" && realpath -m -- "$import_path")
+  case "$resolved" in "$ROOT"|"$ROOT"/*) ;; *) fail "QML import escapes plugin root: $file:$line $import_path" ;; esac
+done < <(grep -RnhE '^import[[:space:]]+"[^\"]+"' "$ROOT/runtime" "$ROOT/versions" 2>/dev/null |
+  sed -E 's#^([^:]+):([0-9]+):import[[:space:]]+"([^\"]+)".*#\1:\2:\3#')
+ok 'relative QML imports stay within the plugin root'
+
+if grep -RIn --exclude-dir=.git --exclude=CHANGELOG.md --exclude=AGENTS.md --exclude=astra-native-check \
+    --exclude=native-install-compat.test.sh \
+    'https://github.com/sanjyay/quickshell-dots' "$ROOT" >/dev/null; then
+  fail 'stale active quickshell-dots repository URL found'
+else ok 'no stale active quickshell-dots repository URL found'; fi
+
+if grep -RIn --include='*.qml' -- 'ShellRoot\|qs -n\|qs -c bar\|quickshell -c bar' \
+    "$ROOT/runtime" "$ROOT/versions" >/dev/null; then
+  fail 'runtime contains a standalone Quickshell entry or launch command'
+else ok 'runtime uses only the host omarchy-shell process'; fi
+
+if [[ -d "$ROOT/node_modules" ]]; then warn 'repository-local node_modules is present (development/full-install mode)';
+else ok 'base payload has no node_modules prerequisite'; fi
+
+if command -v node >/dev/null 2>&1; then
+  dependency=$(node "$ROOT/scripts/holiday-helper.js" dependency-status 2>/dev/null || true)
+  if grep -q '"available":true' <<<"$dependency"; then ok 'optional date-holidays runtime is available';
+  elif grep -q '"code":"dependency-unavailable"' <<<"$dependency"; then warn 'optional date-holidays runtime is unavailable; base calendar remains degraded';
+  else fail 'holiday helper did not report a structured dependency state'; fi
+else warn 'node is unavailable; holiday capability will be degraded'; fi
+
+if (( errors > 0 )); then printf 'native check: FAILED (%d errors, %d warnings)\n' "$errors" "$warnings"; exit 1; fi
+printf 'native check: PASS (%d warnings)\n' "$warnings"

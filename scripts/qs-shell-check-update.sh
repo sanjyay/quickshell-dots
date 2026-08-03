@@ -3,7 +3,7 @@
 #
 # Topology of THIS setup: the live bar dir is a *copy* of versions/default/ from the
 # installed config directory. Prefer the source recorded there in .qsastra-source;
-# fall back to the persistent deploy clone at ~/.local/share/quickshell-dots only
+# fall back to the persistent Astra deploy clone only
 # when the recorded source is missing or invalid. We never run git in the live dir —
 # we compare the deploy repo's tracking branch against origin, scoped to the
 # installed config.
@@ -14,7 +14,7 @@
 # depends on delete-detection.
 set -euo pipefail
 
-REPO="${QS_SHELL_REPO:-$HOME/.local/share/quickshell-dots}"
+REPO="${QS_SHELL_REPO:-$HOME/.local/share/quickshell-astra/repository}"
 DEST="${QS_SHELL_DEST:-$HOME/.config/quickshell/bar}"
 STATE_DIR="$HOME/.cache/qs-shell"
 STATE="$STATE_DIR/update-available.json"

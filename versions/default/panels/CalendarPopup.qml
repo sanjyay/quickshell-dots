@@ -768,6 +768,17 @@ PanelWindow {
 
                 UiText {
                     width: parent.width
+                    visible: root.holidays.unavailableMessage.length > 0
+                    text: root.holidays.unavailableMessage
+                    color: root.sumi
+                    opacity: 0.85
+                    font.family: root.mono
+                    font.pixelSize: 9
+                    wrapMode: Text.Wrap
+                }
+
+                UiText {
+                    width: parent.width
                     visible: root.holidays.effectiveCountryCode === "IN"
                     text: "Banks closed on second and fourth Saturdays are shown automatically."
                     color: root.sumi

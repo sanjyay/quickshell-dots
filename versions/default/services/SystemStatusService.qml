@@ -3,6 +3,8 @@ import Quickshell.Io
 
 QtObject {
     id: service
+    readonly property string notificationSilenceHelper: Qt.resolvedUrl("../../../scripts/qs-notification-silence.sh")
+        .toString().replace(/^file:\/\//, "")
 
     property bool notificationSilenced: false
     property bool privacyMicMuted: false
@@ -49,13 +51,13 @@ QtObject {
     }
 
     property Process notificationSilenceReadProc: Process {
-        command: ["bash", "-c", "qs-notification-silence status"]
+        command: [service.notificationSilenceHelper, "status"]
         stdout: StdioCollector {
             onStreamFinished: service.notificationSilenced = this.text.trim() === "ON"
         }
     }
     property Process notificationSilenceToggleProc: Process {
-        command: ["bash", "-c", "qs-notification-silence toggle"]
+        command: [service.notificationSilenceHelper, "toggle"]
         onRunningChanged: if (!running) service.refreshNotificationSilence()
     }
     property Timer notificationSilenceTimer: Timer {

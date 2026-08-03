@@ -28,6 +28,8 @@ repo's source of truth lives in `versions/default/`; the runtime entry points ar
   connection actions.
 - `AiUsageService.qml` owns Claude, Codex, and OpenCode collection, parsing,
   caching, and freshness tracking.
+- `RuntimeCapabilities.qml` probes optional commands and holiday data once,
+  caches the result, and exposes it through Astra health diagnostics.
 - `PopupSurface.qml` is the shared popup shell used by the pilot panels that have
   moved to the new shared popup contract.
 
@@ -51,6 +53,10 @@ only way a panel can become reachable.
 
 - `install.sh` installs the bar tree, helper entry points, hooks, and systemd
   units.
+- `scripts/astra-setup-extras` and `scripts/astra-remove-extras` own the
+  opt-in native-plugin holiday data, binding, and timer lifecycle.
+- `scripts/astra-native-check` validates a checkout or installed Git-only
+  plugin payload without modifying it.
 - `scripts/qs-shell-post-update.sh` handles the self-update flow.
 - `scripts/ensure-hypr-launcher-binding.sh` maintains the managed Hyprland block.
 - `scripts/qs-shell-apply-update.sh` and `scripts/qs-shell-refresh-local.sh`
@@ -65,3 +71,9 @@ If you are changing how something looks or reacts, start in `modules/` or
 `panels/`. If you are changing how the data arrives, look in `services/` or the
 helper scripts. If you are changing startup, installation, or cleanup, inspect
 `install.sh`, `uninstall.sh`, and the managed binding helper together.
+
+The complete tracked repository is one self-contained plugin root. Runtime QML
+resolves implementation and helper files relative to that root; mutable state
+belongs under XDG state/cache/data directories. Native Git installation never
+constructs a `ShellRoot`, starts `qs -c bar`, or mutates Hyprland/systemd while
+QML is loading.

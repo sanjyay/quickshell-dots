@@ -3,7 +3,7 @@
 #
 # Topology: the live bar dir is a *copy* of versions/default/ from the installed
 # config directory. Prefer the source recorded there in .qsastra-source; fall
-# back to the persistent deploy clone at ~/.local/share/quickshell-dots only
+# back to the persistent Astra deploy clone only
 # when the recorded source is missing or invalid. Updating = pull that repo,
 # redeploy the installed config, restart the bar.
 #
@@ -19,7 +19,7 @@
 #   - persisted settings (slot order / splits) live in ~/.cache and are untouched
 set -euo pipefail
 
-REPO="${QS_SHELL_REPO:-$HOME/.local/share/quickshell-dots}"
+REPO="${QS_SHELL_REPO:-$HOME/.local/share/quickshell-astra/repository}"
 DEST="${QS_SHELL_DEST:-$HOME/.config/quickshell/bar}"
 [ "$DEST" != "/" ] && DEST="${DEST%/}"
 STATE_DIR="$HOME/.cache/qs-shell"
