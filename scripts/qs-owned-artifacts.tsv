@@ -1,7 +1,7 @@
 # source<TAB>destination-key<TAB>mode<TAB>policy
 scripts/qs-mode.sh	local-bin/qs-mode	755	mandatory
 scripts/qs-managed-bindings.sh	local-bin/qs-managed-bindings	755	mandatory
-scripts/qs-rise-input.sh	local-bin/qs-rise-input	755	mandatory
+scripts/qs-astra-input.sh	local-bin/qs-astra-input	755	mandatory
 scripts/qs-menu-data.sh	local-bin/qs-menu-data	755	mandatory
 scripts/qs-menu-action.sh	local-bin/qs-menu-action	755	mandatory
 scripts/qs-theme-switcher	local-bin/qs-theme-switcher	755	mandatory
@@ -12,11 +12,11 @@ scripts/qs-capture.sh	local-bin/qs-capture	755	mandatory
 scripts/qs-notification-silence.sh	local-bin/qs-notification-silence	755	mandatory
 scripts/qs-state-write	local-bin/qs-state-write	755	mandatory
 scripts/swayosd-client	local-bin/swayosd-client	755	foreign-guarded
-scripts/qs-clipboard-filter.py	local-lib/qs-rise/qs-clipboard-filter.py	755	mandatory
-scripts/qs-elephant-wl-paste.sh	local-lib/qs-rise/elephant-bin/wl-paste	755	mandatory
-systemd/elephant-clipboard-privacy.conf	user-unit/elephant.service.d/50-qs-rise-clipboard-privacy.conf	644	mandatory
+scripts/qs-clipboard-filter.py	local-lib/qs-astra/qs-clipboard-filter.py	755	mandatory
+scripts/qs-elephant-wl-paste.sh	local-lib/qs-astra/elephant-bin/wl-paste	755	mandatory
+systemd/elephant-clipboard-privacy.conf	user-unit/elephant.service.d/50-qs-astra-clipboard-privacy.conf	644	mandatory
 hooks/50-quickshell-bar.sh	omarchy-theme-hook/50-quickshell-bar.sh	755	mandatory
-contrib/post-boot.d/quickshell-rise	omarchy-post-boot/quickshell-rise	755	optional-existing
+contrib/post-boot.d/quickshell-astra	omarchy-post-boot/quickshell-astra	755	optional-existing
 scripts/qs-shell-check-update.sh	quickshell-bin/qs-shell-check-update.sh	755	mandatory
 scripts/qs-shell-apply-update.sh	quickshell-bin/qs-shell-apply-update.sh	755	mandatory
 scripts/qs-shell-refresh-local.sh	quickshell-bin/qs-shell-refresh-local.sh	755	mandatory

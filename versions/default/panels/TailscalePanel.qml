@@ -19,7 +19,7 @@ PanelWindow {
     anchors { top: true; bottom: true; left: true; right: true }
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "quickshell-rise-tailscale"
+    WlrLayershell.namespace: "quickshell-astra-tailscale"
     WlrLayershell.keyboardFocus: root.tailscaleVisible
         ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     visible: reveal > 0.001
@@ -121,7 +121,7 @@ PanelWindow {
     }
 
     IpcHandler {
-        target: "quickshell-rise-tailscale"
+        target: "quickshell-astra-tailscale"
 
         function open(): string {
             root.activateFocusedPopupScreen()

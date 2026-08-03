@@ -1,5 +1,5 @@
 #!/bin/bash
-# Quickshell Rise — restore the persisted UI provider mode at session start.
+# Quickshell Astra — restore the persisted UI provider mode at session start.
 if command -v qs-mode >/dev/null 2>&1; then
   qs-mode "$(qs-mode status 2>/dev/null || printf quickshell)" >/dev/null 2>&1 || true
 else

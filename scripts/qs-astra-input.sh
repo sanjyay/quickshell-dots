@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Quickshell Rise — profile-owned media-key actions and OSD bridge.
+# Quickshell Astra — profile-owned media-key actions and OSD bridge.
 set -euo pipefail
 
-STATE_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode"
+STATE_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/qs-astra/mode"
 QS_CONFIG="bar"
 
 [[ "$(cat "$STATE_FILE" 2>/dev/null || printf omarchy)" == quickshell ]] || exit 0
@@ -135,5 +135,5 @@ case "${1:-}" in
     touchpad) touchpad_action "${2:-toggle}" ;;
     lock) lock_action "${2:-Caps Lock}" ;;
     osd) shift; state_action "$@" ;;
-    *) printf 'usage: qs-rise-input {volume|mic|brightness|keyboard|media|audio-output|touchpad|lock|osd} ...\n' >&2; exit 2 ;;
+    *) printf 'usage: qs-astra-input {volume|mic|brightness|keyboard|media|audio-output|touchpad|lock|osd} ...\n' >&2; exit 2 ;;
 esac

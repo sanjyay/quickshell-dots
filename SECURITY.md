@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Quickshell Rise is developed as a rolling-release Omarchy Quattro plugin. Security
+Quickshell Astra is developed as a rolling-release Omarchy Quattro plugin. Security
 fixes are made on the current `main` branch; older commits and the retired
 standalone `qs -c bar` architecture are not maintained.
 

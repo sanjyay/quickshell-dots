@@ -2,7 +2,7 @@
 # QS-Shell apply update.
 #
 # Topology: the live bar dir is a *copy* of versions/default/ from the installed
-# config directory. Prefer the source recorded there in .qsrise-source; fall
+# config directory. Prefer the source recorded there in .qsastra-source; fall
 # back to the persistent deploy clone at ~/.local/share/quickshell-dots only
 # when the recorded source is missing or invalid. Updating = pull that repo,
 # redeploy the installed config, restart the bar.
@@ -30,8 +30,8 @@ BACKUP_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/qs-shell/backups"
 mkdir -p "$STATE_DIR"
 
 SOURCE="${QS_SHELL_SOURCE:-}"
-if [ -z "$SOURCE" ] && [ -r "$DEST/.qsrise-source" ]; then
-  SOURCE="$(tr -d '\n' < "$DEST/.qsrise-source")"
+if [ -z "$SOURCE" ] && [ -r "$DEST/.qsastra-source" ]; then
+  SOURCE="$(tr -d '\n' < "$DEST/.qsastra-source")"
 fi
 if [ -n "$SOURCE" ] && [ -d "$SOURCE/.git" ]; then
   REPO="$SOURCE"
@@ -193,7 +193,7 @@ if [ -f "$backup/quotes.txt" ]; then
   cp -p "$backup/quotes.txt" "$stage/quotes.txt"
 fi
 printf '%s\n' "$cfg" > "$stage/.qsrise"
-[ -f "$backup/.qsrise-source" ] && cp -p "$backup/.qsrise-source" "$stage/.qsrise-source"
+[ -f "$backup/.qsastra-source" ] && cp -p "$backup/.qsastra-source" "$stage/.qsastra-source"
 
 # Stop the bar before swapping, and WAIT for it to actually exit (don't trust a
 # fixed sleep). Prefer Quickshell's registered config path over command-line

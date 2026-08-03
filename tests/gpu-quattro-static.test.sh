@@ -11,6 +11,6 @@ grep -Fq 'Qt.resolvedUrl("../modules/qs-gpu-probe.sh")' versions/default/service
 ! grep -q 'Process {' versions/default/panels/CpuPanel.qml
 grep -Fq 'root.systemMetrics.gpuTemperatureC' versions/default/modules/CpuWidget.qml
 grep -Fq 'readonly property var metricsModel: root.systemMetrics' versions/default/panels/CpuPanel.qml
-grep -Fq 'gpuDisplayModelReady' versions/rise/Bar.qml
+grep -Fq 'gpuDisplayModelReady' versions/astra/Bar.qml
 grep -Fq 'cmp -s "$repo_root/versions/default/modules/qs-gpu-probe.sh"' install.sh
 printf 'PASS: GPU JSON, plugin-relative collector, shared model, health and install contracts\n'

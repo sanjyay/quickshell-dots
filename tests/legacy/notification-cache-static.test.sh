@@ -9,7 +9,7 @@ fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 require_literal() { grep -Fq -- "$1" "$2" || fail "missing '$1' in ${2#$repo/}"; }
 
 # Preserve the cache path/schema while routing writes through one atomic helper.
-require_literal 'qs-rise-notifications.json' "$manager"
+require_literal 'qs-astra-notifications.json' "$manager"
 require_literal 'JSON.stringify({ recent: saved })' "$manager"
 require_literal 'AtomicStateWriter {' "$manager"
 require_literal 'path: manager.cachePath' "$manager"

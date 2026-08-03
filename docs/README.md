@@ -16,4 +16,4 @@ installer, or migration behavior.
 - `safe-validation.md`: what can be tested safely without touching the live session.
 
 The migration guide at `docs/QUATTRO-MIGRATION.md` is the best starting point if
-you want to understand how Rise fits into Omarchy Quattro.
+you want to understand how Astra fits into Omarchy Quattro.

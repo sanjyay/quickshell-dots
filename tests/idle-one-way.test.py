@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Behavioral contract for Rise's one-way native idle observer."""
+"""Behavioral contract for Astra's one-way native idle observer."""
 
 import unittest
 
@@ -14,7 +14,7 @@ class NativeIdle:
         self.stay_awake = not enabled
 
 
-class RiseObserver:
+class AstraObserver:
     def __init__(self, backend):
         self.backend = backend
 
@@ -29,22 +29,22 @@ class RiseObserver:
 class IdleOneWayContract(unittest.TestCase):
     def test_external_change_updates_ui_without_writeback(self):
         native = NativeIdle(False)
-        rise = RiseObserver(native)
+        astra = AstraObserver(native)
         native.stay_awake = True
-        self.assertTrue(rise.awake)
+        self.assertTrue(astra.awake)
         self.assertEqual(native.calls, 0)
 
     def test_one_click_calls_backend_once(self):
         native = NativeIdle(False)
-        rise = RiseObserver(native)
-        rise.click()
-        self.assertTrue(rise.awake)
+        astra = AstraObserver(native)
+        astra.click()
+        self.assertTrue(astra.awake)
         self.assertEqual(native.calls, 1)
 
     def test_recreation_adopts_state_without_writeback(self):
         native = NativeIdle(True)
-        rise = RiseObserver(native)
-        self.assertTrue(rise.awake)
+        astra = AstraObserver(native)
+        self.assertTrue(astra.awake)
         self.assertEqual(native.calls, 0)
 
 

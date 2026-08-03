@@ -1,4 +1,4 @@
-"""Atomic JSON cache writes shared by Quickshell Rise usage providers."""
+"""Atomic JSON cache writes shared by Quickshell Astra usage providers."""
 
 import json
 import os

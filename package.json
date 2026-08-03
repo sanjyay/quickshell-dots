@@ -1,8 +1,8 @@
 {
-  "name": "quickshell-rise-runtime",
+  "name": "quickshell-astra-runtime",
   "private": true,
   "version": "4.0.0-alpha.1",
-  "description": "Pinned runtime data dependencies for Quickshell Rise",
+  "description": "Pinned runtime data dependencies for Quickshell Astra",
   "license": "MIT",
   "dependencies": {
     "date-holidays": "3.34.0"

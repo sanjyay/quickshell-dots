@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-STATE="${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/notifications-silenced"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/qs-astra/notifications-silenced"
 mkdir -p "$(dirname "$STATE")"
 
 case "${1:-status}" in

@@ -3,18 +3,18 @@
 set -euo pipefail
 
 looknfeel="${HYPR_LOOKNFEEL_CONF:-$HOME/.config/hypr/looknfeel.conf}"
-begin="# >>> quickshell-rise managed switcher blur rules >>>"
-end="# <<< quickshell-rise managed switcher blur rules <<<"
+begin="# >>> quickshell-astra managed switcher blur rules >>>"
+end="# <<< quickshell-astra managed switcher blur rules <<<"
 
 managed_block="$(cat <<'EOF'
-# >>> quickshell-rise managed switcher blur rules >>>
+# >>> quickshell-astra managed switcher blur rules >>>
 layerrule = blur on, match:namespace quickshell-theme-switcher
 layerrule = ignore_alpha 0, match:namespace quickshell-theme-switcher
 layerrule = blur on, match:namespace quickshell-wallpaper-switcher
 layerrule = ignore_alpha 0, match:namespace quickshell-wallpaper-switcher
 layerrule = blur on, match:namespace quickshell-history
 layerrule = ignore_alpha 0, match:namespace quickshell-history
-# <<< quickshell-rise managed switcher blur rules <<<
+# <<< quickshell-astra managed switcher blur rules <<<
 EOF
 )"
 

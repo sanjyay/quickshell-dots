@@ -6,8 +6,8 @@ DEST="${QS_SHELL_DEST:-$HOME/.config/quickshell/bar}"
 SRC="${QS_SHELL_SOURCE:-}"
 [ "$DEST" != "/" ] && DEST="${DEST%/}"
 
-if [ -z "$SRC" ] && [ -r "$DEST/.qsrise-source" ]; then
-  SRC="$(tr -d '\n' < "$DEST/.qsrise-source")"
+if [ -z "$SRC" ] && [ -r "$DEST/.qsastra-source" ]; then
+  SRC="$(tr -d '\n' < "$DEST/.qsastra-source")"
 fi
 if [ -n "$SRC" ] && [ ! -d "$SRC/versions/default" ]; then
   printf '%s\n' "QS-Shell: recorded source '$SRC' is unavailable; falling back to the deploy clone" >&2
@@ -33,7 +33,7 @@ trap 'rm -rf "$stage" 2>/dev/null || true' EXIT
 cp -r "$SRC/versions/default/." "$stage/"
 [ -f "$DEST/quotes.txt" ] && cp -p "$DEST/quotes.txt" "$stage/quotes.txt"
 printf 'default\n' > "$stage/.qsrise"
-printf '%s\n' "$SRC" > "$stage/.qsrise-source"
+printf '%s\n' "$SRC" > "$stage/.qsastra-source"
 
 pkill -f 'qs.* -c bar([[:space:]]|$)' 2>/dev/null || true
 pkill -f "quickshell -p $DEST" 2>/dev/null || true

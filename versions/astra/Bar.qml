@@ -215,7 +215,7 @@ Item {
         for (var i = 0; i < barScreens.length; i++) {
             var screen = barScreens[i]
             geometry.push({
-                id: "quickshell-rise",
+                id: "quickshell-astra",
                 screen: screen.name,
                 x: 0,
                 y: 0,
@@ -288,6 +288,20 @@ Item {
         function ping(): void { }
     }
 
+    IpcHandler {
+        target: "quickshell-astra-clipboard"
+        function open(): void { theme.openClipboard() }
+        function close(): void { theme.clipboardVisible = false }
+        function toggle(): void {
+            if (theme.clipboardVisible) theme.clipboardVisible = false
+            else theme.openClipboard()
+        }
+        function state(): string { return theme.clipboardVisible ? "open" : "closed" }
+        function diagnostics(): string { return JSON.stringify(root.historyDiagnostics()) }
+        function ping(): void { }
+    }
+
+    // Deprecated Rise alias sharing the canonical Astra clipboard panel.
     IpcHandler {
         target: "quickshell-rise-clipboard"
         function open(): void { theme.openClipboard() }

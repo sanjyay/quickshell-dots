@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Project Rename
+
+- Renamed Quickshell Rise to Quickshell Astra, including the plugin ID,
+  production path, IPC commands, managed configuration markers, state paths,
+  helper scripts, hooks, and holiday update units.
+- Added transactional migration from Rise installations and state to Astra,
+  including cleanup of obsolete Rise-managed plugin files, bindings, hooks,
+  services, and caches after Astra activates successfully.
+- Kept deprecated Rise health and clipboard IPC aliases that delegate to the
+  same Astra runtime state for upgrade compatibility.
+
 ## 4.0.0-alpha.1
 
 - Migrated Quickshell Rise from a standalone Quickshell configuration to an

@@ -366,7 +366,7 @@ PanelWindow {
                 width: parent.width
                 visible: !calPopup.settingsVisible && root.holidays.status === "error"
                 text: root.holidays.errorCode === "country-ambiguous"
-                    ? "Select a holiday country in Rise settings"
+                    ? "Select a holiday country in Astra settings"
                     : "Holiday data unavailable"
                 color: root.sumi
                 opacity: 0.7

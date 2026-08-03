@@ -1,0 +1,8 @@
+[Unit]
+Description=Quickshell Astra annual verified holiday data update
+Documentation=https://github.com/sanjyay/quickshell-dots/blob/main/docs/holidays.md
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/node %h/.config/omarchy/plugins/io.github.sanjyay.quickshell-astra/scripts/holiday-annual-update.js
+Nice=19

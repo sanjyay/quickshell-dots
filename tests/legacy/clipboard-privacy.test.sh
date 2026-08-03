@@ -22,5 +22,5 @@ sensitive $'ABCD-EFGH-IJKL\nMNOP-QRST-UVWX\n'
 rg -q 'elephant-bin' "$repo/systemd/elephant-clipboard-privacy.conf"
 rg -q 'qs-clipboard-filter.py' "$repo/install.sh"
 rg -q 'elephant-clipboard-privacy.conf' "$repo/install.sh"
-rg -q '50-qs-rise-clipboard-privacy.conf' "$repo/uninstall.sh"
+rg -q '50-qs-astra-clipboard-privacy.conf' "$repo/uninstall.sh"
 echo "ok (clipboard privacy filter)"

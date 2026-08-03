@@ -54,7 +54,7 @@ test("official provider wins for IN/TN/2026 and fallback remains available", () 
   assert.deepEqual(recurring.records.map(row => [row.date, row.name]),
     [["2027-01-01", "New Year's Day"]]);
 
-  const emptyRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rise-regional-empty."));
+  const emptyRoot = fs.mkdtempSync(path.join(os.tmpdir(), "astra-regional-empty."));
   assert.equal(provider.selectProvider("IN", "MH", 2026, {
     datasetVersion: "3.34.0", dataRoot: emptyRoot
   }).kind, "date-holidays");
@@ -68,7 +68,7 @@ test("official provider wins for IN/TN/2026 and fallback remains available", () 
 });
 
 test("invalid official JSON fails safely and importer rejects invalid data", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rise-regional-invalid."));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "astra-regional-invalid."));
   const directory = path.join(root, "IN", "TN");
   fs.mkdirSync(directory, { recursive: true });
   fs.writeFileSync(path.join(directory, "2026.json"), "{broken");
@@ -87,7 +87,7 @@ test("invalid official JSON fails safely and importer rejects invalid data", () 
 });
 
 test("official merge preserves national scope and exposes full regional months", () => {
-  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "rise-regional-merge."));
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "astra-regional-merge."));
   const value = helper.getHolidays({
     country: "IN", subdivision: "TN", year: 2026,
     showNational: true, showRegional: true,
@@ -124,7 +124,7 @@ test("official merge preserves national scope and exposes full regional months",
 });
 
 test("2027 fallback marks fixed New Year without claiming a complete annual source", () => {
-  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "rise-regional-2027."));
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "astra-regional-2027."));
   const value = helper.getHolidays({
     country: "IN", subdivision: "TN", year: 2027,
     showNational: true, showRegional: true,

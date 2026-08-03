@@ -1,6 +1,6 @@
 # Calendar holidays
 
-Rise marks national and regional public holidays in the calendar month grid.
+Astra marks national and regional public holidays in the calendar month grid.
 When India is effective, it also marks the recurring second and fourth Saturday
 bank-branch closures.
 Color-coded rings encircle holiday dates while preserving the existing today
@@ -10,13 +10,13 @@ country, and region where applicable.
 
 ## Configuration
 
-Holiday defaults live in the existing Rise `bar` settings in
+Holiday defaults live in the existing Astra `bar` settings in
 `~/.config/omarchy/shell.json`:
 
 ```json
 {
   "bar": {
-    "id": "io.github.sanjyay.quickshell-rise",
+    "id": "io.github.sanjyay.quickshell-astra",
     "calendar": {
       "holidays": {
         "enabled": true,
@@ -74,7 +74,7 @@ has no Tamil Nadu public holiday, so no regional ring is expected that month.
 Selections are atomically persisted across shell restarts at:
 
 ```text
-${XDG_STATE_HOME:-~/.local/state}/quickshell-rise/holiday-settings.json
+${XDG_STATE_HOME:-~/.local/state}/quickshell-astra/holiday-settings.json
 ```
 
 Delete this file to reset the selector to the configured defaults. Invalid
@@ -108,11 +108,11 @@ national. Tamil Nadu statewide records such as Pongal remain regional.
 
 Tamil Nadu 2026 is sourced from Tamil Nadu Government Gazette Extraordinary
 No. 721, Part II—Section 1, G.O.(Ms.) No.708 dated 11 November 2025. Its
-annexure contains 24 entries. Rise bundles the 23 statewide public holidays;
+annexure contains 24 entries. Astra bundles the 23 statewide public holidays;
 the 1 April annual account closing is excluded because the Gazette explicitly
 limits it to commercial and co-operative banks.
 
-When a later annual Tamil Nadu order is not yet available, Rise continues using
+When a later annual Tamil Nadu order is not yet available, Astra continues using
 `date-holidays` and adds only the narrowly verified fixed-date fallback in
 `data/holidays/IN/TN/recurring.json`. Currently this supplies New Year's Day,
 which appears in consecutive official 2025 and 2026 Tamil Nadu orders. The
@@ -122,7 +122,7 @@ guessed from an earlier year.
 
 ## Indian Saturday bank closures
 
-When the effective country is `IN`, Rise locally calculates the second and
+When the effective country is `IN`, Astra locally calculates the second and
 fourth Saturday of every displayed month. It does not use `date-holidays` for
 these records and does not make a network request. The first, third, and fifth
 Saturdays are not marked. The calculation finds the first Saturday from the
@@ -146,7 +146,7 @@ plugin. Runtime calendar use makes no network requests. Country metadata,
 subdivision metadata, and holiday results are cached at:
 
 ```text
-${XDG_CACHE_HOME:-~/.cache}/quickshell-rise/holidays/
+${XDG_CACHE_HOME:-~/.cache}/quickshell-astra/holidays/
 ```
 
 Holiday keys include country, subdivision, year, enabled public scopes,
@@ -160,13 +160,13 @@ directory to regenerate everything.
 Inspect the active provider and source metadata with:
 
 ```bash
-omarchy-shell quickshell-rise-health holidayDiagnostics
+omarchy-shell quickshell-astra-health holidayDiagnostics
 ```
 
 ## Verified annual update
 
 The installer enables
-`quickshell-rise-holiday-annual-update.timer`. At 09:00 local time every
+`quickshell-astra-holiday-annual-update.timer`. At 09:00 local time every
 January 1 (with up to 30 minutes of randomized delay), it checks the trusted
 project repository for that year's reviewed `IN/TN` JSON. `Persistent=true`
 causes a missed check to run after the machine next starts.
@@ -177,7 +177,7 @@ validates the country, subdivision, year, ISO dates, official-source metadata,
 duplicates, and record types, then writes atomically to:
 
 ```text
-${XDG_DATA_HOME:-~/.local/share}/quickshell-rise/holidays/IN/TN/<year>.json
+${XDG_DATA_HOME:-~/.local/share}/quickshell-astra/holidays/IN/TN/<year>.json
 ```
 
 It invalidates only matching year caches and restarts `omarchy-shell` after a
@@ -189,10 +189,10 @@ search results, or treats an unverified festival date as official.
 Check or trigger it manually with:
 
 ```bash
-systemctl --user list-timers quickshell-rise-holiday-annual-update.timer
-systemctl --user start quickshell-rise-holiday-annual-update.service
-journalctl --user -u quickshell-rise-holiday-annual-update.service
-cat "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-rise/holiday-annual-update.json"
+systemctl --user list-timers quickshell-astra-holiday-annual-update.timer
+systemctl --user start quickshell-astra-holiday-annual-update.service
+journalctl --user -u quickshell-astra-holiday-annual-update.service
+cat "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-astra/holiday-annual-update.json"
 ```
 
 The annual state file reports `updated`, `not-published`, or `error`. The
@@ -258,8 +258,8 @@ Holiday calculations and data come from
 [`date-holidays`](https://github.com/commenthol/date-holidays), pinned in
 `package-lock.json`. npm metadata declares `(ISC AND CC-BY-3.0)`; the bundled
 `LICENSE` more specifically licenses code under ISC and holiday data under CC
-BY-SA 3.0. Rise follows the stricter data notice. The installed package
-includes its complete license and source attributions. Rise remains MIT.
+BY-SA 3.0. Astra follows the stricter data notice. The installed package
+includes its complete license and source attributions. Astra remains MIT.
 
 Tamil Nadu 2026 regional dates come from the
 [Tamil Nadu Government Gazette Extraordinary No. 721](https://stationeryprinting.tn.gov.in/extraordinary/2025/721_Ex_II_1_2025.pdf),
@@ -311,6 +311,6 @@ published by the Government of Tamil Nadu on 11 November 2025.
 20. The annual download is protected by HTTPS and strict content validation,
     but is not cryptographically signed separately from the trusted project
     repository.
-21. If no reviewed file is available on January 1, Rise does not retry
+21. If no reviewed file is available on January 1, Astra does not retry
     automatically during the year; use the documented manual service command
     after publication.

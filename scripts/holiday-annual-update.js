@@ -38,7 +38,7 @@ function fetchText(url, redirects = 0) {
   return new Promise((resolve, reject) => {
     if (redirects > 3) return reject(new Error("too many redirects"));
     const request = https.get(url, {
-      headers: { "User-Agent": "quickshell-rise-holiday-updater/1" },
+      headers: { "User-Agent": "quickshell-astra-holiday-updater/1" },
       timeout: 15000
     }, response => {
       if ([301, 302, 307, 308].includes(response.statusCode) && response.headers.location) {
@@ -72,19 +72,19 @@ function fetchText(url, redirects = 0) {
 
 function notify(title, message, urgency = "normal") {
   childProcess.spawnSync("notify-send", [
-    "-a", "Quickshell Rise", "-u", urgency, title, message
+    "-a", "Quickshell Astra", "-u", urgency, title, message
   ], { stdio: "ignore", timeout: 3000 });
 }
 
 function statePath(env) {
   return path.join(env.XDG_STATE_HOME || path.join(env.HOME || os.homedir(), ".local/state"),
-    "quickshell-rise", "holiday-annual-update.json");
+    "quickshell-astra", "holiday-annual-update.json");
 }
 
 function clearYearCache(country, subdivision, year, env) {
   const directory = path.join(
     env.XDG_CACHE_HOME || path.join(env.HOME || os.homedir(), ".cache"),
-    "quickshell-rise", "holidays");
+    "quickshell-astra", "holidays");
   let removed = 0;
   try {
     for (const name of fs.readdirSync(directory)) {
@@ -109,7 +109,7 @@ async function update(options = {}) {
   if (!/^[A-Z]{2}$/.test(country) || !/^[A-Z0-9-]{1,12}$/.test(subdivision))
     throw new Error("country or subdivision code is invalid");
 
-  const template = options.sourceUrl || env.QS_RISE_HOLIDAY_UPDATE_URL || DEFAULT_URL;
+  const template = options.sourceUrl || env.QS_ASTRA_HOLIDAY_UPDATE_URL || DEFAULT_URL;
   const url = template
     .replaceAll("{country}", country)
     .replaceAll("{subdivision}", subdivision)

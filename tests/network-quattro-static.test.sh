@@ -6,7 +6,7 @@ service="$repo/versions/default/services/NetworkSummaryService.qml"
 widget="$repo/versions/default/modules/NetworkWidget.qml"
 panel="$repo/versions/default/panels/NetworkPanel.qml"
 theme="$repo/versions/default/Theme.qml"
-rise="$repo/versions/rise/Bar.qml"
+astra="$repo/versions/astra/Bar.qml"
 
 require() {
   rg -q -- "$1" "$2" || {
@@ -42,7 +42,7 @@ require_fixed 'dnsAction.command = ["omarchy-dns", provider]' "$service"
 require 'omarchy-launch-floating-terminal-with-presentation' "$service"
 require 'typeof entry.network.connect === "function"' "$service"
 require '"nmcli", "--ask", "--wait", "15"' "$service"
-require 'serviceInstances: 1' "$rise"
+require 'serviceInstances: 1' "$astra"
 
 if rg -q 'iwctl|impala|qs -c bar|quickshell -c bar' "$service" "$widget" "$panel"; then
   echo "FAIL: legacy or standalone network path found" >&2

@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import "../versions/rise" as RiseComponents
+import "../versions/astra" as AstraComponents
 
 Item {
     id: root
@@ -22,10 +22,10 @@ Item {
         && shell !== null
         && manifest !== null
         && barConfig !== null
-    readonly property var rise: riseLoader.item
-    readonly property int screenCount: rise && rise.barScreens ? rise.barScreens.length : 0
-    readonly property int windowCount: rise && rise.createdWindowCount !== undefined
-        ? rise.createdWindowCount : 0
+    readonly property var astra: astraLoader.item
+    readonly property int screenCount: astra && astra.barScreens ? astra.barScreens.length : 0
+    readonly property int windowCount: astra && astra.createdWindowCount !== undefined
+        ? astra.createdWindowCount : 0
 
     function tryInitialize() {
         if (initialized || initializationError !== "" || !hostReady) return
@@ -35,21 +35,21 @@ Item {
     }
 
     function finishInitialization() {
-        if (!riseLoader.item) {
-            initializationError = "Rise component did not create"
+        if (!astraLoader.item) {
+            initializationError = "Astra component did not create"
             return
         }
-        initialized = riseLoader.item.initialized === true
-        initializationError = String(riseLoader.item.initializationError || "")
+        initialized = astraLoader.item.initialized === true
+        initializationError = String(astraLoader.item.initializationError || "")
     }
 
     function healthObject() {
         var fatal = initializationError
-        if (!fatal && rise && rise.initializationError) fatal = String(rise.initializationError)
-        var ready = initialized && rise && rise.initialized === true && windowCount > 0 && fatal === ""
+        if (!fatal && astra && astra.initializationError) fatal = String(astra.initializationError)
+        var ready = initialized && astra && astra.initialized === true && windowCount > 0 && fatal === ""
         return {
             ok: ready,
-            plugin: "io.github.sanjyay.quickshell-rise",
+            plugin: "io.github.sanjyay.quickshell-astra",
             componentCreated: componentCreated,
             hostReady: hostReady,
             shellInjected: shell !== null,
@@ -60,18 +60,18 @@ Item {
             screens: screenCount,
             windows: windowCount,
             degradedFeatures: [],
-            gpu: rise && rise.gpuDiagnostics ? rise.gpuDiagnostics() : {},
-            idle: rise && rise.idleDiagnostics ? rise.idleDiagnostics() : {},
-            network: rise && rise.networkDiagnostics ? rise.networkDiagnostics() : {},
-            history: rise && rise.historyDiagnostics ? rise.historyDiagnostics() : {},
+            gpu: astra && astra.gpuDiagnostics ? astra.gpuDiagnostics() : {},
+            idle: astra && astra.idleDiagnostics ? astra.idleDiagnostics() : {},
+            network: astra && astra.networkDiagnostics ? astra.networkDiagnostics() : {},
+            history: astra && astra.historyDiagnostics ? astra.historyDiagnostics() : {},
             generation: generation,
             timestamp: Date.now()
         }
     }
 
     function debugBarGeometry() {
-        if (!rise || !rise.debugBarGeometry) return []
-        return rise.debugBarGeometry()
+        if (!astra || !astra.debugBarGeometry) return []
+        return astra.debugBarGeometry()
     }
 
     onOmarchyPathChanged: tryInitialize()
@@ -84,57 +84,75 @@ Item {
     }
 
     IpcHandler {
-        target: "quickshell-rise-health"
+        target: "quickshell-astra-health"
         function ping(): string { return JSON.stringify(root.healthObject()) }
         function refreshAiUsage(): bool {
-            return root.rise ? root.rise.refreshAiUsage() : false
+            return root.astra ? root.astra.refreshAiUsage() : false
         }
         function refreshNetwork(): bool {
-            return root.rise ? root.rise.refreshNetwork() : false
+            return root.astra ? root.astra.refreshNetwork() : false
         }
         function aiUsageDiagnostics(): string {
-            return JSON.stringify(root.rise ? root.rise.aiUsageDiagnostics() : {
+            return JSON.stringify(root.astra ? root.astra.aiUsageDiagnostics() : {
                 initialized: false,
                 collectorRunning: false,
                 providers: {}
             })
         }
         function openAiUsage(provider: string): void {
-            if (root.rise) root.rise.openAiUsage(provider)
+            if (root.astra) root.astra.openAiUsage(provider)
         }
         function closeAiUsage(): void {
-            if (root.rise) root.rise.closeAiUsage()
+            if (root.astra) root.astra.closeAiUsage()
         }
         function openSystemMetrics(): void {
-            if (root.rise) root.rise.openSystemMetrics()
+            if (root.astra) root.astra.openSystemMetrics()
         }
         function closeSystemMetrics(): void {
-            if (root.rise) root.rise.closeSystemMetrics()
+            if (root.astra) root.astra.closeSystemMetrics()
         }
         function openCalendar(): void {
-            if (root.rise) root.rise.openCalendar()
+            if (root.astra) root.astra.openCalendar()
         }
         function showCalendarMonth(year: int, month: int): bool {
-            return root.rise ? root.rise.showCalendarMonth(year, month) : false
+            return root.astra ? root.astra.showCalendarMonth(year, month) : false
         }
         function closeCalendar(): void {
-            if (root.rise) root.rise.closeCalendar()
+            if (root.astra) root.astra.closeCalendar()
         }
         function holidayDiagnostics(): string {
-            return JSON.stringify(root.rise ? root.rise.holidayDiagnostics() : {
+            return JSON.stringify(root.astra ? root.astra.holidayDiagnostics() : {
                 status: "unavailable",
                 records: []
             })
         }
     }
 
+    // Deprecated Rise alias. It delegates to this same component and state;
+    // no second bar or provider is created.
+    IpcHandler {
+        target: "quickshell-rise-health"
+        function ping(): string { return JSON.stringify(root.healthObject()) }
+        function refreshAiUsage(): bool { return root.astra ? root.astra.refreshAiUsage() : false }
+        function refreshNetwork(): bool { return root.astra ? root.astra.refreshNetwork() : false }
+        function aiUsageDiagnostics(): string { return JSON.stringify(root.astra ? root.astra.aiUsageDiagnostics() : {}) }
+        function openAiUsage(provider: string): void { if (root.astra) root.astra.openAiUsage(provider) }
+        function closeAiUsage(): void { if (root.astra) root.astra.closeAiUsage() }
+        function openSystemMetrics(): void { if (root.astra) root.astra.openSystemMetrics() }
+        function closeSystemMetrics(): void { if (root.astra) root.astra.closeSystemMetrics() }
+        function openCalendar(): void { if (root.astra) root.astra.openCalendar() }
+        function showCalendarMonth(year: int, month: int): bool { return root.astra ? root.astra.showCalendarMonth(year, month) : false }
+        function closeCalendar(): void { if (root.astra) root.astra.closeCalendar() }
+        function holidayDiagnostics(): string { return JSON.stringify(root.astra ? root.astra.holidayDiagnostics() : {}) }
+    }
+
     Loader {
-        id: riseLoader
+        id: astraLoader
         active: root.hostReady && root.initializationError === ""
         asynchronous: false
 
         sourceComponent: Component {
-            RiseComponents.Bar {
+            AstraComponents.Bar {
                 omarchyPath: root.omarchyPath
                 shell: root.shell
                 manifest: root.manifest
@@ -147,7 +165,7 @@ Item {
         onLoaded: Qt.callLater(root.finishInitialization)
         onStatusChanged: {
             if (status === Loader.Error)
-                root.initializationError = "Rise component loader error"
+                root.initializationError = "Astra component loader error"
         }
     }
 }

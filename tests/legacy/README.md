@@ -34,7 +34,7 @@ bindings, standalone process switching, or old artifact manifest.
 - `qs-menu-data.test.sh`
 - `qs-menu-font-action.test.sh`
 
-They assert Elephant or Rise-owned notification, clipboard, OSD, and standalone
+They assert Elephant or Astra-owned notification, clipboard, OSD, and standalone
 IPC providers. Quattro owns those singleton services.
 
 ## Still-Valid Tests Requiring Service-Adapter Porting

@@ -8,7 +8,7 @@ Scope {
     id: manager
     required property var root
 
-    readonly property string cachePath: Quickshell.env("HOME") + "/.cache/qs-rise-notifications.json"
+    readonly property string cachePath: Quickshell.env("HOME") + "/.cache/qs-astra-notifications.json"
     property var recent: []
     property var toasts: []
     property bool cacheLoaded: false
@@ -138,7 +138,7 @@ Scope {
             "candidate=$(find \"$D\" -maxdepth 1 -type f -iname 'screenrecording-*.mp4' -printf '%T@\\t%p\\n' 2>/dev/null | sort -rn | head -1 | cut -f2-);",
             "fi;",
             "[[ -n $candidate && -f $candidate ]] && exec omacut \"$candidate\""
-        ].join(" "), "rise-open-screen-recording", inferredPath])
+        ].join(" "), "astra-open-screen-recording", inferredPath])
         return true
     }
 

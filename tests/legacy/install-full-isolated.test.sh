@@ -78,7 +78,7 @@ destination="$HOME/.config/quickshell/bar"
 [[ -f "$destination/.qsrise" ]] || fail "ownership marker missing"
 [[ "$(cat "$destination/.qsrise-source")" == "$repo" ]] || fail "source marker mismatch"
 bash "$repo/scripts/qs-verify-config-tree.sh" "$repo/versions/default" "$destination"
-[[ "$(cat "$XDG_STATE_HOME/qs-rise/mode")" == quickshell ]] || fail "healthy install did not record quickshell"
+[[ "$(cat "$XDG_STATE_HOME/qs-astra/mode")" == quickshell ]] || fail "healthy install did not record quickshell"
 
 printf 'fixture custom quote\n' > "$destination/quotes.txt"
 bash "$repo/install.sh" --no-ai-backend --no-autostart >/dev/null
@@ -86,20 +86,20 @@ bash "$repo/install.sh" --no-ai-backend --no-autostart >/dev/null
 bash "$repo/scripts/qs-verify-config-tree.sh" "$repo/versions/default" "$destination"
 
 for marker in \
-  '# >>> quickshell-rise managed menu bindings >>>' \
-  '# >>> quickshell-rise managed media bindings >>>' \
-  '# >>> quickshell-rise managed notification bindings >>>'; do
+  '# >>> quickshell-astra managed menu bindings >>>' \
+  '# >>> quickshell-astra managed media bindings >>>' \
+  '# >>> quickshell-astra managed notification bindings >>>'; do
   [[ "$(grep -Fxc "$marker" "$HYPR_BINDINGS_CONF")" -eq 1 ]] || fail "managed marker is not idempotent: $marker"
 done
 grep -q '^systemctl[[:space:]]' "$QS_TEST_COMMAND_LOG" || fail "systemctl was not intercepted"
 grep -q '^qs[[:space:]].*ipc call health ping' "$QS_TEST_COMMAND_LOG" || fail "health check was not exercised"
-[[ ! -e "$HOME/.config/omarchy/hooks/post-boot.d/quickshell-rise" ]] || fail "--no-autostart installed hook"
+[[ ! -e "$HOME/.config/omarchy/hooks/post-boot.d/quickshell-astra" ]] || fail "--no-autostart installed hook"
 
 bash "$repo/install.sh" --no-ai-backend --autostart >/dev/null
-cmp -s "$repo/contrib/post-boot.d/quickshell-rise" \
-  "$HOME/.config/omarchy/hooks/post-boot.d/quickshell-rise" || fail "autostart policy did not install source"
+cmp -s "$repo/contrib/post-boot.d/quickshell-astra" \
+  "$HOME/.config/omarchy/hooks/post-boot.d/quickshell-astra" || fail "autostart policy did not install source"
 bash "$repo/install.sh" --no-ai-backend --no-autostart >/dev/null
-[[ ! -e "$HOME/.config/omarchy/hooks/post-boot.d/quickshell-rise" ]] || fail "--no-autostart did not remove hook"
+[[ ! -e "$HOME/.config/omarchy/hooks/post-boot.d/quickshell-astra" ]] || fail "--no-autostart did not remove hook"
 
 # Exercise complete cleanup and backup restoration without touching live state.
 backup="$destination.bak.20000101-000000"

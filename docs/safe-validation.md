@@ -64,7 +64,7 @@ less dependent on QML source spelling.
 
 ```bash
 bash -n install.sh uninstall.sh scripts/*.sh hooks/50-quickshell-bar.sh \
-  contrib/post-boot.d/quickshell-rise
+  contrib/post-boot.d/quickshell-astra
 bash tests/refactoring-baseline.test.sh
 bash tests/bindings-install-uninstall.test.sh
 bash tests/install-full-isolated.test.sh

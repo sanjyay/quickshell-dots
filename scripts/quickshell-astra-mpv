@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# quickshell-rise-owned-mpv-screenrecord-action
+# quickshell-astra-owned-mpv-screenrecord-action
 
 parent_command=$(ps -o args= -p "$PPID" 2>/dev/null || true)
 target=${1:-}

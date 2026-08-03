@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-id="io.github.sanjyay.quickshell-rise"
+id="io.github.sanjyay.quickshell-astra"
 entry="$(jq -r '.entryPoints.bar' "$repo/manifest.json")"
 
 jq -e --arg id "$id" '
@@ -22,22 +22,22 @@ grep -Fq 'readonly property bool hostReady:' "$bar"
 grep -Fq 'function tryInitialize()' "$bar"
 grep -Fq 'property bool initialized: false' "$bar"
 grep -Fq 'property string initializationError: ""' "$bar"
-grep -Fq 'target: "quickshell-rise-health"' "$bar"
+grep -Fq 'target: "quickshell-astra-health"' "$bar"
 grep -Fq 'fatalError:' "$bar"
 grep -Fq 'windows:' "$bar"
 grep -Fq 'function debugBarGeometry()' "$bar"
 
 ! grep -Eq 'qs -c bar|qs -n -d -c bar|quickshell -c bar' \
-  "$bar" "$repo/versions/rise/Bar.qml" "$repo/install.sh"
+  "$bar" "$repo/versions/astra/Bar.qml" "$repo/install.sh"
 ! grep -Eq 'NotificationManager|NotificationServer|HardwareOsdOverlay' \
-  "$repo/versions/rise/Bar.qml"
-grep -Fq 'HistoryPanel { root: theme }' "$repo/versions/rise/Bar.qml"
-grep -Fq 'target: "quickshell-rise-clipboard"' "$repo/versions/rise/Bar.qml"
+  "$repo/versions/astra/Bar.qml"
+grep -Fq 'HistoryPanel { root: theme }' "$repo/versions/astra/Bar.qml"
+grep -Fq 'target: "quickshell-astra-clipboard"' "$repo/versions/astra/Bar.qml"
 ! grep -Eqi 'elephant|bindings\.conf|waybar|mako|swayosd|impala|iwctl' "$repo/install.sh"
 
 smoke="$repo/tests/fixtures/smoke/Bar.qml"
 [[ -f "$smoke" ]]
-grep -Fq 'target: "quickshell-rise-health"' "$smoke"
+grep -Fq 'target: "quickshell-astra-health"' "$smoke"
 grep -Fq 'function debugBarGeometry()' "$smoke"
 
 printf 'PASS: Quattro manifest, loader, initialization, health, and ownership contracts\n'

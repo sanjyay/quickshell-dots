@@ -2,7 +2,7 @@
 # QS-Shell update check (writes a state file the bar watches; no apply here).
 #
 # Topology of THIS setup: the live bar dir is a *copy* of versions/default/ from the
-# installed config directory. Prefer the source recorded there in .qsrise-source;
+# installed config directory. Prefer the source recorded there in .qsastra-source;
 # fall back to the persistent deploy clone at ~/.local/share/quickshell-dots only
 # when the recorded source is missing or invalid. We never run git in the live dir —
 # we compare the deploy repo's tracking branch against origin, scoped to the
@@ -21,8 +21,8 @@ STATE="$STATE_DIR/update-available.json"
 mkdir -p "$STATE_DIR"
 
 SOURCE="${QS_SHELL_SOURCE:-}"
-if [ -z "$SOURCE" ] && [ -r "$DEST/.qsrise-source" ]; then
-  SOURCE="$(tr -d '\n' < "$DEST/.qsrise-source")"
+if [ -z "$SOURCE" ] && [ -r "$DEST/.qsastra-source" ]; then
+  SOURCE="$(tr -d '\n' < "$DEST/.qsastra-source")"
 fi
 if [ -n "$SOURCE" ] && [ -d "$SOURCE/.git" ]; then
   REPO="$SOURCE"

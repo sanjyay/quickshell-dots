@@ -33,7 +33,7 @@ PanelWindow {
     anchors { top: true; bottom: true; left: true; right: true }
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "quickshell-rise-network"
+    WlrLayershell.namespace: "quickshell-astra-network"
     WlrLayershell.keyboardFocus: root.networkVisible
         ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     visible: reveal > 0.001
@@ -188,7 +188,7 @@ PanelWindow {
     }
 
     IpcHandler {
-        target: "quickshell-rise-network"
+        target: "quickshell-astra-network"
         function open(): string {
             root.activateFocusedPopupScreen()
             root.networkVisible = true

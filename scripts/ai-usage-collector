@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect Codex, Claude, and OpenCode usage into one normalized Rise state."""
+"""Collect Codex, Claude, and OpenCode usage into one normalized Astra state."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ SCHEMA_VERSION = 1
 STALE_AFTER_SECONDS = 15 * 60
 HOME = Path(os.environ.get("HOME") or Path.home())
 XDG_STATE_HOME = Path(os.environ.get("XDG_STATE_HOME") or HOME / ".local/state")
-STATE_DIR = XDG_STATE_HOME / "quickshell-rise"
+STATE_DIR = XDG_STATE_HOME / "quickshell-astra"
 STATE_FILE = STATE_DIR / "ai-usage.json"
 LOCK_FILE = STATE_DIR / "ai-usage.lock"
 ANSI_RE = re.compile(r"\x1b(?:[@-_][0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
@@ -238,7 +238,7 @@ def codex_rpc(executable: str) -> dict:
     )
     try:
         rpc_request(proc, 1, "initialize", {
-            "clientInfo": {"name": "quickshell-rise-ai-usage", "version": "1"}
+            "clientInfo": {"name": "quickshell-astra-ai-usage", "version": "1"}
         }, timeout=8)
         assert proc.stdin is not None
         proc.stdin.write(json.dumps({"method": "initialized", "params": {}}) + "\n")
@@ -350,7 +350,7 @@ def collect_claude() -> dict:
         headers={
             "Authorization": f"Bearer {token}",
             "anthropic-beta": "oauth-2025-04-20",
-            "User-Agent": "claude-code/quickshell-rise",
+            "User-Agent": "claude-code/quickshell-astra",
             "Content-Type": "application/json",
         },
     )

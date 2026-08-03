@@ -134,7 +134,7 @@ test("real India and Tamil Nadu scope classification is stable for 2026", () => 
 });
 
 test("national and regional filters are independent", () => {
-  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "rise-holiday-filter."));
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "astra-holiday-filter."));
   const env = { HOME: temporary, XDG_CACHE_HOME: path.join(temporary, "cache") };
   const national = helper.getHolidays({
     country: "IN", subdivision: "TN", year: 2026, showNational: true,
@@ -192,7 +192,7 @@ test("cache keys separate country, subdivision, year, public scopes, and provide
 });
 
 test("metadata cache loads and corrupt metadata regenerates atomically", () => {
-  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "rise-holiday-meta."));
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "astra-holiday-meta."));
   const env = { HOME: temporary, XDG_CACHE_HOME: path.join(temporary, "cache") };
   let calls = 0;
   const first = helper.cachedMetadata("countries", "", () => { calls++; return [{ code: "IN", name: "India" }]; }, env);
@@ -209,7 +209,7 @@ test("metadata cache loads and corrupt metadata regenerates atomically", () => {
 });
 
 test("valid cache loads, corrupt cache regenerates, and writes are atomic", () => {
-  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "rise-holiday-test."));
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "astra-holiday-test."));
   const env = { HOME: temporary, XDG_CACHE_HOME: path.join(temporary, "cache") };
   let calls = 0;
   const factory = () => ({
@@ -233,7 +233,7 @@ test("valid cache loads, corrupt cache regenerates, and writes are atomic", () =
 });
 
 test("old incomplete cache schemas and provider-less keys are regenerated", () => {
-  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "rise-holiday-old-cache."));
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "astra-holiday-old-cache."));
   const env = { HOME: temporary, XDG_CACHE_HOME: path.join(temporary, "cache") };
   const file = helper.cachePath("IN", "TN", 2026, "national+regional", env,
     "tn-government-2026-schema1-revision1");
@@ -281,9 +281,9 @@ test("invalid helper commands and selections return structured errors", () => {
 });
 
 test("holiday settings state writes are private, atomic, and path restricted", () => {
-  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "rise-holiday-state."));
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "astra-holiday-state."));
   const env = { ...process.env, HOME: temporary, XDG_STATE_HOME: path.join(temporary, "state") };
-  const target = path.join(env.XDG_STATE_HOME, "quickshell-rise", "holiday-settings.json");
+  const target = path.join(env.XDG_STATE_HOME, "quickshell-astra", "holiday-settings.json");
   const script = path.join(__dirname, "../scripts/holiday-helper.js");
   const data = JSON.stringify({ schemaVersion: 1, countryMode: "manual", country: "IN" });
   const result = childProcess.spawnSync(process.execPath,

@@ -10,7 +10,7 @@ trap 'rm -rf -- "$tmp"' EXIT
 export HOME="$tmp/home"
 export XDG_STATE_HOME="$tmp/state"
 mkdir -p "$HOME" "$XDG_STATE_HOME"
-state="$XDG_STATE_HOME/qs-rise/notifications-silenced"
+state="$XDG_STATE_HOME/qs-astra/notifications-silenced"
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 [[ "$(realpath -m "$HOME")" != "$(realpath -m "$real_home")" ]] || fail "temporary HOME resolves to real HOME"

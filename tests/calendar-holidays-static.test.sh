@@ -5,7 +5,7 @@ service="versions/default/services/HolidayService.qml"
 calendar="versions/default/panels/CalendarPopup.qml"
 theme="versions/default/Theme.qml"
 runtime="runtime/Bar.qml"
-bar="versions/rise/Bar.qml"
+bar="versions/astra/Bar.qml"
 
 require() {
   rg -Fq "$1" "$2" || { printf 'missing %s in %s\n' "$1" "$2" >&2; exit 1; }

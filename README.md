@@ -1,7 +1,7 @@
-# Quickshell Rise for Omarchy Quattro
+# Quickshell Astra for Omarchy Quattro
 
-Quickshell Rise is a full-bar plugin for Omarchy Quattro. It runs inside the
-single long-lived `omarchy-shell` process and adds Rise's bar, panels, widgets,
+Quickshell Astra is a full-bar plugin for Omarchy Quattro. It runs inside the
+single long-lived `omarchy-shell` process and adds Astra's bar, panels, widgets,
 and helpers without starting a second Quickshell session.
 
 This repository is for the Quattro plugin architecture only. It does not support
@@ -13,7 +13,7 @@ classic standalone `qs -c bar` usage.
 - Launcher, workspaces, clock, audio, MPRIS, battery, power profile, network,
   Bluetooth, microphone, weather, tray, system metrics, Tailscale, AI usage,
   idle, and update widgets.
-- Rise control center and detail panels.
+- Astra control center and detail panels.
 - Offline public-holiday markers and details in the calendar, with safe
   timezone-based country detection, an in-calendar searchable country/region
   selector, national/regional controls, an official bundled Tamil Nadu 2026
@@ -41,20 +41,20 @@ git pull --ff-only
 ./install.sh
 ```
 
-Remove Rise with:
+Remove Astra with:
 
 ```bash
 ./uninstall.sh
 ```
 
 The installer stages the plugin atomically, installs the managed Hyprland
-binding block, switches Omarchy to the Rise bar, and runs health checks. If a
+binding block, switches Omarchy to the Astra bar, and runs health checks. If a
 step fails, the previous bar, shell config, and bindings are restored.
 
 Installation state is recorded in:
 
 ```text
-~/.local/state/quickshell-rise/install-state.json
+~/.local/state/quickshell-astra/install-state.json
 ```
 
 ## Where the code lives
@@ -62,7 +62,7 @@ Installation state is recorded in:
 ```text
 manifest.json                 Plugin manifest used by Omarchy Quattro
 runtime/Bar.qml               Runtime adapter that waits for host injection
-versions/rise/Bar.qml         Production bar composition
+versions/astra/Bar.qml         Production bar composition
 versions/default/modules/     Reusable widgets and shared controls
 versions/default/panels/      Panels, popups, and pickers
 versions/default/services/    Shared data services and collectors
@@ -77,7 +77,7 @@ docs/                         Architecture and migration notes
 ## How it is structured
 
 - `runtime/Bar.qml` is the small host-facing entry point.
-- `versions/rise/Bar.qml` builds the actual production bar once Omarchy's
+- `versions/astra/Bar.qml` builds the actual production bar once Omarchy's
   injected properties are ready.
 - `versions/default/` contains the widgets, panels, and shared services.
 - `Theme.qml` acts as the shared state and compatibility layer for the bar.
@@ -89,7 +89,7 @@ docs/                         Architecture and migration notes
 omarchy-shell shell ping
 omarchy-shell launcher open
 omarchy-shell menu toggle
-omarchy-shell quickshell-rise-clipboard toggle
+omarchy-shell quickshell-astra-clipboard toggle
 omarchy plugin validate .
 ```
 

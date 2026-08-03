@@ -60,8 +60,8 @@ QtObject {
     property bool countryQueued: false
 
     readonly property string statePath: Quickshell.env("XDG_STATE_HOME")
-        ? Quickshell.env("XDG_STATE_HOME") + "/quickshell-rise/holiday-settings.json"
-        : Quickshell.env("HOME") + "/.local/state/quickshell-rise/holiday-settings.json"
+        ? Quickshell.env("XDG_STATE_HOME") + "/quickshell-astra/holiday-settings.json"
+        : Quickshell.env("HOME") + "/.local/state/quickshell-astra/holiday-settings.json"
     readonly property string helperPath: {
         var value = String(Qt.resolvedUrl("../../../scripts/holiday-helper.js"))
         return value.indexOf("file://") === 0 ? value.substring(7) : value
@@ -449,7 +449,7 @@ QtObject {
     function setError(error, fallbackCode) {
         errorCode = String(error.code || fallbackCode)
         errorMessage = String(error.message || "Holiday data unavailable")
-        console.warn("Quickshell Rise holidays: " + errorCode + ": " + errorMessage)
+        console.warn("Quickshell Astra holidays: " + errorCode + ": " + errorMessage)
     }
 
     function holidaysFor(date) {
@@ -514,7 +514,7 @@ QtObject {
         writerCommand: ["node", service.helperPath, "state-write"]
         onSaved: service.stateFile.reload()
         onFailed: function(state, exitCode) {
-            console.warn("Quickshell Rise holidays: settings write failed with exit code " + exitCode)
+            console.warn("Quickshell Astra holidays: settings write failed with exit code " + exitCode)
         }
     }
 

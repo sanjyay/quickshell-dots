@@ -7,7 +7,7 @@ const DATA_ROOT = path.resolve(__dirname, "../data/holidays");
 
 function userDataRoot(env = process.env) {
   return path.join(env.XDG_DATA_HOME || path.join(env.HOME || require("os").homedir(), ".local/share"),
-    "quickshell-rise", "holidays");
+    "quickshell-astra", "holidays");
 }
 
 class RegionalProviderError extends Error {

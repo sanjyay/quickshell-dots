@@ -10,7 +10,7 @@
 | Live entry point | `~/.config/quickshell/bar/shell.qml` | Derived installed copy |
 | Configuration name | `bar` | External compatibility contract |
 | Ownership marker | `.qsrise` | Proves the installed tree is project-owned |
-| Source marker | `.qsrise-source` | Records a local source checkout when available |
+| Source marker | `.qsastra-source` | Records a local source checkout when available |
 | User helpers | `~/.local/bin/` | Individually installed project entrypoints |
 | Updater helpers | `~/.config/quickshell/bin/` | Project-owned updater/helper scripts |
 | User units | `~/.config/systemd/user/` | Individually owned services/timers |
@@ -53,12 +53,12 @@ directory.
 
 | Installed location | Current project-owned artifacts |
 |---|---|
-| `~/.local/bin/` | `claude-usage`, `codex-usage`, `opencode-usage`, provider module `qs_usage_cache.py`, `qs-mode`, `qs-managed-bindings`, `qs-rise-input`, `swayosd-client`, `qs-menu-action`, `qs-menu-data`, `qs-theme-switcher`, `qs-wallpaper-switcher`, `qs-clipboard`, `qs-emoji`, `qs-capture`, `qs-notification-silence`, `qs-state-write` |
+| `~/.local/bin/` | `claude-usage`, `codex-usage`, `opencode-usage`, provider module `qs_usage_cache.py`, `qs-mode`, `qs-managed-bindings`, `qs-astra-input`, `swayosd-client`, `qs-menu-action`, `qs-menu-data`, `qs-theme-switcher`, `qs-wallpaper-switcher`, `qs-clipboard`, `qs-emoji`, `qs-capture`, `qs-notification-silence`, `qs-state-write` |
 | `~/.config/quickshell/bin/` | `qs-shell-check-update.sh`, `qs-shell-apply-update.sh`, `qs-shell-refresh-local.sh`, `ensure-hypr-launcher-binding.sh`, `ensure-hypr-switcher-blur-rules.sh` |
-| `~/.local/lib/qs-rise/` | `qs-clipboard-filter.py`, private `elephant-bin/wl-paste` wrapper |
-| `~/.config/systemd/user/elephant.service.d/` | `50-qs-rise-clipboard-privacy.conf` |
+| `~/.local/lib/qs-astra/` | `qs-clipboard-filter.py`, private `elephant-bin/wl-paste` wrapper |
+| `~/.config/systemd/user/elephant.service.d/` | `50-qs-astra-clipboard-privacy.conf` |
 | `~/.config/omarchy/hooks/theme-set.d/` | `50-quickshell-bar.sh` |
-| `~/.config/omarchy/hooks/post-boot.d/` | Optional `quickshell-rise` |
+| `~/.config/omarchy/hooks/post-boot.d/` | Optional `quickshell-astra` |
 
 Project user units are:
 
@@ -68,7 +68,7 @@ Project user units are:
 - `qs-shell-update-check.service` and `qs-shell-update-check.timer`
 
 The project also installs
-`elephant.service.d/50-qs-rise-clipboard-privacy.conf`, an Omarchy theme hook,
+`elephant.service.d/50-qs-astra-clipboard-privacy.conf`, an Omarchy theme hook,
 and optionally the post-boot hook. Retired package-updater paths remain in
 migration cleanup and are not current artifacts.
 
@@ -78,11 +78,11 @@ helpers, and current uninstall delegate to it; uninstall keeps an internal
 fallback solely for installations that predate the helper.
 
 Managed Hyprland ownership consists of three marker blocks in the selected
-bindings file: `quickshell-rise managed menu bindings`, `managed media
+bindings file: `quickshell-astra managed menu bindings`, `managed media
 bindings`, and `managed notification bindings`. The menu block has distinct
 Quickshell and Omarchy command sets. A separate exact launcher/toggle helper
 maintains `SUPER SPACE` launcher and `SUPER SHIFT SPACE` provider-toggle lines.
-The look-and-feel file contains the `quickshell-rise managed switcher blur
+The look-and-feel file contains the `quickshell-astra managed switcher blur
 rules` block for the native theme, wallpaper, and History window namespaces.
 User lines outside these exact markers/lines are not owned.
 
@@ -106,7 +106,7 @@ fixture executes it only with temporary roots and lifecycle command shims.
 
 ## Profile behavior
 
-Mode is recorded in `${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise/mode`.
+Mode is recorded in `${XDG_STATE_HOME:-$HOME/.local/state}/qs-astra/mode`.
 `qs-mode quickshell` installs Quickshell menu/media/notification bindings,
 reloads Hyprland, stops competing presentation services, starts
 `qs -n -d -c bar`, and requires both instance discovery and `health ping`

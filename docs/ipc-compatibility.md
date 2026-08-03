@@ -1,5 +1,10 @@
 # IPC and Entrypoint Compatibility
 
+Canonical project endpoints use the `quickshell-astra-*` prefix. The deprecated
+`quickshell-rise-health` and `quickshell-rise-clipboard` endpoints remain
+in-process aliases to the same Astra objects for upgrade compatibility; they
+do not create another bar, panel, provider, or Quickshell process.
+
 The following 13 targets and 44 methods are the baseline external interface.
 An absent tracked caller is not evidence that a method is removable.
 
@@ -45,7 +50,7 @@ qs-menu-data.sh
 qs-mode.sh
 qs-notification-silence.sh
 qs-state-write
-qs-rise-input.sh
+qs-astra-input.sh
 qs_usage_cache.py
 qs-shell-apply-update.sh
 qs-shell-check-update.sh

@@ -1,28 +1,28 @@
-# Quickshell Rise and Omarchy Quattro
+# Quickshell Astra and Omarchy Quattro
 
 This document is a compact migration guide for people working on the repo.
 It focuses on the pieces that matter when you are trying to understand why a
 feature lives where it does.
 
-## What Rise is
+## What Astra is
 
-Quickshell Rise is a full-bar plugin hosted by the single long-lived
+Quickshell Astra is a full-bar plugin hosted by the single long-lived
 `omarchy-shell` process. It shares the Quattro runtime and should not create a
 second Quickshell bar or replace Quattro-owned services.
 
 ## What is authoritative
 
-The runtime contract is driven by the installed Quattro host. Rise must follow
+The runtime contract is driven by the installed Quattro host. Astra must follow
 that contract rather than guessing legacy paths or starting its own providers.
 The current plugin entry points are:
 
 - `manifest.json`
 - `runtime/Bar.qml`
-- `versions/rise/Bar.qml`
+- `versions/astra/Bar.qml`
 
 ## What moved to Quattro
 
-These areas are no longer owned by Rise as separate implementations:
+These areas are no longer owned by Astra as separate implementations:
 
 - notifications
 - clipboard capture and history storage
@@ -32,12 +32,12 @@ These areas are no longer owned by Rise as separate implementations:
 - audio and Bluetooth backends
 - NetworkManager integration
 
-Rise can still present some of those capabilities in its UI, but the underlying
+Astra can still present some of those capabilities in its UI, but the underlying
 service is Quattro-owned.
 
-## What Rise still owns
+## What Astra still owns
 
-Rise keeps its own UI composition, layout, panels, and plugin-local services for
+Astra keeps its own UI composition, layout, panels, and plugin-local services for
 things that are safe to present from the bar:
 
 - bar layout and slot positioning
@@ -59,6 +59,6 @@ things that are safe to present from the bar:
 
 ## Reminder
 
-If a feature depends on Quattro state, do not add a second Rise-owned copy of
-that state just to make the UI easier. Rise should observe the shared backend and
+If a feature depends on Quattro state, do not add a second Astra-owned copy of
+that state just to make the UI easier. Astra should observe the shared backend and
 present it clearly.

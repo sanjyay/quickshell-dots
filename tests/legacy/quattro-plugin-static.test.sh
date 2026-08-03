@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-plugin_id="io.github.sanjyay.quickshell-rise"
+plugin_id="io.github.sanjyay.quickshell-astra"
 
 jq -e --arg id "$plugin_id" \
   '.schemaVersion == 1 and .id == $id and .kinds == ["bar"] and .entryPoints.bar == "versions/default/Bar.qml"' \

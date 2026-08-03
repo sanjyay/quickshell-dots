@@ -15,7 +15,8 @@ destination_list="$tmp/destination"
 
 LC_ALL=C find "$source_tree" -type f ! -name quotes.txt -printf '%P\n' | sort > "$source_list"
 LC_ALL=C find "$destination" -type f \
-  ! -name quotes.txt ! -name .qsrise ! -name .qsrise-source \
+  ! -name quotes.txt ! -name .qsastra ! -name .qsastra-source \
+  ! -name .qsrise ! -name .qsrise-source \
   -printf '%P\n' | sort > "$destination_list"
 
 if ! cmp -s "$source_list" "$destination_list"; then

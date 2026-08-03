@@ -1,30 +1,39 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-PLUGIN_ID="io.github.sanjyay.quickshell-rise"
+PLUGIN_ID="io.github.sanjyay.quickshell-astra"
+LEGACY_PLUGIN_ID="io.github.sanjyay.quickshell-rise"
 SCHEMA_VERSION=1
-REPO_URL="${QS_RISE_REPO_URL:-https://github.com/sanjyay/quickshell-dots.git}"
-STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-rise"
+REPO_URL="${QS_ASTRA_REPO_URL:-https://github.com/sanjyay/quickshell-dots.git}"
+STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-astra"
 STATE_FILE="$STATE_HOME/install-state.json"
+LEGACY_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell-rise"
+LEGACY_STATE_FILE="$LEGACY_STATE_HOME/install-state.json"
 PLUGINS_DIR="$HOME/.config/omarchy/plugins"
 TARGET="$PLUGINS_DIR/$PLUGIN_ID"
+LEGACY_TARGET="$PLUGINS_DIR/$LEGACY_PLUGIN_ID"
 SHELL_CONFIG="$HOME/.config/omarchy/shell.json"
 BINDINGS="$HOME/.config/hypr/bindings.lua"
-BLOCK_BEGIN="-- BEGIN QUICKSHELL-RISE MANAGED BLOCK"
-BLOCK_END="-- END QUICKSHELL-RISE MANAGED BLOCK"
+BLOCK_BEGIN="-- BEGIN QUICKSHELL-ASTRA MANAGED BLOCK"
+BLOCK_END="-- END QUICKSHELL-ASTRA MANAGED BLOCK"
+LEGACY_BLOCK_BEGIN="-- BEGIN QUICKSHELL-RISE MANAGED BLOCK"
+LEGACY_BLOCK_END="-- END QUICKSHELL-RISE MANAGED BLOCK"
 LOOKNFEEL="$HOME/.config/hypr/looknfeel.lua"
-BLUR_BLOCK_BEGIN="-- BEGIN QUICKSHELL-RISE HISTORY BLUR"
-BLUR_BLOCK_END="-- END QUICKSHELL-RISE HISTORY BLUR"
-LEGACY_IDLE_WRAPPER="$HOME/.local/bin/quickshell-rise-idle-toggle"
+BLUR_BLOCK_BEGIN="-- BEGIN QUICKSHELL-ASTRA HISTORY BLUR"
+BLUR_BLOCK_END="-- END QUICKSHELL-ASTRA HISTORY BLUR"
+LEGACY_BLUR_BLOCK_BEGIN="-- BEGIN QUICKSHELL-RISE HISTORY BLUR"
+LEGACY_BLUR_BLOCK_END="-- END QUICKSHELL-RISE HISTORY BLUR"
+LEGACY_IDLE_WRAPPER="$HOME/.local/bin/quickshell-astra-idle-toggle"
 MPV_WRAPPER="$HOME/.local/bin/mpv"
 LEGACY_SCREENRECORD_WRAPPER="$HOME/.local/bin/omarchy-capture-screenrecording"
-LEGACY_SCREENRECORD_SHIM_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/quickshell-rise/screenrecord-bin"
+LEGACY_SCREENRECORD_SHIM_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/quickshell-astra/screenrecord-bin"
 UNIT_DIR="$HOME/.config/systemd/user"
-HOLIDAY_UPDATE_UNIT="quickshell-rise-holiday-annual-update"
+HOLIDAY_UPDATE_UNIT="quickshell-astra-holiday-annual-update"
+LEGACY_HOLIDAY_UPDATE_UNIT="quickshell-rise-holiday-annual-update"
 
 info() { printf '==> %s\n' "$*"; }
 warn() { printf '!! %s\n' "$*" >&2; }
-die() { printf 'quickshell-rise: %s\n' "$*" >&2; exit 1; }
+die() { printf 'quickshell-astra: %s\n' "$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 for command in git jq lua hyprctl pgrep omarchy omarchy-shell mktemp node npm; do
@@ -36,7 +45,7 @@ omarchy-shell shell ping >/dev/null ||
   die "the long-lived omarchy-shell is not responding"
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-temp_root="$(mktemp -d "${TMPDIR:-/tmp}/quickshell-rise.install.XXXXXX")"
+temp_root="$(mktemp -d "${TMPDIR:-/tmp}/quickshell-astra.install.XXXXXX")"
 stage="$temp_root/plugin"
 backup_plugin="$temp_root/previous-plugin"
 backup_shell="$temp_root/shell.json"
@@ -64,6 +73,14 @@ if [[ -f "$STATE_FILE" ]] &&
    jq -e --arg id "$PLUGIN_ID" '.schemaVersion == 1 and .pluginId == $id' "$STATE_FILE" >/dev/null 2>&1; then
   previous_bar="$(jq -r '.previousBarId // "omarchy.bar"' "$STATE_FILE")"
   saved_shell_backup="$(jq -r '.previousShellConfigBackup // empty' "$STATE_FILE")"
+  if [[ -n "$saved_shell_backup" && -f "$saved_shell_backup" ]] &&
+     jq -e '.version == 1' "$saved_shell_backup" >/dev/null 2>&1; then
+    install -m 600 "$saved_shell_backup" "$temp_root/original-shell.before.json"
+  fi
+elif [[ -f "$LEGACY_STATE_FILE" ]] &&
+     jq -e --arg id "$LEGACY_PLUGIN_ID" '.schemaVersion == 1 and .pluginId == $id' "$LEGACY_STATE_FILE" >/dev/null 2>&1; then
+  previous_bar="$(jq -r '.previousBarId // "omarchy.bar"' "$LEGACY_STATE_FILE")"
+  saved_shell_backup="$(jq -r '.previousShellConfigBackup // empty' "$LEGACY_STATE_FILE")"
   if [[ -n "$saved_shell_backup" && -f "$saved_shell_backup" ]] &&
      jq -e '.version == 1' "$saved_shell_backup" >/dev/null 2>&1; then
     install -m 600 "$saved_shell_backup" "$temp_root/original-shell.before.json"
@@ -99,7 +116,7 @@ rollback() {
     rm -f -- "$LOOKNFEEL"
   fi
   if [[ -f "$MPV_WRAPPER" ]] &&
-     grep -Fq 'quickshell-rise-owned-mpv-screenrecord-action' "$MPV_WRAPPER"; then
+     grep -Fq 'quickshell-astra-owned-mpv-screenrecord-action' "$MPV_WRAPPER"; then
     rm -f -- "$MPV_WRAPPER"
   fi
   systemctl --user disable --now "$HOLIDAY_UPDATE_UNIT.timer" >/dev/null 2>&1 || true
@@ -185,11 +202,16 @@ omarchy plugin validate "$stage"
 [[ -x "$stage/scripts/ai-usage-collector" ]] ||
   die "repository is incomplete: scripts/ai-usage-collector is missing or not executable"
 if [[ -e "$MPV_WRAPPER" ]] &&
-   ! grep -Fq 'quickshell-rise-owned-mpv-screenrecord-action' "$MPV_WRAPPER"; then
-  die "refusing to replace non-Rise MPV wrapper: $MPV_WRAPPER"
+   ! grep -Fq 'quickshell-astra-owned-mpv-screenrecord-action' "$MPV_WRAPPER"; then
+  die "refusing to replace non-Astra MPV wrapper: $MPV_WRAPPER"
 fi
 
 mkdir -p -- "$PLUGINS_DIR" "$STATE_HOME" "$(dirname -- "$BINDINGS")"
+for legacy_state_name in ai-usage.json holiday-settings.json holiday-annual-update.json; do
+  if [[ ! -e "$STATE_HOME/$legacy_state_name" && -f "$LEGACY_STATE_HOME/$legacy_state_name" ]]; then
+    install -m 600 "$LEGACY_STATE_HOME/$legacy_state_name" "$STATE_HOME/$legacy_state_name"
+  fi
+done
 if [[ -e "$TARGET" ]]; then
   mv -- "$TARGET" "$backup_plugin"
   had_plugin=1
@@ -248,9 +270,9 @@ for legacy_ai_unit in claude-usage codex-usage opencode-usage; do
 done
 systemctl --user daemon-reload >/dev/null 2>&1 || true
 
-info "Removing obsolete Rise idle overrides"
+info "Removing obsolete Astra idle overrides"
 if [[ -f "$LEGACY_IDLE_WRAPPER" ]] &&
-   grep -Fq 'quickshell-rise-owned-idle-toggle' "$LEGACY_IDLE_WRAPPER"; then
+   grep -Fq 'quickshell-astra-owned-idle-toggle' "$LEGACY_IDLE_WRAPPER"; then
   rm -f -- "$LEGACY_IDLE_WRAPPER"
 fi
 rm -f -- "$HOME/.cache/quickshell/app-launcher/apps.json"
@@ -281,39 +303,40 @@ for holiday_file in \
   versions/default/services/HolidaySelection.js \
   versions/default/panels/CalendarPopup.qml \
   versions/default/modules/AtomicStateWriter.qml \
-  versions/rise/Bar.qml; do
+  versions/astra/Bar.qml; do
   cmp -s "$repo_root/$holiday_file" "$TARGET/$holiday_file" ||
     die "installed holiday runtime differs from staged source: $holiday_file"
 done
 for holiday_unit in \
-  systemd/quickshell-rise-holiday-annual-update.service \
-  systemd/quickshell-rise-holiday-annual-update.timer; do
+  systemd/quickshell-astra-holiday-annual-update.service \
+  systemd/quickshell-astra-holiday-annual-update.timer; do
   cmp -s "$repo_root/$holiday_unit" "$TARGET/$holiday_unit" ||
     die "installed holiday update unit differs from staged source: $holiday_unit"
 done
 cmp -s "$repo_root/versions/default/panels/HistoryPanel.qml" \
   "$TARGET/versions/default/panels/HistoryPanel.qml" ||
-  die "installed Rise clipboard history panel differs from staged source"
+  die "installed Astra clipboard history panel differs from staged source"
 for history_file in versions/default/panels/HistoryModel.js scripts/history-recording-preview.sh; do
   cmp -s "$repo_root/$history_file" "$TARGET/$history_file" ||
-    die "installed Rise history runtime differs from staged source: $history_file"
+    die "installed Astra history runtime differs from staged source: $history_file"
 done
 
 info "Installing the Quattro Lua binding block"
 bindings_temp="$temp_root/bindings.new"
 if [[ -f "$BINDINGS" ]]; then
-  awk -v begin="$BLOCK_BEGIN" -v end="$BLOCK_END" '
-    $0 == begin { managed=1; next }
-    $0 == end { managed=0; next }
+  awk -v begin="$BLOCK_BEGIN" -v end="$BLOCK_END" \
+      -v legacy_begin="$LEGACY_BLOCK_BEGIN" -v legacy_end="$LEGACY_BLOCK_END" '
+    $0 == begin || $0 == legacy_begin { managed=1; next }
+    $0 == end || $0 == legacy_end { managed=0; next }
     !managed { print }
   ' "$BINDINGS" >"$bindings_temp"
 fi
 cat >>"$bindings_temp" <<LUA
 
--- BEGIN QUICKSHELL-RISE MANAGED BLOCK
+-- BEGIN QUICKSHELL-ASTRA MANAGED BLOCK
 hl.unbind("SUPER + CTRL + V")
-o.bind("SUPER + CTRL + V", "Quickshell Rise clipboard history", "omarchy-shell quickshell-rise-clipboard toggle")
--- END QUICKSHELL-RISE MANAGED BLOCK
+o.bind("SUPER + CTRL + V", "Quickshell Astra clipboard history", "omarchy-shell quickshell-astra-clipboard toggle")
+-- END QUICKSHELL-ASTRA MANAGED BLOCK
 LUA
 lua -e "assert(loadfile('$bindings_temp'))"
 install -m 644 "$bindings_temp" "$BINDINGS"
@@ -321,22 +344,23 @@ install -m 644 "$bindings_temp" "$BINDINGS"
 info "Installing the history blur layer rule"
 looknfeel_temp="$temp_root/looknfeel.new"
 if [[ -f "$LOOKNFEEL" ]]; then
-  awk -v begin="$BLUR_BLOCK_BEGIN" -v end="$BLUR_BLOCK_END" '
-    $0 == begin { managed=1; next }
-    $0 == end { managed=0; next }
+  awk -v begin="$BLUR_BLOCK_BEGIN" -v end="$BLUR_BLOCK_END" \
+      -v legacy_begin="$LEGACY_BLUR_BLOCK_BEGIN" -v legacy_end="$LEGACY_BLUR_BLOCK_END" '
+    $0 == begin || $0 == legacy_begin { managed=1; next }
+    $0 == end || $0 == legacy_end { managed=0; next }
     !managed { print }
   ' "$LOOKNFEEL" >"$looknfeel_temp"
 fi
 cat >>"$looknfeel_temp" <<LUA
 
--- BEGIN QUICKSHELL-RISE HISTORY BLUR
+-- BEGIN QUICKSHELL-ASTRA HISTORY BLUR
 hl.config({ decoration = { blur = { enabled = true } } })
 hl.layer_rule({
   match = { namespace = "^quickshell-history$" },
   blur = true,
   ignore_alpha = 0
 })
--- END QUICKSHELL-RISE HISTORY BLUR
+-- END QUICKSHELL-ASTRA HISTORY BLUR
 LUA
 lua -e "assert(loadfile('$looknfeel_temp'))"
 install -m 644 "$looknfeel_temp" "$LOOKNFEEL"
@@ -351,7 +375,7 @@ if hyprctl binds -j | jq -e '
     (.description // "") == "Toggle idle inhibitor" or
     ((.key // "") == "I" and (.modmask // 0) == 68 and
      (.description // "") != "Toggle locking on idle"))' >/dev/null; then
-  die "a Rise-owned or non-native SUPER+CTRL+I binding remains active"
+  die "a Astra-owned or non-native SUPER+CTRL+I binding remains active"
 fi
 hyprctl binds -j | jq -e '
   any(.[]; (.key // "") == "I" and (.modmask // 0) == 68 and
@@ -360,8 +384,8 @@ hyprctl binds -j | jq -e '
 hyprctl binds -j | jq -e '
   any(.[];
     (.key // "") == "V" and (.modmask // 0) == 68 and
-    (.description // "") == "Quickshell Rise clipboard history")' >/dev/null ||
-  die "Quickshell Rise SUPER+CTRL+V clipboard binding is missing"
+    (.description // "") == "Quickshell Astra clipboard history")' >/dev/null ||
+  die "Quickshell Astra SUPER+CTRL+V clipboard binding is missing"
 
 # Plugin replacement can leave the already-instantiated bar component in Qt's
 # component cache. A supported shell restart is the cold-start contract and
@@ -370,7 +394,7 @@ info "Restarting omarchy-shell with the installed plugin"
 "$OMARCHY_PATH/bin/omarchy-restart-shell"
 
 info "Running Quattro health checks"
-health_timeout="${QS_RISE_HEALTH_TIMEOUT:-15}"
+health_timeout="${QS_ASTRA_HEALTH_TIMEOUT:-15}"
 health_deadline=$((SECONDS + health_timeout))
 health_last_error="health checks have not started"
 health_json=""
@@ -403,18 +427,18 @@ while (( SECONDS < health_deadline )); do
     continue
   fi
 
-  if ! health_json="$(omarchy-shell quickshell-rise-health ping 2>/dev/null)"; then
-    health_last_error="Rise health target is not registered yet"
+  if ! health_json="$(omarchy-shell quickshell-astra-health ping 2>/dev/null)"; then
+    health_last_error="Astra health target is not registered yet"
     sleep 0.25
     continue
   fi
   if ! jq -e . <<<"$health_json" >/dev/null 2>&1; then
-    health_last_error="Rise health returned malformed JSON: $health_json"
+    health_last_error="Astra health returned malformed JSON: $health_json"
     sleep 0.25
     continue
   fi
   if jq -e '.fatalError != ""' <<<"$health_json" >/dev/null; then
-    health_last_error="Rise reported a fatal initialization error: $(jq -r '.fatalError' <<<"$health_json")"
+    health_last_error="Astra reported a fatal initialization error: $(jq -r '.fatalError' <<<"$health_json")"
     break
   fi
   if ! jq -e --argjson expected "$expected_windows" \
@@ -427,7 +451,7 @@ while (( SECONDS < health_deadline )); do
        .network.serviceInstances == 1 and
        (.network.connected | type == "boolean") and
        (.network.nearbyNetworkCount | type == "number")' <<<"$health_json" >/dev/null; then
-    health_last_error="Rise is not initialized or window count does not match monitors: $health_json"
+    health_last_error="Astra is not initialized or window count does not match monitors: $health_json"
     sleep 0.25
     continue
   fi
@@ -456,7 +480,7 @@ while (( SECONDS < health_deadline )); do
     fi
   done < <(pgrep -x quickshell || true)
   if (( legacy_rise_running )); then
-    health_last_error="a legacy standalone Rise process is running"
+    health_last_error="a legacy standalone Astra process is running"
     break
   fi
 
@@ -465,18 +489,18 @@ while (( SECONDS < health_deadline )); do
 done
 
 if [[ -n "$health_last_error" ]]; then
-  warn "Rise health failed after ${health_timeout}s: $health_last_error"
+  warn "Astra health failed after ${health_timeout}s: $health_last_error"
   instance_id="$(quickshell list --all 2>/dev/null | awk '/^Instance / { gsub(/:$/, "", $2); print $2; exit }')"
   if [[ -n "$instance_id" ]]; then
-    warn "Recent Rise QML diagnostics:"
+    warn "Recent Astra QML diagnostics:"
     quickshell log -i "$instance_id" -t 1200 2>&1 |
-      grep -Ei 'quickshell-rise|Bar\.qml|Loader|QQml|QML|module|singleton|required|undefined|null|TypeError|ReferenceError|failed to load|is not a type|is not installed|Cannot assign|Cannot read property' |
+      grep -Ei 'quickshell-astra|Bar\.qml|Loader|QQml|QML|module|singleton|required|undefined|null|TypeError|ReferenceError|failed to load|is not a type|is not installed|Cannot assign|Cannot read property' |
       tail -80 >&2
   fi
   die "$health_last_error"
 fi
-omarchy-shell quickshell-rise-clipboard ping >/dev/null ||
-  die "Rise clipboard history IPC target is unavailable"
+omarchy-shell quickshell-astra-clipboard ping >/dev/null ||
+  die "Astra clipboard history IPC target is unavailable"
 jq -e 'type == "array"' \
   "$HOME/.local/state/omarchy/clipboard-history.json" >/dev/null ||
   die "Omarchy clipboard history is unavailable or malformed"
@@ -505,13 +529,13 @@ cmp -s "$repo_root/scripts/ai-usage-collector" "$TARGET/scripts/ai-usage-collect
 
 info "Installing the Omakut screen-recording notification action"
 mkdir -p -- "$(dirname -- "$MPV_WRAPPER")"
-install -m 755 "$TARGET/scripts/quickshell-rise-mpv" "$MPV_WRAPPER"
+install -m 755 "$TARGET/scripts/quickshell-astra-mpv" "$MPV_WRAPPER"
 if [[ -f "$LEGACY_SCREENRECORD_WRAPPER" ]] &&
-   grep -Fq 'quickshell-rise-owned-screenrecord-capture' "$LEGACY_SCREENRECORD_WRAPPER"; then
+   grep -Fq 'quickshell-astra-owned-screenrecord-capture' "$LEGACY_SCREENRECORD_WRAPPER"; then
   rm -f -- "$LEGACY_SCREENRECORD_WRAPPER"
 fi
 if [[ -f "$LEGACY_SCREENRECORD_SHIM_DIR/omarchy-notification-send" ]] &&
-   grep -Fq 'quickshell-rise-owned-screenrecord-notification' \
+   grep -Fq 'quickshell-astra-owned-screenrecord-notification' \
      "$LEGACY_SCREENRECORD_SHIM_DIR/omarchy-notification-send"; then
   rm -f -- "$LEGACY_SCREENRECORD_SHIM_DIR/omarchy-notification-send"
 fi
@@ -551,8 +575,8 @@ jq -n \
     filesCreated: [$pluginPath],
     filesModified: [$bindingsPath, $looknfeelPath],
     managedLuaBlock: {begin: $blockBegin, end: $blockEnd},
-    systemdUserUnits: ["quickshell-rise-holiday-annual-update.service",
-      "quickshell-rise-holiday-annual-update.timer"],
+    systemdUserUnits: ["quickshell-astra-holiday-annual-update.service",
+      "quickshell-astra-holiday-annual-update.timer"],
     optionalBackends: {
       quattroClipboard: true,
       quattroNotifications: true,
@@ -571,5 +595,25 @@ install -m 600 "$temp_root/install-state.json" "$STATE_FILE"
 
 transaction_open=0
 trap - ERR INT TERM EXIT
+
+# Astra is now installed, selected, and healthy. Only now retire artifacts
+# owned by the former Rise plugin; unrelated paths containing "rise" remain.
+systemctl --user disable --now "$LEGACY_HOLIDAY_UPDATE_UNIT.timer" >/dev/null 2>&1 || true
+rm -f -- "$UNIT_DIR/$LEGACY_HOLIDAY_UPDATE_UNIT.service" \
+  "$UNIT_DIR/$LEGACY_HOLIDAY_UPDATE_UNIT.timer"
+if [[ -d "$LEGACY_TARGET" && -f "$LEGACY_TARGET/manifest.json" ]] &&
+   [[ "$(jq -r '.id // empty' "$LEGACY_TARGET/manifest.json" 2>/dev/null)" == "$LEGACY_PLUGIN_ID" ]]; then
+  rm -rf -- "$LEGACY_TARGET"
+fi
+rm -rf -- "${XDG_CACHE_HOME:-$HOME/.cache}/quickshell-rise/holidays" \
+  "${XDG_DATA_HOME:-$HOME/.local/share}/quickshell-rise/holidays"
+rm -f -- "$LEGACY_STATE_HOME/install-state.json" \
+  "$LEGACY_STATE_HOME/shell.before.json" \
+  "$LEGACY_STATE_HOME/ai-usage.json" \
+  "$LEGACY_STATE_HOME/holiday-settings.json" \
+  "$LEGACY_STATE_HOME/holiday-annual-update.json"
+rmdir -- "$LEGACY_STATE_HOME" 2>/dev/null || true
+systemctl --user daemon-reload >/dev/null 2>&1 || true
+omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true
 cleanup
-info "Quickshell Rise is active inside omarchy-shell"
+info "Quickshell Astra is active inside omarchy-shell"

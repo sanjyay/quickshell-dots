@@ -67,7 +67,7 @@ systemctl --user enable --now qs-shell-update-check.timer >/dev/null 2>&1 || tru
 systemctl --user try-restart qs-shell-update-check.timer >/dev/null 2>&1 || true
 
 # Quattro AI usage is collected by the plugin-owned QML service. Remove any
-# classic per-provider units left by older Rise installations.
+# classic per-provider units left by older Astra installations.
 for legacy_ai_unit in claude-usage codex-usage opencode-usage; do
   systemctl --user disable --now "$legacy_ai_unit.timer" >/dev/null 2>&1 || true
   rm -f "$units/$legacy_ai_unit.service" "$units/$legacy_ai_unit.timer"

@@ -13,8 +13,8 @@ QtObject {
     property bool initialRefreshStarted: false
     property string lastRefreshStartedAt: ""
     property string statePath: Quickshell.env("XDG_STATE_HOME")
-        ? Quickshell.env("XDG_STATE_HOME") + "/quickshell-rise/ai-usage.json"
-        : Quickshell.env("HOME") + "/.local/state/quickshell-rise/ai-usage.json"
+        ? Quickshell.env("XDG_STATE_HOME") + "/quickshell-astra/ai-usage.json"
+        : Quickshell.env("HOME") + "/.local/state/quickshell-astra/ai-usage.json"
     readonly property string collectorPath: {
         var value = String(Qt.resolvedUrl("../../../scripts/ai-usage-collector"))
         return value.indexOf("file://") === 0 ? value.substring(7) : value

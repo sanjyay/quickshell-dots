@@ -19,7 +19,7 @@ export HYPR_LOOKNFEEL_CONF="$XDG_CONFIG_HOME/hypr/looknfeel.conf"
 export QS_TEST_COMMAND_LOG="$tmp/commands.log"
 mkdir -p "$HOME/.local/bin" "$HOME/.config/quickshell/bin" "$HOME/.config/systemd/user" \
   "$HOME/.config/omarchy/hooks/theme-set.d" "$HOME/.config/omarchy/hooks/post-boot.d" \
-  "$HOME/.config/hypr" "$XDG_STATE_HOME/qs-rise" "$HOME/.local/lib/qs-rise/elephant-bin" "$XDG_RUNTIME_DIR" "$tmp/bin"
+  "$HOME/.config/hypr" "$XDG_STATE_HOME/qs-astra" "$HOME/.local/lib/qs-astra/elephant-bin" "$XDG_RUNTIME_DIR" "$tmp/bin"
 
 [[ "$(realpath -m "$HOME")" != "$(realpath -m "$real_home")" ]] || fail "temporary HOME resolves to real HOME"
 [[ "$(realpath -m "$HYPR_BINDINGS_CONF")" != "$(realpath -m "$real_home/.config/hypr/bindings.conf")" ]] || fail "binding target resolves to real configuration"
@@ -36,15 +36,15 @@ export PATH="$tmp/bin:/usr/bin:/bin"
 
 # Seed files as stale but project-owned. The optional post-boot hook is refreshed
 # only because it already exists.
-printf '# quickshell-rise-owned-swayosd-client\nstale\n' > "$HOME/.local/bin/swayosd-client"
+printf '# quickshell-astra-owned-swayosd-client\nstale\n' > "$HOME/.local/bin/swayosd-client"
 for backend in claude-usage codex-usage opencode-usage; do
   printf '#!/usr/bin/env bash\n# stale optional backend\n' > "$HOME/.local/bin/$backend"
   chmod +x "$HOME/.local/bin/$backend"
 done
-printf 'stale\n' > "$HOME/.config/omarchy/hooks/post-boot.d/quickshell-rise"
+printf 'stale\n' > "$HOME/.config/omarchy/hooks/post-boot.d/quickshell-astra"
 printf 'user = kept\n' > "$HYPR_BINDINGS_CONF"
 printf 'decoration { rounding = 7 }\n' > "$HYPR_LOOKNFEEL_CONF"
-printf 'omarchy\n' > "$XDG_STATE_HOME/qs-rise/mode"
+printf 'omarchy\n' > "$XDG_STATE_HOME/qs-astra/mode"
 
 bash "$repo/scripts/qs-shell-post-update.sh" "$repo"
 
@@ -53,7 +53,7 @@ while IFS='|' read -r source destination; do
 done <<'EOF'
 scripts/qs-mode.sh|.local/bin/qs-mode
 scripts/qs-managed-bindings.sh|.local/bin/qs-managed-bindings
-scripts/qs-rise-input.sh|.local/bin/qs-rise-input
+scripts/qs-astra-input.sh|.local/bin/qs-astra-input
 scripts/swayosd-client|.local/bin/swayosd-client
 scripts/qs-menu-action.sh|.local/bin/qs-menu-action
 scripts/qs-menu-data.sh|.local/bin/qs-menu-data
@@ -74,11 +74,11 @@ systemd/codex-usage.timer|.config/systemd/user/codex-usage.timer
 scripts/opencode-usage|.local/bin/opencode-usage
 systemd/opencode-usage.service|.config/systemd/user/opencode-usage.service
 systemd/opencode-usage.timer|.config/systemd/user/opencode-usage.timer
-scripts/qs-clipboard-filter.py|.local/lib/qs-rise/qs-clipboard-filter.py
-scripts/qs-elephant-wl-paste.sh|.local/lib/qs-rise/elephant-bin/wl-paste
-systemd/elephant-clipboard-privacy.conf|.config/systemd/user/elephant.service.d/50-qs-rise-clipboard-privacy.conf
+scripts/qs-clipboard-filter.py|.local/lib/qs-astra/qs-clipboard-filter.py
+scripts/qs-elephant-wl-paste.sh|.local/lib/qs-astra/elephant-bin/wl-paste
+systemd/elephant-clipboard-privacy.conf|.config/systemd/user/elephant.service.d/50-qs-astra-clipboard-privacy.conf
 hooks/50-quickshell-bar.sh|.config/omarchy/hooks/theme-set.d/50-quickshell-bar.sh
-contrib/post-boot.d/quickshell-rise|.config/omarchy/hooks/post-boot.d/quickshell-rise
+contrib/post-boot.d/quickshell-astra|.config/omarchy/hooks/post-boot.d/quickshell-astra
 scripts/qs-shell-check-update.sh|.config/quickshell/bin/qs-shell-check-update.sh
 scripts/qs-shell-apply-update.sh|.config/quickshell/bin/qs-shell-apply-update.sh
 scripts/qs-shell-refresh-local.sh|.config/quickshell/bin/qs-shell-refresh-local.sh
@@ -100,14 +100,14 @@ bash "$repo/scripts/qs-shell-post-update.sh" "$repo"
 [[ "$(cat "$HOME/.local/bin/swayosd-client")" == 'foreign wrapper' ]] || fail "foreign swayosd-client was overwritten"
 
 # Reapplying a Quickshell profile updates bindings without starting services.
-printf 'quickshell\n' > "$XDG_STATE_HOME/qs-rise/mode"
+printf 'quickshell\n' > "$XDG_STATE_HOME/qs-astra/mode"
 bash "$repo/scripts/qs-shell-post-update.sh" "$repo"
 grep -Fqx 'bind = SUPER, SPACE, exec, qs -c bar ipc call -- launcher open' "$HYPR_BINDINGS_CONF" || fail "post-update did not preserve Quickshell binding profile"
 ! grep -Fqx 'bindd = SUPER, SPACE, Launch apps, exec, omarchy-launch-walker' "$HYPR_BINDINGS_CONF" || fail "post-update left Omarchy launcher in Quickshell profile"
 
 # Optional autostart remains absent when the user has not opted in.
-rm -f "$HOME/.config/omarchy/hooks/post-boot.d/quickshell-rise"
+rm -f "$HOME/.config/omarchy/hooks/post-boot.d/quickshell-astra"
 bash "$repo/scripts/qs-shell-post-update.sh" "$repo"
-[[ ! -e "$HOME/.config/omarchy/hooks/post-boot.d/quickshell-rise" ]] || fail "post-update enabled optional autostart"
+[[ ! -e "$HOME/.config/omarchy/hooks/post-boot.d/quickshell-astra" ]] || fail "post-update enabled optional autostart"
 
 printf 'ok (isolated complete post-update companion parity)\n'

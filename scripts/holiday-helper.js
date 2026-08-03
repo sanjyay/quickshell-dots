@@ -10,7 +10,7 @@ const dataset = require("date-holidays/package.json");
 const regionalProvider = require("./regional-holiday-provider.js");
 
 const SCHEMA_VERSION = 5;
-const PROJECT = "quickshell-rise";
+const PROJECT = "quickshell-astra";
 const VALID_TYPES = new Set(["public"]);
 const holidayCatalog = new Holidays();
 

@@ -43,23 +43,23 @@ require_count 1 'unbind = SUPER, SPACE'
 require_count 1 'bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open'
 
 bash "$helper" profile quickshell
-require_count 1 '# >>> quickshell-rise managed menu bindings >>>'
-require_count 1 '# >>> quickshell-rise managed media bindings >>>'
-require_count 1 '# >>> quickshell-rise managed notification bindings >>>'
+require_count 1 '# >>> quickshell-astra managed menu bindings >>>'
+require_count 1 '# >>> quickshell-astra managed media bindings >>>'
+require_count 1 '# >>> quickshell-astra managed notification bindings >>>'
 require_line 'bind = SUPER, SPACE, exec, qs -c bar ipc call -- launcher open'
 forbid_line 'bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open'
 require_count 1 'unbind = SUPER, SPACE'
 require_count 1 "bindd = SUPER SHIFT, SPACE, Toggle desktop provider, exec, bash -lc 'if [[ \"\$(qs-mode status)\" == quickshell ]]; then qs-mode omarchy; else qs-mode quickshell; fi'"
-require_line 'bindeld = , XF86AudioRaiseVolume, Quickshell volume up, exec, qs-rise-input volume up'
+require_line 'bindeld = , XF86AudioRaiseVolume, Quickshell volume up, exec, qs-astra-input volume up'
 bash "$helper" profile quickshell
-require_count 1 '# >>> quickshell-rise managed menu bindings >>>'
-require_count 1 '# >>> quickshell-rise managed media bindings >>>'
-require_count 1 '# >>> quickshell-rise managed notification bindings >>>'
+require_count 1 '# >>> quickshell-astra managed menu bindings >>>'
+require_count 1 '# >>> quickshell-astra managed media bindings >>>'
+require_count 1 '# >>> quickshell-astra managed notification bindings >>>'
 
 bash "$helper" profile omarchy
-require_count 1 '# >>> quickshell-rise managed menu bindings >>>'
-require_count 0 '# >>> quickshell-rise managed media bindings >>>'
-require_count 0 '# >>> quickshell-rise managed notification bindings >>>'
+require_count 1 '# >>> quickshell-astra managed menu bindings >>>'
+require_count 0 '# >>> quickshell-astra managed media bindings >>>'
+require_count 0 '# >>> quickshell-astra managed notification bindings >>>'
 require_line 'bindd = SUPER, SPACE, Launch apps, exec, omarchy-launch-walker'
 forbid_line 'bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open'
 require_count 1 'unbind = SUPER, SPACE'
@@ -68,11 +68,11 @@ require_count 1 "bindd = SUPER SHIFT, SPACE, Toggle desktop provider, exec, bash
 bash "$helper" remove
 require_line 'user-before = kept'
 require_line 'user-after = kept'
-require_count 0 '# >>> quickshell-rise managed menu bindings >>>'
+require_count 0 '# >>> quickshell-astra managed menu bindings >>>'
 forbid_line 'unbind = SUPER, SPACE'
 forbid_line 'bind = SUPER, SPACE, exec, qs -c bar ipc call launcher open'
 
-if compgen -G "$(dirname "$bindings")/.qs-rise-bindings.*" >/dev/null; then
+if compgen -G "$(dirname "$bindings")/.qs-astra-bindings.*" >/dev/null; then
   fail "atomic binding edit left a temporary file"
 fi
 

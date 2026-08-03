@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "id": "io.github.sanjyay.quickshell-rise",
-  "name": "Quickshell Rise",
+  "id": "io.github.sanjyay.quickshell-astra",
+  "name": "Quickshell Astra",
   "version": "4.0.0-alpha.1",
   "author": "Sanjay",
   "license": "MIT",
-  "description": "Quickshell Rise full bar for the Omarchy Quattro shell",
+  "description": "Quickshell Astra full bar for the Omarchy Quattro shell",
   "kinds": [
     "bar"
   ],

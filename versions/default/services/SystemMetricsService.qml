@@ -58,7 +58,7 @@ QtObject {
         } catch (e) {
             gpuParseStatus = "parse-failed"
             gpuErrorCode = "invalid-json"
-            console.warn("Rise GPU collector returned invalid JSON (" + text.length + " bytes)")
+            console.warn("Astra GPU collector returned invalid JSON (" + text.length + " bytes)")
             return
         }
         if (record.schemaVersion !== 1 || typeof record.status !== "string") {

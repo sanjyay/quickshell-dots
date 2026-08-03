@@ -81,7 +81,7 @@ qs-menu-data.sh
 qs-mode.sh
 qs-notification-silence.sh
 qs-owned-artifacts.tsv
-qs-rise-input.sh
+qs-astra-input.sh
 qs-shell-apply-update.sh
 qs-shell-check-update.sh
 qs-shell-post-update.sh
@@ -112,17 +112,17 @@ find "$repo/systemd" -maxdepth 1 -type f -printf '%f\n' | sort > "$tmp/units.act
 diff -u "$units_expected" "$tmp/units.actual" || fail "user unit/drop-in snapshot changed"
 
 for marker in \
-  '# >>> quickshell-rise managed menu bindings >>>' \
-  '# <<< quickshell-rise managed menu bindings <<<' \
-  '# >>> quickshell-rise managed media bindings >>>' \
-  '# <<< quickshell-rise managed media bindings <<<' \
-  '# >>> quickshell-rise managed notification bindings >>>' \
-  '# <<< quickshell-rise managed notification bindings <<<'
+  '# >>> quickshell-astra managed menu bindings >>>' \
+  '# <<< quickshell-astra managed menu bindings <<<' \
+  '# >>> quickshell-astra managed media bindings >>>' \
+  '# <<< quickshell-astra managed media bindings <<<' \
+  '# >>> quickshell-astra managed notification bindings >>>' \
+  '# <<< quickshell-astra managed notification bindings <<<'
 do
   require_literal "$marker" "$repo/scripts/qs-managed-bindings.sh"
 done
-require_literal '# >>> quickshell-rise managed switcher blur rules >>>' "$repo/scripts/ensure-hypr-switcher-blur-rules.sh"
-require_literal '# <<< quickshell-rise managed switcher blur rules <<<' "$repo/scripts/ensure-hypr-switcher-blur-rules.sh"
+require_literal '# >>> quickshell-astra managed switcher blur rules >>>' "$repo/scripts/ensure-hypr-switcher-blur-rules.sh"
+require_literal '# <<< quickshell-astra managed switcher blur rules <<<' "$repo/scripts/ensure-hypr-switcher-blur-rules.sh"
 require_literal 'qs -c bar ipc call launcher open' "$repo/scripts/qs-managed-bindings.sh"
 require_literal 'Toggle desktop provider' "$repo/scripts/qs-managed-bindings.sh"
 require_literal 'exec "$helper" ensure-launcher' "$repo/scripts/ensure-hypr-launcher-binding.sh"
@@ -131,7 +131,7 @@ require_literal 'DEST="$HOME/.config/quickshell/bar"' "$repo/install.sh"
 require_literal 'CONFIG_DIR="default"' "$repo/install.sh"
 require_literal 'echo "$CONFIG_DIR" > "$stage/.qsrise"' "$repo/install.sh"
 require_literal '.qsrise-source' "$repo/install.sh"
-require_literal 'STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/qs-rise"' "$repo/scripts/qs-mode.sh"
+require_literal 'STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/qs-astra"' "$repo/scripts/qs-mode.sh"
 require_literal 'setsid qs -n -d -c bar' "$repo/scripts/qs-mode.sh"
 require_literal 'ipc call health ping' "$repo/scripts/qs-mode.sh"
 require_literal 'scripts/qs-managed-bindings.sh' "$repo/scripts/qs-owned-artifacts.tsv"
@@ -165,7 +165,7 @@ require_literal 'function saveSplits()' "$repo/versions/default/Theme.qml"
 require_literal 'function serializeOrder()' "$repo/versions/default/BarSlot.qml"
 require_literal 'function serializeSplits()' "$repo/versions/default/BarSlot.qml"
 require_literal 'retired package-updater fields' "$repo/versions/default/Theme.qml"
-require_literal 'qs-rise-notifications.json' "$repo/versions/default/NotificationManager.qml"
+require_literal 'qs-astra-notifications.json' "$repo/versions/default/NotificationManager.qml"
 require_literal 'update-available.json' "$repo/scripts/qs-shell-check-update.sh"
 require_literal 'notifications-silenced' "$repo/scripts/qs-notification-silence.sh"
 

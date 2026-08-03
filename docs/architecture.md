@@ -2,15 +2,15 @@
 
 ## The short version
 
-Rise runs as a full-bar plugin inside the single `omarchy-shell` process. The
+Astra runs as a full-bar plugin inside the single `omarchy-shell` process. The
 repo's source of truth lives in `versions/default/`; the runtime entry points are
-`manifest.json`, `runtime/Bar.qml`, and `versions/rise/Bar.qml`.
+`manifest.json`, `runtime/Bar.qml`, and `versions/astra/Bar.qml`.
 
 ## Live entry points
 
 - `runtime/Bar.qml` is the host-facing adapter. It waits for Omarchy to inject
   the plugin context before starting the real bar.
-- `versions/rise/Bar.qml` is the production bar composition.
+- `versions/astra/Bar.qml` is the production bar composition.
 - `versions/default/shell.qml` is the wider legacy-style root used by the source
   tree, but the Quattro plugin path is what matters at runtime.
 - `BarSlot.qml` creates per-monitor bar windows and places widgets into the
@@ -57,7 +57,7 @@ only way a panel can become reachable.
   support the update lifecycle.
 - `hooks/50-quickshell-bar.sh` refreshes theme-related state after an Omarchy
   theme change.
-- `contrib/post-boot.d/quickshell-rise` is the optional boot hook.
+- `contrib/post-boot.d/quickshell-astra` is the optional boot hook.
 
 ## Practical takeaway
 

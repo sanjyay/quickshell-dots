@@ -7,14 +7,14 @@ theme="$repo/versions/default/Theme.qml"
 widget="$repo/versions/default/modules/ClaudeWidget.qml"
 panel="$repo/versions/default/panels/AiUsagePanel.qml"
 runtime="$repo/runtime/Bar.qml"
-rise="$repo/versions/rise/Bar.qml"
+astra="$repo/versions/astra/Bar.qml"
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 require() { rg -Fq -- "$1" "$2" || fail "missing '$1' in ${2#$repo/}"; }
 reject() { ! rg -Fq -- "$1" "$2" || fail "obsolete '$1' remains in ${2#$repo/}"; }
 
 require 'startupReady: theme.aiCollectorReady' "$theme"
-require 'aiCollectorReady: root.initialized' "$rise"
+require 'aiCollectorReady: root.initialized' "$astra"
 require 'initialRefreshStarted' "$service"
 require 'if (startupReady && !initialRefreshStarted)' "$service"
 require 'collectorProcess.running' "$service"

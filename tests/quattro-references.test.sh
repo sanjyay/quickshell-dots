@@ -12,7 +12,7 @@ while IFS=: read -r file _ import_path; do
     printf 'FAIL: unresolved QML import %s from %s\n' "$import_path" "$file" >&2
     exit 1
   }
-done < <(cd "$repo" && rg -n '^import "[.][^"]*"' rise versions tests/fixtures -g '*.qml')
+done < <(cd "$repo" && rg -n '^import "[.][^"]*"' runtime versions tests/fixtures -g '*.qml')
 
 while IFS= read -r script; do
   bash -n "$script"

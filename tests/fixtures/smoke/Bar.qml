@@ -26,7 +26,7 @@ Item {
     function health() {
         return {
             ok: componentCreated && hostReady && validScreens.length > 0,
-            plugin: "io.github.sanjyay.quickshell-rise",
+            plugin: "io.github.sanjyay.quickshell-astra",
             componentCreated: componentCreated,
             shellInjected: shell !== null,
             manifestInjected: manifest !== null,
@@ -44,7 +44,7 @@ Item {
         var geometry = []
         for (var i = 0; i < validScreens.length; i++) {
             geometry.push({
-                id: "quickshell-rise-smoke",
+                id: "quickshell-astra-smoke",
                 screen: validScreens[i].name,
                 x: 0,
                 y: 0,
@@ -56,19 +56,19 @@ Item {
         return geometry
     }
 
-    onOmarchyPathChanged: console.log("Rise smoke omarchyPath injected=" + (omarchyPath !== ""))
-    onShellChanged: console.log("Rise smoke shell injected=" + (shell !== null))
-    onManifestChanged: console.log("Rise smoke manifest injected=" + (manifest !== null))
-    onBarWidgetRegistryChanged: console.log("Rise smoke barWidgetRegistry injected=" + (barWidgetRegistry !== null))
-    onPluginRegistryChanged: console.log("Rise smoke pluginRegistry injected=" + (pluginRegistry !== null))
-    onBarConfigChanged: console.log("Rise smoke barConfig injected=" + (barConfig !== null))
+    onOmarchyPathChanged: console.log("Astra smoke omarchyPath injected=" + (omarchyPath !== ""))
+    onShellChanged: console.log("Astra smoke shell injected=" + (shell !== null))
+    onManifestChanged: console.log("Astra smoke manifest injected=" + (manifest !== null))
+    onBarWidgetRegistryChanged: console.log("Astra smoke barWidgetRegistry injected=" + (barWidgetRegistry !== null))
+    onPluginRegistryChanged: console.log("Astra smoke pluginRegistry injected=" + (pluginRegistry !== null))
+    onBarConfigChanged: console.log("Astra smoke barConfig injected=" + (barConfig !== null))
     Component.onCompleted: {
         componentCreated = true
-        console.log("Rise smoke component created before injection")
+        console.log("Astra smoke component created before injection")
     }
 
     IpcHandler {
-        target: "quickshell-rise-health"
+        target: "quickshell-astra-health"
         function ping(): string { return JSON.stringify(root.health()) }
     }
 
@@ -87,7 +87,7 @@ Item {
                     left: true
                     right: true
                 }
-                WlrLayershell.namespace: "quickshell-rise-smoke"
+                WlrLayershell.namespace: "quickshell-astra-smoke"
                 WlrLayershell.layer: WlrLayer.Top
             }
         }
