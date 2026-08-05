@@ -81,7 +81,7 @@ BarWidgetButton {
             text: rootMod.timeStr
             color: root.ink
             font.family: root.mono
-            font.pixelSize: 12
+            font.pixelSize: root.uiFontSize(12)
             font.letterSpacing: 1
         }
 
@@ -90,7 +90,7 @@ BarWidgetButton {
             text: rootMod.dateStr
             color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.5)
             font.family: root.mono
-            font.pixelSize: 10
+            font.pixelSize: root.uiFontSize(10)
             font.letterSpacing: 0.5
         }
     }

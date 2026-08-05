@@ -64,6 +64,7 @@ Item {
             idle: astra && astra.idleDiagnostics ? astra.idleDiagnostics() : {},
             network: astra && astra.networkDiagnostics ? astra.networkDiagnostics() : {},
             history: astra && astra.historyDiagnostics ? astra.historyDiagnostics() : {},
+            display: astra && astra.displayDiagnostics ? astra.displayDiagnostics() : {},
             generation: generation,
             timestamp: Date.now()
         }
@@ -125,6 +126,11 @@ Item {
                 status: "unavailable",
                 records: []
             })
+        }
+        function openDisplay(): bool { return root.astra ? root.astra.openDisplay() : false }
+        function closeDisplay(): void { if (root.astra) root.astra.closeDisplay() }
+        function setDisplayTextSize(pixelSize: int): bool {
+            return root.astra ? root.astra.setDisplayTextSize(pixelSize) : false
         }
     }
 

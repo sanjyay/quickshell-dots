@@ -55,7 +55,7 @@ Item {
             text: rootMod.tempText(rootMod.cpuTemp, false)
             color: root.seal
             font.family: root.mono
-            font.pixelSize: 12
+            font.pixelSize: root.uiFontSize(12)
             font.weight: Font.Medium
         }
 
@@ -77,7 +77,7 @@ Item {
             text: rootMod.tempText(rootMod.gpuTemp, false)
             color: root.seal
             font.family: root.mono
-            font.pixelSize: 12
+            font.pixelSize: root.uiFontSize(12)
             font.weight: Font.Medium
         }
     }

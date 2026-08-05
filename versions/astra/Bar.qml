@@ -210,6 +210,42 @@ Item {
         return theme.historyDiagnosticsProvider ? theme.historyDiagnosticsProvider.diagnosticsObject() : {}
     }
 
+    function displayDiagnostics() {
+        var display = theme.display
+        return {
+            visible: theme.displayVisible,
+            output: display.outputName,
+            monitorStatus: display.monitorStatus,
+            monitor: display.monitor,
+            brightnessAvailable: display.brightnessAvailable,
+            brightness: display.brightnessAvailable ? display.brightnessPercent : null,
+            scaleApplying: display.scaleApplying,
+            scaleError: display.scaleError,
+            textSize: display.textSize,
+            textSizeApplying: display.textSizeApplying,
+            textSizeSteps: display.textSizeSteps,
+            settingsLoaded: display.settingsLoaded,
+            settingsError: display.settingsError
+        }
+    }
+
+    function openDisplay() {
+        if (!theme.activateFocusedPopupScreen()) return false
+        theme.display.outputName = theme.activePopupScreenName
+        theme.displayVisible = true
+        return true
+    }
+
+    function closeDisplay() {
+        theme.displayVisible = false
+    }
+
+    function setDisplayTextSize(pixelSize) {
+        if (theme.display.textSizeSteps.indexOf(pixelSize) < 0) return false
+        theme.display.setTextSize(pixelSize)
+        return true
+    }
+
     function debugBarGeometry() {
         var geometry = []
         for (var i = 0; i < barScreens.length; i++) {
@@ -531,6 +567,7 @@ Item {
     VolumePanel { root: theme }
     TrayPanel { root: theme }
     NetworkPanel { root: theme }
+    DisplayPanel { root: theme }
     BluetoothPanel { root: theme }
     TailscalePanel { root: theme }
     BatteryPanel { root: theme }

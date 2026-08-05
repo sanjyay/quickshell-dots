@@ -201,6 +201,8 @@ jq -e '.ok == true and .provider.id == "tn-recurring-fixed" and
 omarchy plugin validate "$stage"
 [[ -x "$stage/scripts/ai-usage-collector" ]] ||
   die "repository is incomplete: scripts/ai-usage-collector is missing or not executable"
+[[ -x "$stage/scripts/astra-display-scale" ]] ||
+  die "repository is incomplete: scripts/astra-display-scale is missing or not executable"
 if [[ -e "$MPV_WRAPPER" ]] &&
    ! grep -Fq 'quickshell-astra-owned-mpv-screenrecord-action' "$MPV_WRAPPER"; then
   die "refusing to replace non-Astra MPV wrapper: $MPV_WRAPPER"
@@ -526,6 +528,17 @@ for provider in codex claude opencode; do
 done
 cmp -s "$repo_root/scripts/ai-usage-collector" "$TARGET/scripts/ai-usage-collector" ||
   die "installed AI usage collector differs from repository source"
+for display_file in \
+  runtime/Bar.qml \
+  versions/astra/Bar.qml \
+  scripts/astra-display-scale \
+  versions/default/services/DisplayModel.js \
+  versions/default/services/DisplayService.qml \
+  versions/default/modules/DisplayWidget.qml \
+  versions/default/panels/DisplayPanel.qml; do
+  cmp -s "$repo_root/$display_file" "$TARGET/$display_file" ||
+    die "installed Display runtime differs from staged source: $display_file"
+done
 
 info "Installing the Omakut screen-recording notification action"
 mkdir -p -- "$(dirname -- "$MPV_WRAPPER")"

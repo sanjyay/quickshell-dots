@@ -28,6 +28,9 @@ repo's source of truth lives in `versions/default/`; the runtime entry points ar
   connection actions.
 - `AiUsageService.qml` owns Claude, Codex, and OpenCode collection, parsing,
   caching, and freshness tracking.
+- `DisplayService.qml` owns output-name monitor mapping, visible-only brightness
+  refresh, serialized scale changes, and synchronization with Omarchy's
+  authoritative system typography setting.
 - `PopupSurface.qml` is the shared popup shell used by the pilot panels that have
   moved to the new shared popup contract.
 

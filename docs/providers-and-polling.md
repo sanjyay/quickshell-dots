@@ -24,6 +24,7 @@ providers whose semantics differ.
 | CAVA | Separate consumers in MPRIS panel and particle animation; merge only after live duplication proof |
 | Camera | `helpers/camera-switch-monitor.py` owns the long-running input monitor; `CameraSwitchMonitor.qml` is the stable protocol adapter. Synthetic event tests cover press/release interpretation without opening real input devices |
 | Theme/font | One-shot reads refreshed by the installed theme hook |
+| Display | `DisplayService` reads structured `hyprctl monitors -j` state and the selected output's Omarchy brightness backend every 5 seconds only while its panel is open; brightness writes are debounced/coalesced and scale writes are serialized |
 
 All `Process`, `Timer`, systemd timer, and long-running helper declarations are
 considered provider ownership. Future provider consolidation must preserve

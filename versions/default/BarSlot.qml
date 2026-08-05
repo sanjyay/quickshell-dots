@@ -497,6 +497,7 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 4
                 NetworkWidget       { root: barSlot.root; compact: barSlot.compactLayout; anchors.verticalCenter: parent.verticalCenter }
+                DisplayWidget       { root: barSlot.root; barScreen: barSlot.screen; anchors.verticalCenter: parent.verticalCenter }
                 BluetoothWidget     { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
                 PrivacyMicWidget    { root: barSlot.root; anchors.verticalCenter: parent.verticalCenter }
                 PrivacyCameraWidget { root: barSlot.root; cameraSwitch: barSlot.root.cameraSwitch; anchors.verticalCenter: parent.verticalCenter }
@@ -976,7 +977,8 @@ PanelWindow {
                 power:        island.groupX("G14", 0.5),
                 mpris:        island.groupX("G9",  0.5),
                 launcher:     island.groupX("G1",  0.5),
-                tailscale:    island.groupX("G15", 0.5)
+                tailscale:    island.groupX("G15", 0.5),
+                display:      island.groupX("G11", 0.5)
             }
         }
         onPanelAnchorsChanged: barSlot.root.publishBarAnchors(panelScreenName, panelAnchors)

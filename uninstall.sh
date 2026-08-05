@@ -16,6 +16,9 @@ BLOCK_END="-- END QUICKSHELL-ASTRA MANAGED BLOCK"
 LEGACY_BLOCK_BEGIN="-- BEGIN QUICKSHELL-RISE MANAGED BLOCK"
 LEGACY_BLOCK_END="-- END QUICKSHELL-RISE MANAGED BLOCK"
 LOOKNFEEL="$HOME/.config/hypr/looknfeel.lua"
+MONITORS="$HOME/.config/hypr/monitors.lua"
+DISPLAY_SCALE_BLOCK_BEGIN="-- BEGIN QUICKSHELL-ASTRA DISPLAY SCALE"
+DISPLAY_SCALE_BLOCK_END="-- END QUICKSHELL-ASTRA DISPLAY SCALE"
 BLUR_BLOCK_BEGIN="-- BEGIN QUICKSHELL-ASTRA HISTORY BLUR"
 BLUR_BLOCK_END="-- END QUICKSHELL-ASTRA HISTORY BLUR"
 LEGACY_BLUR_BLOCK_BEGIN="-- BEGIN QUICKSHELL-RISE HISTORY BLUR"
@@ -98,6 +101,22 @@ if [[ -f "$LOOKNFEEL" ]]; then
   install -m 644 "$temp" "$LOOKNFEEL"
   rm -f -- "$temp"
   trap - EXIT
+fi
+if [[ -f "$MONITORS" ]] && grep -Fxq "$DISPLAY_SCALE_BLOCK_BEGIN" "$MONITORS" &&
+   [[ "$(grep -Fxc -- "$DISPLAY_SCALE_BLOCK_BEGIN" "$MONITORS" || true)" -eq 1 ]] &&
+   [[ "$(grep -Fxc -- "$DISPLAY_SCALE_BLOCK_END" "$MONITORS" || true)" -eq 1 ]]; then
+  temp="$(mktemp "${TMPDIR:-/tmp}/quickshell-astra.monitors.XXXXXX")"
+  trap 'rm -f -- "${temp:-}"' EXIT
+  awk -v begin="$DISPLAY_SCALE_BLOCK_BEGIN" -v end="$DISPLAY_SCALE_BLOCK_END" '
+    $0 == begin { managed=1; next }
+    $0 == end { managed=0; next }
+    !managed { print }
+  ' "$MONITORS" >"$temp"
+  if have lua; then lua -e "assert(loadfile('$temp'))"; fi
+  install -m "$(stat -c '%a' "$MONITORS")" "$temp" "$MONITORS"
+  rm -f -- "$temp"
+  trap - EXIT
+  rm -f -- "$MONITORS.quickshell-astra-before-display-scale.bak"
 fi
 if [[ -f "$IDLE_WRAPPER" ]] &&
    grep -Fq 'quickshell-astra-owned-idle-toggle' "$IDLE_WRAPPER"; then

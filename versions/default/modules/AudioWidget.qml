@@ -81,7 +81,7 @@ Item {
                     ? Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.35)
                     : root.ink
                 font.family: root.mono
-                font.pixelSize: 9
+                font.pixelSize: root.uiFontSize(9)
                 font.weight: Font.Medium
             }
         }

@@ -159,7 +159,7 @@ Item {
                              : isOccupied ? Qt.rgba(root.seal.r, root.seal.g, root.seal.b, 0.5)
                                           : Qt.rgba(root.seal.r, root.seal.g, root.seal.b, 0.28)
                         font.family: root.mono
-                        font.pixelSize: isFocused ? 13 : 12
+                        font.pixelSize: root.uiFontSize(isFocused ? 13 : 12)
                         font.weight: isFocused ? Font.Bold : Font.Normal
                     }
                 }

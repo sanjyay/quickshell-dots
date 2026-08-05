@@ -33,7 +33,7 @@ files, and keep rollback possible.
 
 ## Legacy bar-setting schemas
 
-`quickshell_widgets` is one space-delimited line with fields 0 through 35:
+`quickshell_widgets` is one space-delimited line with fields 0 through 36:
 
 ```text
 memory legacyBrightness ai power bluetooth workspaceMode pickerStyle
@@ -41,7 +41,7 @@ legacyWeather clock12h network shadow radiusSmall heightMin workspaceStyle
 barPosition border status quick cpu volume mpris aiTool frost logoMode
 logoText logoIcon retired0 retired0 retiredFriday retired0 privacy battery
 privacyMic privacyCamera clock reserved reservedLegacyPulse notifications
-volumeManual aiUsageManual tailscale
+volumeManual aiUsageManual tailscale display
 ```
 
 Boolean values are encoded as `0`/`1`. Reserved and retired fields remain in

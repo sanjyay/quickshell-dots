@@ -11,7 +11,8 @@ classic standalone `qs -c bar` usage.
 
 - A multi-monitor top or bottom bar with left, center, and right widget groups.
 - Launcher, workspaces, clock, audio, MPRIS, battery, power profile, network,
-  Bluetooth, microphone, weather, tray, system metrics, Tailscale, AI usage,
+  Bluetooth, display brightness/scale/system text size, microphone, weather,
+  tray, system metrics, Tailscale, AI usage,
   idle, and update widgets.
 - Astra control center and detail panels.
 - Offline public-holiday markers and details in the calendar, with safe
@@ -109,6 +110,26 @@ troubleshooting, attribution, and limitations.
 
 Legacy standalone pieces such as Elephant, Waybar, Mako, SwayOSD, Impala,
 iwctl, classic hypridle hooks, and `qs-mode` are not part of the current bar.
+
+## Display controls
+
+The monitor icon in the system-status group opens Astra's Display panel for the
+output hosting that bar. Brightness uses Omarchy's installed display backend,
+which selects internal backlight or external DDC/CI support as appropriate.
+The icon is enabled by default, uses the selected Astra bar accent even while
+idle, and can be toggled under **Bar Functions → Widgets → Display**.
+Physical scale is read from Hyprland and can be set to 1x, 1.25x, 1.6x, 2x,
+3x, or 4x for that output only. Astra keeps one marked, idempotent rule in
+`~/.config/hypr/monitors.lua`; the first scale change creates a one-time backup.
+
+Astra text-size stops are 10, 12, 14, 16, 18, and 20px, with 12px as the safe
+default. The setting uses Omarchy's system text-size backend, updating the
+Omarchy shell, GTK text scaling, and supported terminal font sizes. Omarchy's
+`~/.config/omarchy/shell.toml` font setting is the authoritative persisted state.
+Display, Control/Functions, and shared menu typography update live from this
+token. Textual bar widgets including clock/date, CPU/GPU temperature, memory,
+volume, media, workspace numbers, AI provider, and power profile also update;
+glyph/icon sizing stays fixed.
 
 ## Further reading
 

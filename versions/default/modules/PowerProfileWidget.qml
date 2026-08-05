@@ -54,7 +54,7 @@ Item {
             text: "PWR"
             color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.6)
             font.family: root.mono
-            font.pixelSize: 12
+            font.pixelSize: root.uiFontSize(12)
             font.letterSpacing: 0.5
         }
 
@@ -67,7 +67,7 @@ Item {
                 return Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.85)
             }
             font.family: root.mono
-            font.pixelSize: 12
+            font.pixelSize: root.uiFontSize(12)
             Behavior on color { ColorAnimation { duration: 200 } }
         }
     }

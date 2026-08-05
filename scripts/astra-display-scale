@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# Astra-owned, output-specific Hyprland scale writer. It preserves the selected
+# output's live mode, position, transform, mirror, bit depth, VRR, and colour
+# properties and maintains exactly one managed rule per output.
+
+output="${1:-}"
+requested="${2:-}"
+monitor_file="${HYPR_MONITORS_FILE:-$HOME/.config/hypr/monitors.lua}"
+begin="-- BEGIN QUICKSHELL-ASTRA DISPLAY SCALE"
+end="-- END QUICKSHELL-ASTRA DISPLAY SCALE"
+
+[[ "$output" =~ ^[A-Za-z0-9_.:-]+$ ]] || { echo "invalid output name" >&2; exit 2; }
+case "$requested" in 1|1.25|1.6|2|3|4) ;; *) echo "unsupported scale" >&2; exit 2;; esac
+command -v hyprctl >/dev/null || { echo "hyprctl is unavailable" >&2; exit 69; }
+command -v jq >/dev/null || { echo "jq is unavailable" >&2; exit 69; }
+[[ -f "$monitor_file" && -w "$monitor_file" ]] || { echo "monitor config is absent or read-only: $monitor_file" >&2; exit 73; }
+
+monitors="$(hyprctl monitors -j)" || { echo "hyprctl monitor query failed" >&2; exit 70; }
+monitor="$(jq -e -c --arg output "$output" '.[] | select(.name == $output and .disabled != true)' <<<"$monitors")" || {
+  echo "output is no longer available: $output" >&2; exit 69;
+}
+
+width="$(jq -er '.width | numbers' <<<"$monitor")"
+height="$(jq -er '.height | numbers' <<<"$monitor")"
+refresh="$(jq -er '.refreshRate | numbers' <<<"$monitor")"
+x="$(jq -er '.x | numbers' <<<"$monitor")"
+y="$(jq -er '.y | numbers' <<<"$monitor")"
+transform="$(jq -er '.transform // 0 | numbers' <<<"$monitor")"
+mirror="$(jq -r '.mirrorOf // "none"' <<<"$monitor")"
+format="$(jq -r '.currentFormat // ""' <<<"$monitor")"
+vrr="$(jq -r 'if .vrr == true then 1 else 0 end' <<<"$monitor")"
+cm="$(jq -r '.colorManagementPreset // "srgb"' <<<"$monitor")"
+sdr_brightness="$(jq -r '.sdrBrightness // 1.0' <<<"$monitor")"
+sdr_saturation="$(jq -r '.sdrSaturation // 1.0' <<<"$monitor")"
+sdr_min="$(jq -r '.sdrMinLuminance // 0.2' <<<"$monitor")"
+sdr_max="$(jq -r '.sdrMaxLuminance // 80' <<<"$monitor")"
+bitdepth=8
+[[ "$format" == *101010* || "$format" == *2101010* ]] && bitdepth=10
+
+clean_scale="$(awk -v scale="$requested" -v width="$width" -v height="$height" '
+  function gcd(a,b,t){ while(b){t=a%b;a=b;b=t} return a }
+  BEGIN { g=gcd(width*120,height*120); k=int(scale*120+0.5); if(k>g)k=g; while(g%k!=0)k++; printf "%g",k/120 }
+')"
+
+lua_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+escaped_output="$(lua_escape "$output")"
+escaped_mirror="$(lua_escape "$mirror")"
+rule="hl.monitor({ output = \"$escaped_output\", mode = \"${width}x${height}@${refresh}\", position = \"${x}x${y}\", scale = ${clean_scale}, transform = ${transform}, bitdepth = ${bitdepth}, vrr = ${vrr}, cm = \"${cm}\", sdrbrightness = ${sdr_brightness}, sdrsaturation = ${sdr_saturation}, sdr_min_luminance = ${sdr_min}, sdr_max_luminance = ${sdr_max}"
+[[ "$mirror" != "none" && -n "$mirror" ]] && rule+=", mirror = \"$escaped_mirror\""
+rule+=" }) -- quickshell-astra-output:$output"
+
+config_dir="$(dirname -- "$monitor_file")"
+temp="$(mktemp "$config_dir/.astra-monitors.XXXXXX")"
+trap 'rm -f -- "${temp:-}"' EXIT
+
+begin_count="$(grep -Fxc -- "$begin" "$monitor_file" || true)"
+end_count="$(grep -Fxc -- "$end" "$monitor_file" || true)"
+if (( begin_count != end_count || begin_count > 1 )); then
+  echo "refusing malformed Astra Display scale block in $monitor_file" >&2
+  exit 78
+fi
+
+awk -v begin="$begin" -v end="$end" -v output="$output" -v rule="$rule" '
+  $0 == begin { managed=1; print; next }
+  $0 == end {
+    if (!replaced) print rule
+    managed=0; found=1; print; next
+  }
+  managed && index($0, "-- quickshell-astra-output:" output) { if (!replaced) print rule; replaced=1; next }
+  { print }
+  END {
+    if (!found) {
+      print ""
+      print begin
+      print rule
+      print end
+    }
+  }
+' "$monitor_file" >"$temp"
+
+if command -v lua >/dev/null; then lua -e "assert(loadfile('$temp'))"; fi
+backup="$monitor_file.quickshell-astra-before-display-scale.bak"
+[[ -e "$backup" ]] || install -m 600 "$monitor_file" "$backup"
+install -m "$(stat -c '%a' "$monitor_file")" "$temp" "$monitor_file"
+rm -f -- "$temp"
+trap - EXIT
+
+hyprctl reload >/dev/null || { echo "Hyprland reload failed after writing $monitor_file" >&2; exit 70; }
+config_errors="$(hyprctl configerrors)" || { echo "Could not query Hyprland config errors" >&2; exit 70; }
+[[ -z "${config_errors//[[:space:]]/}" ]] || {
+  echo "Hyprland reported configuration errors after scale update" >&2; exit 78;
+}
+
+actual="$(hyprctl monitors -j | jq -er --arg output "$output" '.[] | select(.name == $output) | .scale')"
+awk -v actual="$actual" -v expected="$clean_scale" 'BEGIN { exit !((actual-expected < .011) && (expected-actual < .011)) }' || {
+  echo "scale confirmation failed for $output: expected $clean_scale, got $actual" >&2; exit 70;
+}
+printf '{"output":"%s","scale":%s}\n' "$output" "$actual"

@@ -102,9 +102,17 @@ Item {
         return "Red"
     }
     property string mono: "JetBrainsMono Nerd Font"
-    readonly property int menuRowHeight: 42
+    // System typography setting mirrored from Omarchy's live Style singleton.
+    // DisplayService applies supported stops; glyph/icon sizes remain independent.
+    readonly property var display: displayService
+    readonly property int uiTextSize: displayService.textSize
+    readonly property real uiTextScale: uiTextSize / displayService.defaultTextSize
+    function uiFontSize(basePixels) {
+        return Math.max(8, Math.round(Number(basePixels) * uiTextScale))
+    }
+    readonly property int menuRowHeight: Math.max(42, uiFontSize(18) + 24)
     readonly property int menuRowSpacing: 3
-    readonly property int menuFontSize: 18
+    readonly property int menuFontSize: uiFontSize(18)
     readonly property int menuFontWeight: Font.DemiBold
     readonly property int menuRowRadius: 6
 
@@ -151,7 +159,7 @@ Item {
     property var barLayoutControllers: ({})
     property bool _barLayoutSyncing: false
 
-    readonly property bool anyPopupVisible: menuVisible || themeSwitcherVisible || wallpaperSwitcherVisible || clipboardVisible || emojiPickerVisible || captureVisible || calendarVisible || cpuVisible || aiUsageVisible
+    readonly property bool anyPopupVisible: menuVisible || themeSwitcherVisible || wallpaperSwitcherVisible || clipboardVisible || emojiPickerVisible || captureVisible || calendarVisible || cpuVisible || aiUsageVisible || displayVisible
         || memVisible || volVisible || controlVisible || networkVisible || bluetoothVisible
         || batteryVisible || mprisVisible || tailscaleVisible
         || workspaceVisible || imagePickerVisible || mediaBrowserVisible || notifVisible
@@ -327,6 +335,7 @@ Item {
         else if (name === "launcher") launcherBarX = x
         else if (name === "shellUpdate") shellUpdateBarX = x
         else if (name === "tailscale") tailscaleBarX = x
+        else if (name === "display") displayBarX = x
         else if (name === "trayMenu") trayMenuX = x
     }
 
@@ -392,6 +401,7 @@ Item {
         if (except !== "trayVisible") trayVisible = false
         if (except !== "trayMenuVisible") trayMenuVisible = false
         if (except !== "tailscaleVisible") tailscaleVisible = false
+        if (except !== "displayVisible") displayVisible = false
         hideTooltip()
         _closingPopups = false
     }
@@ -399,6 +409,15 @@ Item {
     function popupOpened(prop) {
         if (!_closingPopups && theme[prop]) closePopups(prop)
     }
+
+    property bool displayVisible: false
+    property real displayBarX: 0
+    onDisplayVisibleChanged: {
+        popupOpened("displayVisible")
+        displayService.panelVisible = displayVisible
+    }
+
+    DisplayService { id: displayService }
 
     function openImagePicker(mode) {
         activateFocusedPopupScreen()
@@ -940,6 +959,7 @@ Item {
     property bool modCpu:        true
     property bool modVolume:     true
     property bool modNetwork:    true
+    property bool modDisplay:    true
     readonly property string networkMode: networkService.connectionType
     readonly property real networkDlRate: networkService.receiveRateBytes
     readonly property real networkUlRate: networkService.transmitRateBytes
@@ -1128,6 +1148,10 @@ Item {
     onModPowerChanged:      if (_widgetsLoaded) saveWidgets()
     onModBluetoothChanged:  if (_widgetsLoaded) saveWidgets()
     onModNetworkChanged:    if (_widgetsLoaded) saveWidgets()
+    onModDisplayChanged: {
+        if (!modDisplay) displayVisible = false
+        if (_widgetsLoaded) saveWidgets()
+    }
     onModStatusChanged:     if (_widgetsLoaded) saveWidgets()
     onModNotificationsChanged: {
         if (!modNotifications) notifVisible = false
@@ -1204,7 +1228,8 @@ Item {
                  + (modNotifications ? "1" : "0") + " "   // +32 notification bell
                  + (volumeManual ? "1" : "0") + " "       // +33 volume manual override
                  + (aiUsageManual ? "1" : "0") + " "      // +34 AI manual override
-                 + (modTailscale ? "1" : "0")              // +35 optional Tailscale widget
+                 + (modTailscale ? "1" : "0") + " "        // +35 optional Tailscale widget
+                 + (modDisplay ? "1" : "0")                 // +36 Display widget (default ON)
         widgetSaveProc.command = ["bash", "-c",
             "echo '" + line + "' > '" + widgetsCachePath + "'"]
         widgetSaveProc.running = false
@@ -1407,6 +1432,7 @@ Item {
                     if (parts.length > wsField + 33) theme.volumeManual = parts[wsField + 33] === "1"
                     if (parts.length > wsField + 34) theme.aiUsageManual = parts[wsField + 34] === "1"
                     if (parts.length > wsField + 35) theme.modTailscale = parts[wsField + 35] === "1"
+                    if (parts.length > wsField + 36) theme.modDisplay = parts[wsField + 36] !== "0"
                 }
                 theme._widgetsLoaded = true
             }

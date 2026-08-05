@@ -154,7 +154,7 @@ Item {
                     ? Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.85)
                     : Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.4)
                 font.family: root.mono
-                font.pixelSize: 12
+                font.pixelSize: root.uiFontSize(12)
                 x: 0
                 Behavior on color { ColorAnimation { duration: 200 } }
                 onTextChanged: marqueeClip.resetMarquee()
